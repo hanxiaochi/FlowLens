@@ -6,7 +6,7 @@
 
 ## 先看一遍怎么用
 
-[![FlowLens 1.0 中文操作简介，点击观看](docs/images/video-cover.jpg)](https://github.com/hanxiaochi/FlowLens/releases/download/v1.0.0/FlowLens-1.0-guide.zh-CN.mp4)
+https://github.com/user-attachments/assets/28391070-49bd-4f0b-bb1a-9981a34142cb
 
 **3 分 36 秒，中文旁白与字幕。** 从提交五天请假开始，看看审批规则、数据变化和 3D 部署怎样连起来，最后导出给开发的资料。
 

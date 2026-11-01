@@ -6,7 +6,7 @@
 
 ## Watch the walkthrough
 
-[![FlowLens 1.0 — English walkthrough](docs/images/video-cover-en.jpg)](https://github.com/hanxiaochi/FlowLens/releases/download/v1.0.0/FlowLens-1.0-guide.en.mp4)
+https://github.com/user-attachments/assets/16c04fa8-d317-42ba-b5b7-97d5c65ea38b
 
 **English narration and subtitles, 3 minutes 55 seconds.** Follow a five-day leave request through approvals, data changes, system diagrams, and a 3D deployment scene, then export the design for development.
 
