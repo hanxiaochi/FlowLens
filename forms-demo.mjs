@@ -21,3 +21,25 @@ export function demoWorkspace(){
  record=applyOperation(record,{type:'save',role:'填报人',values:{company:'示范施工单位',contract:'演示合同段 01',location:'示范工点 A',date:'2026-11-02',issues:'请体验提交、退回修改及签收；不代表真实工程情况。'},note:'已准备好一份草稿，点击提交即可开始体验。'});
  const workspace=emptyWorkspace();workspace.templates=[template];workspace.cases=[record];return validateWorkspace(workspace);
 }
+
+export function rectificationWorkspace(){
+ const fields=[
+ {id:'instruction',label:'指令编号',owner:'draft',required:true},
+ {id:'location',label:'检查部位',owner:'draft',required:true},
+ {id:'issue',label:'问题及整改要求',owner:'draft',required:true},
+ {id:'deadline',label:'整改期限',owner:'draft',type:'date',required:true},
+ {id:'quantity',label:'涉及数量',owner:'draft',type:'number',min:0,unit:'处'},
+ {id:'response',label:'整改措施及完成情况',owner:'reply',required:true},
+ {id:'completed-date',label:'完成日期',owner:'reply',type:'date',required:true},
+ {id:'evidence',label:'附件及现场证据说明',owner:'reply',required:true},
+ {id:'conclusion',label:'复查结论',owner:'recheck',type:'select',options:['符合要求','补充资料后复查'],required:true},
+ {id:'review-note',label:'复查意见',owner:'recheck',required:true},
+ {id:'received',label:'归档资料已核对',owner:'receipt',type:'boolean',required:true},
+ {id:'archive-code',label:'归档编号',owner:'receipt',required:true}
+ ].map(f=>({type:'text',confirmation:'pending',evidence:'原创教学样例 / '+f.id,...f}));
+ const cell=(id,text)=>({id,text,colspan:1,rowspan:1,blocks:[{id:id+'-p',type:'paragraph',text}]});
+ const template={id:'demo-rectification-v1',version:1,code:'DEMO-002',title:'监理指令、整改回复与复查单（虚构样例）',source:'FlowLens 原创教学样例',warnings:['仅展示一份业务载体贯穿多个阶段，不是规范用表。结论选项不会自动批准；办理人需决定继续或退回。所有规则需业务负责人确认。'],fields,workflow:[{id:'reply',label:'整改回复',role:'施工单位',kind:'review'},{id:'recheck',label:'监理复查',role:'专业监理',kind:'review',returnTo:'reply'},{id:'receipt',label:'资料归档',role:'资料员',kind:'receipt'}],blocks:[{id:'rect-title',type:'paragraph',text:'监理指令 → 整改回复 → 复查（可退回整改）→ 归档'},{id:'rect-table',type:'table',grid:[1800,6000],rows:fields.map(f=>[cell(f.id+'-label',f.label),cell(f.id,'')])}]};
+ let record=createCase(template,{title:'先试这份：现场整改闭环',project:'青禾示范项目 · 虚构',role:'专业监理'});
+ record=applyOperation(record,{type:'save',role:'专业监理',values:{instruction:'DEMO-ZG-001',location:'示范工点 A',issue:'现场资料缺项，请补充说明并提交复查。',deadline:'2026-11-09',quantity:'2'},note:'虚构演示，可体验退回整改和再次复查。'});
+ const w=emptyWorkspace();w.templates=[template];w.cases=[record];return validateWorkspace(w);
+}

@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test engine.test.mjs model.test.mjs layout.test.mjs diagrams.test.mjs narration.test.mjs data.test.mjs export.test.mjs deployment.test.mjs image-input.test.mjs generation.test.mjs migration.test.mjs forms.test.mjs demo.test.mjs",
+    "test": "node --test engine.test.mjs model.test.mjs layout.test.mjs diagrams.test.mjs narration.test.mjs data.test.mjs export.test.mjs deployment.test.mjs image-input.test.mjs generation.test.mjs migration.test.mjs forms.test.mjs demo.test.mjs forms-delivery.test.mjs",
     "build:demo": "node scripts/build-demo.mjs"
   },
   "dependencies": {
@@ -13,9 +13,10 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.13",
-    "@xmldom/xmldom": "^0.9.12"
+    "@xmldom/xmldom": "^0.9.12",
+    "fake-indexeddb": "^6.2.7"
   },
-  "version": "1.1.0",
+  "version": "1.2.0",
   "engines": {
     "node": ">=22"
   },

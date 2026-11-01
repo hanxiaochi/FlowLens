@@ -1,16 +1,20 @@
 # FlowLens
 
-**简体中文** · [English](README.en.md) · [v1.1.0 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.1.0)
+**简体中文** · [English](README.en.md) · [v1.2.0 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.2.0)
 
 **[直接打开在线 Demo →](https://hanxiaochi.github.io/FlowLens/)**
 
-不用安装，也不用填 API Key。先试一份虚构的工程检查表，或切到交互实验室体验审批与 3D 部署。公开版关闭 AI 生成，填写内容保存在自己的浏览器里。[演示版说明](docs/public-demo.md)
+不用安装，也不用填 API Key。先试一份虚构的监理整改表，或切到交互实验室体验审批与 3D 部署。公开版关闭 AI 生成，填写内容保存在自己的浏览器里。[演示版说明](docs/public-demo.md)
 
 **把现成的 Word 业务表格，变成能填写、能流转、能讲清楚的系统样例。**
 
 ![虚构工程表单进入监理审核](docs/images/forms-demo.png)
 
-先试一份表：点击提交 → 切换专业监理 → 填写监理意见 → 审核 → 切换资料员签收。想看按钮背后的请求与数据，再打开交互实验室。
+先试一份表：专业监理发出指令 → 施工单位回复 → 监理复查，必要时退回整改 → 资料员归档。再点“系统设计”和“开发交付”，看到的仍是这份表，不会跳到另一套员工示例。
+
+**1.2 新增：** 有类型的字段、可配置退回阶段、保存冲突保护，以及包含接口、SQL 和本地验证器的交付包。[完整说明与验收](docs/release-1.2.0.md)
+
+![同一份整改业务的系统定义](docs/images/business-definition-1.2.jpg)
 
 [反馈卡住的步骤](https://github.com/hanxiaochi/FlowLens/issues/new?template=trial-feedback.yml) · [分享介绍与试用计划](docs/launch-kit.md)
 

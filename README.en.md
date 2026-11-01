@@ -1,10 +1,10 @@
 # FlowLens
 
-[简体中文](README.md) · **English** · [v1.1.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.1.0)
+[简体中文](README.md) · **English** · [v1.2.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.2.0)
 
 **[Try the live demo →](https://hanxiaochi.github.io/FlowLens/)**
 
-No installation or API key needed. Start with a fictional inspection form, or explore approvals and 3D deployment in the interaction lab. AI generation is disabled in the public demo; your edits stay in your browser. The demo interface is currently in Chinese.
+No installation or API key needed. Start with a fictional instruction and rectification form, or explore approvals and 3D deployment in the interaction lab. AI generation is disabled in the public demo; your edits stay in your browser. The demo interface is currently in Chinese.
 
 **Click a button. See where the request goes and what changes in the data.**
 
@@ -15,6 +15,12 @@ No installation or API key needed. Start with a fictional inspection form, or ex
 [Share trial feedback](https://github.com/hanxiaochi/FlowLens/issues/new?template=trial-feedback.yml) · [Launch notes and English post](docs/launch-kit.md)
 
 [Product audit and proposed next steps (Chinese)](docs/fde-product-audit-2026-11-02.md) · [Discovery and acceptance worksheet (Chinese)](docs/fde-discovery-worksheet.md)
+
+**New in 1.2:** The selected form now drives the system view, typed data schema, API draft and handoff ZIP. Reviewers can return a record to a specific earlier stage. Failed saves keep the committed state unchanged, and stale browser tabs cannot overwrite newer work. The ZIP includes a dependency-free Node.js rule verifier. This is still a local simulation, not a multiuser backend.
+
+![One business definition across the handoff](docs/images/business-definition-1.2.jpg)
+
+[1.2 release notes and acceptance (Chinese)](docs/release-1.2.0.md)
 
 ## Watch the walkthrough
 
