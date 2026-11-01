@@ -1,0 +1,20 @@
+{
+  "name": "flowlens",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test engine.test.mjs model.test.mjs layout.test.mjs diagrams.test.mjs narration.test.mjs data.test.mjs export.test.mjs deployment.test.mjs image-input.test.mjs generation.test.mjs migration.test.mjs"
+  },
+  "dependencies": {
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.13"
+  },
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "description": "把产品想法变成可以操作、可以解释的系统原型。"
+}
