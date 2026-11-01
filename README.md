@@ -1,12 +1,18 @@
 # FlowLens
 
-**简体中文** · [English](README.en.md)
+**简体中文** · [English](README.en.md) · [v1.1.0 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.1.0)
 
 **[直接打开在线 Demo →](https://hanxiaochi.github.io/FlowLens/)**
 
 不用安装，也不用填 API Key。先试一份虚构的工程检查表，或切到交互实验室体验审批与 3D 部署。公开版关闭 AI 生成，填写内容保存在自己的浏览器里。[演示版说明](docs/public-demo.md)
 
-**点一下按钮，看看请求怎么走，数据又是怎么变的。**
+**把现成的 Word 业务表格，变成能填写、能流转、能讲清楚的系统样例。**
+
+![虚构工程表单进入监理审核](docs/images/forms-demo.png)
+
+先试一份表：点击提交 → 切换专业监理 → 填写监理意见 → 审核 → 切换资料员签收。想看按钮背后的请求与数据，再打开交互实验室。
+
+[反馈卡住的步骤](https://github.com/hanxiaochi/FlowLens/issues/new?template=trial-feedback.yml) · [分享介绍与试用计划](docs/launch-kit.md)
 
 ## 先看一遍怎么用
 

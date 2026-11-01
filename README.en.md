@@ -1,12 +1,18 @@
 # FlowLens
 
-[简体中文](README.md) · **English**
+[简体中文](README.md) · **English** · [v1.1.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.1.0)
 
 **[Try the live demo →](https://hanxiaochi.github.io/FlowLens/)**
 
 No installation or API key needed. Start with a fictional inspection form, or explore approvals and 3D deployment in the interaction lab. AI generation is disabled in the public demo; your edits stay in your browser. The demo interface is currently in Chinese.
 
 **Click a button. See where the request goes and what changes in the data.**
+
+**Turn existing Word forms into a workflow you can fill in, run, and discuss.**
+
+![Fictional inspection form under review](docs/images/forms-demo.png)
+
+[Share trial feedback](https://github.com/hanxiaochi/FlowLens/issues/new?template=trial-feedback.yml) · [Launch notes and English post](docs/launch-kit.md)
 
 ## Watch the walkthrough
 
