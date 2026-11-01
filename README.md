@@ -10,6 +10,14 @@
 
 ![实际生成的商品页面与操作后的数据变化](docs/images/prototype.png)
 
+## 先看一遍怎么用
+
+[![FlowLens 1.0 中文操作简介，点击观看](docs/images/video-cover.jpg)](https://github.com/hanxiaochi/FlowLens/releases/download/v1.0.0/FlowLens-1.0-guide.zh-CN.mp4)
+
+**3 分 36 秒，中文旁白与字幕。** 从提交五天请假开始，看看审批规则、数据变化和 3D 部署怎样连起来，最后导出给开发的资料。
+
+[观看 / 下载完整视频](https://github.com/hanxiaochi/FlowLens/releases/download/v1.0.0/FlowLens-1.0-guide.zh-CN.mp4) · [章节与文字稿](docs/video-guide.md) · [下载字幕](https://github.com/hanxiaochi/FlowLens/releases/download/v1.0.0/FlowLens-1.0-guide.zh-CN.srt)
+
 ## 先玩起来
 
 没有 API Key 也没关系。内置了「团队与审批」「商品目录」「服务工单」三个例子，离线就能体验页面操作、流程推演和 3D 部署演示。
