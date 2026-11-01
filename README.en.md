@@ -14,6 +14,8 @@ No installation or API key needed. Start with a fictional inspection form, or ex
 
 [Share trial feedback](https://github.com/hanxiaochi/FlowLens/issues/new?template=trial-feedback.yml) · [Launch notes and English post](docs/launch-kit.md)
 
+[Product audit and proposed next steps (Chinese)](docs/fde-product-audit-2026-11-02.md) · [Discovery and acceptance worksheet (Chinese)](docs/fde-discovery-worksheet.md)
+
 ## Watch the walkthrough
 
 This video covers the 1.0 prototype and system simulation. The new business forms workspace is described below.

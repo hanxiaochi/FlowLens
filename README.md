@@ -14,6 +14,8 @@
 
 [反馈卡住的步骤](https://github.com/hanxiaochi/FlowLens/issues/new?template=trial-feedback.yml) · [分享介绍与试用计划](docs/launch-kit.md)
 
+[需求研究与下一阶段缺口](docs/fde-product-audit-2026-11-02.md) · [业务访谈与交付验收工作单](docs/fde-discovery-worksheet.md)
+
 ## 先看一遍怎么用
 
 下面的视频介绍 1.0 的原型与系统推演；新增的业务表单入口见下方说明。
