@@ -2,6 +2,10 @@
 
 [简体中文](README.md) · **English**
 
+**[Try the live demo →](https://hanxiaochi.github.io/FlowLens/)**
+
+No installation or API key needed. Start with a fictional inspection form, or explore approvals and 3D deployment in the interaction lab. AI generation is disabled in the public demo; your edits stay in your browser. The demo interface is currently in Chinese.
+
 **Click a button. See where the request goes and what changes in the data.**
 
 ## Watch the walkthrough

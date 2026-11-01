@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test engine.test.mjs model.test.mjs layout.test.mjs diagrams.test.mjs narration.test.mjs data.test.mjs export.test.mjs deployment.test.mjs image-input.test.mjs generation.test.mjs migration.test.mjs forms.test.mjs"
+    "test": "node --test engine.test.mjs model.test.mjs layout.test.mjs diagrams.test.mjs narration.test.mjs data.test.mjs export.test.mjs deployment.test.mjs image-input.test.mjs generation.test.mjs migration.test.mjs forms.test.mjs demo.test.mjs",
+    "build:demo": "node scripts/build-demo.mjs"
   },
   "dependencies": {
     "fflate": "^0.8.3",

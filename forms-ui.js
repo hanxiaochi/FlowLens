@@ -120,6 +120,6 @@ export async function mountForms(root){
   workspace.templates.push(...imported);kind='templates';selected=imported[0]?.id??selected;await persist();draw();say(reports.join('；')+'。请核对模板结构，确认填写区与流程。');upload.value='';
  });
  packInput.onchange=wrap(async()=>{if(!clean()){packInput.value='';return;}const file=packInput.files[0];if(!file)return;if(file.size>100*1024*1024)throw Error('工作包不能超过 100 MB');const next=validateWorkspace(JSON.parse(await file.text()));const d=modal('恢复业务工作包');d.append(el('p',`将载入 ${next.templates.length} 份模板、${next.cases.length} 份业务。替换前会自动下载当前工作包作为备份。`),button('备份当前并恢复',wrap(async()=>{download('FlowLens-恢复前备份.json',JSON.stringify(workspace));await saveTail.catch(()=>{});await saveWorkspace(next);workspace=next;selected=null;draw();d.close();say('工作包已恢复。');}),'primary'));packInput.value='';});
- try{workspace=await loadWorkspace();ready=true;say('业务工作区已就绪。数据保存在当前浏览器，可导出工作包备份；Word 导入不调用模型。');}catch(e){say('本地存档读取失败，未覆盖原存档：'+e.message,true);importBtn.disabled=true;}
+ try{workspace=await loadWorkspace();if(document.querySelector('meta[name="flowlens-demo"]')){if(!workspace.templates.length&&!workspace.cases.length){const {demoWorkspace}=await import('./forms-demo.mjs');workspace=demoWorkspace();await persist();}kind='cases';selected=workspace.cases[0]?.id??null;role=workspace.cases[0]?.submitter??'填报人';}ready=true;say('业务工作区已就绪。数据保存在当前浏览器，可导出工作包备份；Word 导入不调用模型。');}catch(e){say('本地存档读取失败，未覆盖原存档：'+e.message,true);importBtn.disabled=true;}
  draw();
 }

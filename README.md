@@ -2,6 +2,10 @@
 
 **简体中文** · [English](README.en.md)
 
+**[直接打开在线 Demo →](https://hanxiaochi.github.io/FlowLens/)**
+
+不用安装，也不用填 API Key。先试一份虚构的工程检查表，或切到交互实验室体验审批与 3D 部署。公开版关闭 AI 生成，填写内容保存在自己的浏览器里。[演示版说明](docs/public-demo.md)
+
 **点一下按钮，看看请求怎么走，数据又是怎么变的。**
 
 ## 先看一遍怎么用
