@@ -60,9 +60,9 @@ export function createServer({generationTimeoutMs=120000}={}){
  model.source='AI 草案';model.assumptions=model.assumptions.map(a=>({...a,status:'pending'}));return send(res,200,{model});
  }return send(res,404,{error:'接口不存在'});
  }
- const local=pathname==='/'?'studio.html':pathname.startsWith('/vendor/')?'node_modules/three/'+pathname.slice(8):pathname.slice(1);
+ const local=pathname==='/forms-vendor/fflate.js'?'node_modules/fflate/esm/browser.js':pathname==='/'?'studio.html':pathname.startsWith('/vendor/')?'node_modules/three/'+pathname.slice(8):pathname.slice(1);
  const file=resolve(root,local);if(!file.startsWith(root.endsWith(sep)?root:root+sep))return send(res,403,{error:'禁止访问'});
- const allowed=['image-input.mjs','studio.html','studio.js','studio.css','model.mjs','examples.mjs','scene.js','graph.js','export.mjs','deployment.mjs','layout.mjs','layout-ui.js','impact.mjs','layout.css','diagrams.mjs','diagrams-ui.js'];if(!allowed.includes(local)&&!local.startsWith('node_modules/three/build/')&&!local.startsWith('node_modules/three/examples/jsm/'))return send(res,404,{error:'不存在'});
+ const allowed=['node_modules/fflate/esm/browser.js','forms.css','forms-print.mjs','forms-ui.js','forms-docx.mjs','forms-model.mjs','forms-store.mjs','image-input.mjs','studio.html','studio.js','studio.css','model.mjs','examples.mjs','scene.js','graph.js','export.mjs','deployment.mjs','layout.mjs','layout-ui.js','impact.mjs','layout.css','diagrams.mjs','diagrams-ui.js'];if(!allowed.includes(local)&&!local.startsWith('node_modules/three/build/')&&!local.startsWith('node_modules/three/examples/jsm/'))return send(res,404,{error:'不存在'});
  try{const data=await readFile(file);res.writeHead(200,{'Content-Type':extname(file)==='.html'?'text/html; charset=utf-8':extname(file)==='.css'?'text/css':'text/javascript','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'});res.end(data);}catch{return send(res,404,{error:'文件不存在'});}
  }catch(e){send(res,400,{error:e.message});}});
 }

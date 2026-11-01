@@ -6,6 +6,8 @@
 
 ## Watch the walkthrough
 
+This video covers the 1.0 prototype and system simulation. The new business forms workspace is described below.
+
 https://github.com/user-attachments/assets/16c04fa8-d317-42ba-b5b7-97d5c65ea38b
 
 **English narration and subtitles, 3 minutes 55 seconds.** Follow a five-day leave request through approvals, data changes, system diagrams, and a 3D deployment scene, then export the design for development.
@@ -15,6 +17,14 @@ https://github.com/user-attachments/assets/16c04fa8-d317-42ba-b5b7-97d5c65ea38b
 The recording uses the current Chinese interface, with English chapter titles, narration, and subtitles. It runs a built-in example; no paid model calls are made during the walkthrough.
 
 ## Why this exists
+
+### Start with the forms you already use
+
+Import DOCX files, configure fields in their original table structure, and pass the same record through review, return, revision, issue, receipt, and archive. Attachments, linked records, template snapshots, and step history stay with the record. Export a workspace package or a standalone printable HTML file.
+
+Local acceptance checks imported 340 templates from four supervision document collections and exercised a complex inspection form. Extracted fields and workflow drafts still need business review. This is a local simulation stored in your browser, without authenticated multiuser access, electronic signatures, or production services.
+
+[Usage guide (Chinese)](docs/forms-guide.md) · [Product goals (Chinese)](docs/forms-roadmap.md) · [Acceptance notes (Chinese)](docs/forms-acceptance.md)
 
 You have an idea for a product, but explaining it to a developer is hard. You draw the screens, then realize the permissions, workflow, and database still need to be figured out. That is where FlowLens started.
 
