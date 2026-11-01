@@ -1,5 +1,7 @@
 # FlowLens 1.0 操作简介
 
+**简体中文** · [English](video-guide.en.md)
+
 [观看 / 下载视频（MP4）](https://github.com/hanxiaochi/FlowLens/releases/download/v1.0.0/FlowLens-1.0-guide.zh-CN.mp4) · [字幕（SRT）](https://github.com/hanxiaochi/FlowLens/releases/download/v1.0.0/FlowLens-1.0-guide.zh-CN.srt)
 
 时长约 3 分 36 秒，1920 × 1080。视频来自实际操作录制，配中文合成旁白和字幕。
