@@ -1,0 +1,125 @@
+import {unzipSync} from './forms-vendor/fflate.js';
+import {extractDocumentXML,parseWordXML,formCells} from './forms-docx.mjs';
+import {uid,createCase,canEdit,applyOperation,attachFile,validateWorkflow} from './forms-model.mjs';
+import {emptyWorkspace,loadWorkspace,saveWorkspace,validateWorkspace} from './forms-store.mjs';
+import {printableForm} from './forms-print.mjs';
+
+const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
+const button=(text,fn,cls)=>{const b=el('button',text,cls);b.type='button';b.onclick=fn;return b;};
+const select=(items,value)=>{const s=el('select');for(const [v,t] of items){const o=el('option',t);o.value=v;s.append(o);}s.value=value;return s;};
+const label=(name,input)=>{const l=el('label',name);l.append(input);return l;};
+const download=(name,data,type='application/json')=>{const a=el('a');const u=URL.createObjectURL(new Blob([data],{type}));a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),10000);};
+const readData=file=>new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(Error('附件读取失败'));r.readAsDataURL(file);});
+const kinds={review:'审核',issue:'签发',receipt:'签收'};
+
+export async function mountForms(root){
+ let workspace=emptyWorkspace(),selected=null,kind='templates',query='',role='填报人',busy=false,saveTail=Promise.resolve(),ready=false;
+ const notice=el('p','正在恢复业务工作区…','forms-notice');notice.setAttribute('role','status');
+ const top=el('div',undefined,'forms-intro');const intro=el('div');intro.append(el('span','PAPERWORK, IN MOTION','eyebrow'),el('h2','让熟悉的表格，开始协同工作。'),el('p','导入 Word，沿用原表填写，把同一份业务文件交给下一位办理人。'));
+ const actions=el('div',undefined,'forms-toolbar');const upload=el('input');upload.type='file';upload.accept='.docx';upload.multiple=true;upload.hidden=true;upload.id='forms-word-upload';
+ const packInput=el('input');packInput.type='file';packInput.accept='.json';packInput.hidden=true;
+ const importBtn=button('＋ 导入 Word 表格',()=>upload.click(),'primary');
+ actions.append(importBtn,button('导出业务工作包',()=>{if(clean())download('FlowLens-业务工作包.json',JSON.stringify(workspace));}),button('恢复工作包',()=>packInput.click()),upload,packInput);top.append(intro,actions);
+ const metrics=el('div',undefined,'forms-metrics');const grid=el('div',undefined,'forms-workspace');const library=el('aside',undefined,'forms-library');const center=el('article',undefined,'forms-center');const inspector=el('aside',undefined,'forms-inspector');grid.append(library,center,inspector);
+ root.append(top,metrics,notice,grid);
+ function say(message,error=false){notice.textContent=message;notice.classList.toggle('error',error);}
+ async function persist(){const snapshot=structuredClone(workspace);saveTail=saveTail.catch(()=>{}).then(()=>saveWorkspace(snapshot));try{await saveTail;}catch(e){say('本地保存失败，请立即导出业务工作包：'+e.message,true);throw e;}}
+ function selectedItem(){return workspace[kind].find(x=>x.id===selected);}
+ function template(){const item=selectedItem();return kind==='cases'?item?.template:item;}
+ function clean(){const item=selectedItem();if(kind!=='cases'||!item)return true;const dirty=Object.entries(values()).some(([k,v])=>v!==(item.values[k]??''));if(dirty)say('当前表单有未保存内容，请先保存填写或提交，再切换记录、导入或打印。',true);return !dirty;}
+ window.addEventListener('beforeunload',e=>{if(!clean()){e.preventDefault();e.returnValue='';}});
+ function wrap(fn){return async()=>{if(!ready||busy)return;try{busy=true;await fn();}catch(e){say(e.message,true);}finally{busy=false;}};}
+ function draw(){
+  metrics.replaceChildren(...[[workspace.templates.length,'份模板'],[workspace.cases.length,'份业务'],[workspace.cases.filter(c=>c.status==='active').length,'项办理中'],[workspace.cases.filter(c=>c.status==='complete').length,'项已归档']].map(([n,t])=>{const x=el('div');x.append(el('strong',String(n)),el('span',t));return x;}));
+  renderLibrary();renderCenter();renderInspector();
+ }
+ function renderLibrary(){
+  library.replaceChildren();const tabs=el('div',undefined,'forms-library-tabs');for(const [key,name] of [['templates','模板库'],['cases','业务台账']])tabs.append(button(name,()=>{if(!clean())return;kind=key;selected=null;draw();},kind===key?'selected':''));
+  const search=el('input');search.placeholder='搜索表号、名称、项目';search.value=query;search.setAttribute('aria-label','搜索业务表单');search.oninput=()=>{query=search.value;renderList();};
+  const list=el('div',undefined,'forms-list');library.append(tabs,search,list);
+  function renderList(){list.replaceChildren();const items=workspace[kind].filter(t=>`${t.code??t.template.code} ${t.title} ${t.project??''} ${t.source??''}`.toLowerCase().includes(query.toLowerCase()));for(const item of items){const b=button('',()=>{if(!clean())return;selected=item.id;draw();},'forms-list-item'+(item.id===selected?' selected':''));b.append(el('small',kind==='templates'?(item.code||'自定义文档'):(item.status==='complete'?'已归档':item.status==='draft'?'填报中':item.template.workflow[item.step].label)),el('strong',item.title),el('span',kind==='templates'?item.source:(item.project||'未填写项目')));list.append(b);}if(!items.length)list.append(el('p',query?'没有匹配记录':'从一份真实的 Word 开始。','forms-empty'));}renderList();
+ }
+ function renderBlocks(blocks,parent,t,record){
+  for(const b of blocks){
+   if(b.type==='paragraph'){
+    const p=el('div',b.text,'forms-paragraph');if(['center','right'].includes(b.align))p.style.textAlign=b.align;if(b.bold)p.classList.add('bold');
+    if(kind==='templates'&&b.text.trim())p.append(button('＋ 填写区',()=>editField(b.id,b.text.slice(0,20)),'forms-map-paragraph'));
+    addInput(p,b.id,t,record);parent.append(p);continue;
+   }
+   const table=el('table',undefined,'forms-table');const colgroup=el('colgroup');const total=b.grid.reduce((a,v)=>a+Number(v),0);for(const width of b.grid){const col=el('col');if(total)col.style.width=`${Number(width)/total*100}%`;colgroup.append(col);}table.append(colgroup);const tbody=el('tbody');
+   for(const row of b.rows){const tr=el('tr');for(const c of row){const td=el('td');td.colSpan=c.colspan;td.rowSpan=c.rowspan;td.dataset.cell=c.id;if(c.spacer){tr.append(td);continue;}
+     // Paragraph controls are only offered at document level, not duplicated inside cells.
+     for(const cb of c.blocks){if(cb.type==='paragraph')td.append(el('div',cb.text,'forms-cell-text'));else renderBlocks([cb],td,t,record);}
+     if(kind==='templates'){td.tabIndex=0;td.classList.add('forms-mappable');td.setAttribute('aria-label',`配置填写区 ${c.text.trim().slice(0,30)||c.id}`);td.onclick=e=>{if(e.target.closest('table')===table)editField(c.id,c.text.trim().slice(0,24)||'填写内容');};td.onkeydown=e=>{if(e.target===td&&e.key==='Enter')editField(c.id,c.text.trim().slice(0,24)||'填写内容');};}
+     addInput(td,c.id,t,record);tr.append(td);
+    }tbody.append(tr);}table.append(tbody);parent.append(table);
+  }
+ }
+ function addInput(parent,id,t,record){
+  const f=t.fields.find(x=>x.id===id);if(!f)return;const owner=f.owner==='draft'?'填报人':t.workflow.find(s=>s.id===f.owner)?.role;
+  if(!record){parent.append(el('span',`${f.label}${f.required?' *':''} · ${owner}`,'forms-field-hint'));return;}
+  const input=el('textarea');input.rows=2;input.value=record.values[id]??'';input.dataset.field=id;input.setAttribute('aria-label',f.label);input.placeholder=f.label+(f.required?' *':'');input.readOnly=!canEdit(record,f,role);input.className='forms-value';
+  const print=el('div',input.value,'forms-print-value');parent.append(input,print);
+ }
+ function renderCenter(){
+  center.replaceChildren();const item=selectedItem(),t=template();if(!item){center.append(el('div','一套真实业务表格，就是系统的起点。','forms-empty-title'),el('p','支持多份 DOCX 批量导入，按监理表号整理模板。复杂表头、合并单元格和附表保留在一起。'),el('p','先核对导入结构，再确认填写区和办理流程。原件不会被修改，导入不调用 AI。'));return;}
+  const header=el('div',undefined,'forms-document-head');header.append(el('span',t.code||'WORD DOCUMENT','eyebrow'),el('h3',item.title),el('p',kind==='templates'?`${t.source} · 模板版本 ${t.version} · ${t.fields.length} 个候选填写区`:`${item.project||'未指定项目'} · 修订 ${item.revision} · ${item.status==='complete'?'已归档':item.status==='draft'?'填报中':t.workflow[item.step].label}`));
+  center.append(header);if(t.warnings?.length){const details=el('details');details.append(el('summary',`导入注意事项（${t.warnings.length}）`));for(const w of t.warnings)details.append(el('p',w));center.append(details);}
+  const paper=el('div',undefined,'forms-paper');renderBlocks(t.blocks,paper,t,kind==='cases'?item:null);center.append(paper);
+ }
+ function modal(title){const d=el('dialog',undefined,'forms-dialog');const head=el('div',undefined,'dialog-head');head.append(el('h2',title),button('关闭',()=>d.close()));d.append(head);document.body.append(d);d.addEventListener('close',()=>d.remove());d.showModal();return d;}
+ function editField(id,suggestion){
+  const t=template();if(kind!=='templates')return;const old=t.fields.find(f=>f.id===id);const d=modal('确认这个填写区');const name=el('input');name.value=old?.label??suggestion;name.maxLength=100;
+  const owner=select([['draft','填报人'],...t.workflow.map(s=>[s.id,`${s.label} · ${s.role}`])],old?.owner??'draft');const required=el('input');required.type='checkbox';required.checked=!!old?.required;
+  d.append(el('p','保留原文，在选中的位置增加填写区。历史业务使用创建时的模板，不会被本次修改覆盖。'),label('字段名称',name),label('由哪个阶段填写',owner),label('办理前必须填写',required));
+  d.append(button('保存填写区',wrap(async()=>{if(!name.value.trim())throw Error('请填写字段名称');const f={id,label:name.value.trim(),owner:owner.value,required:required.checked};t.fields=t.fields.filter(x=>x.id!==id);t.fields.push(f);t.version++;await persist();d.close();draw();say('填写区已更新，已有业务不受影响。');}),'primary'));
+  if(old)d.append(button('移除此填写区',wrap(async()=>{t.fields=t.fields.filter(x=>x.id!==id);t.version++;await persist();d.close();draw();})));
+ }
+ function configureFlow(){
+  const t=template(),d=modal('这份表交给谁办理');const draft=structuredClone(t.workflow);const list=el('div');d.append(el('p','这是可修改的流程草案，不是从签字栏自动判定的业务规则。请对照原表说明确认；同一角色可出现在多个节点。'),list);
+  const rows=[];
+  function paint(){list.replaceChildren();rows.length=0;draft.forEach((s,i)=>{const box=el('div',undefined,'forms-flow-edit');const n=el('input');n.value=s.label;n.setAttribute('aria-label',`节点 ${i+1} 名称`);const r=el('input');r.value=s.role;r.setAttribute('aria-label',`节点 ${i+1} 角色`);const k=select(Object.entries(kinds),s.kind);k.setAttribute('aria-label',`节点 ${i+1} 类型`);rows.push({s,n,r,k});box.append(el('b',`${i+1}`),n,r,k,button('移除',()=>{sync();draft.splice(i,1);paint();}));list.append(box);});}
+  function sync(){rows.forEach(({s,n,r,k})=>Object.assign(s,{label:n.value.trim(),role:r.value.trim(),kind:k.value}));}
+  d.append(button('＋ 增加办理节点',()=>{sync();draft.push({id:uid(),label:'审核',role:'审核人',kind:'review'});paint();}),button('确认流程',wrap(async()=>{sync();validateWorkflow(draft);const removed=t.fields.filter(f=>f.owner!=='draft'&&!draft.some(s=>s.id===f.owner));if(removed.length)throw Error('被移除节点还有填写区，请先把这些填写区调整到其他阶段：'+removed.map(f=>f.label).join('、'));t.workflow=draft;t.version++;await persist();d.close();draw();say('流程已确认，仅用于此后创建的业务。');}),'primary'));paint();
+ }
+ function newCase(){
+  const t=template(),d=modal('用这份表发起业务');const title=el('input');title.value=t.title;const project=el('input');project.placeholder='例如：某公路项目 / 第 01 合同段';const submitter=el('input');submitter.value='填报人';
+  const related=select([['','不关联'],...workspace.cases.map(c=>[c.id,`${c.template.code} ${c.title}`])],'');
+  d.append(label('业务名称',title),label('所属项目 / 合同段',project),label('填报角色',submitter),label('关联已有业务（如原指令单）',related),el('p','创建后保存模板快照。请先确认字段和流程；模板默认节点只是推演起点。'),button('创建并填写',wrap(async()=>{if(!title.value.trim()||!submitter.value.trim())throw Error('业务名称和填报角色不能为空');const r=createCase(t,{title:title.value,project:project.value,role:submitter.value.trim(),relatedId:related.value||null});workspace.cases.unshift(r);kind='cases';selected=r.id;role=r.submitter;await persist();d.close();draw();say('业务已创建。填写后保存草稿，或提交给下一位办理人。');}),'primary'));
+ }
+ function values(){const result={};for(const input of center.querySelectorAll('[data-field]'))if(!input.readOnly)result[input.dataset.field]=input.value;return result;}
+ async function act(type,note){const r=selectedItem();const next=applyOperation(r,{type,role,values:values(),note});workspace.cases[workspace.cases.indexOf(r)]=next;await persist();draw();say(type==='save'?'表单草稿已保存。':type==='return'?'已退回填报人；原审批意见和历史快照保留。':next.status==='complete'?'业务已归档，可打印或导出。':'同一份表单已交给下一位办理人。');}
+ function renderInspector(){
+  inspector.replaceChildren();const item=selectedItem(),t=template();if(!item){inspector.append(el('h3','一份表，贯穿全过程'),el('p','01 导入与核对\n02 确认填写区\n03 配置办理人\n04 填写与流转\n05 追溯与归档'),el('p','本地推演，角色切换不是登录认证。正式签署需要打印后手签或接入电子签章。','forms-boundary'));return;}
+  inspector.append(el('span','THE SAME DOCUMENT','eyebrow'),el('h3',kind==='templates'?'先确认，再运行':'办理这份业务'));
+  if(kind==='templates'){
+   inspector.append(el('p','点击原表任意格子，设置名称、负责阶段和必填要求。空白格只是候选区，不能代替业务确认。'),button('配置办理流程',configureFlow),button('用此表发起业务 →',newCase,'primary'));
+  }else{
+   const roles=[...new Set([item.submitter,...t.workflow.map(s=>s.role)])];if(!roles.includes(role))role=roles[0];const choose=select(roles.map(r=>[r,r]),role);choose.setAttribute('aria-label','表单扮演角色');choose.onchange=()=>{if(center.querySelector('[data-field]')&&JSON.stringify(values())!==JSON.stringify(Object.fromEntries(Object.keys(values()).map(k=>[k,item.values[k]??''])))){say('请先保存草稿或提交，再切换角色，避免丢失填写内容。',true);choose.value=role;return;}role=choose.value;renderCenter();renderInspector();};inspector.append(label('扮演角色（本地推演）',choose));
+   const note=el('textarea');note.placeholder='办理意见；退回时必须说明原因';note.setAttribute('aria-label','表单办理意见');inspector.append(note);
+   const expected=item.status==='draft'?item.submitter:t.workflow[item.step]?.role;const allowed=item.status!=='complete'&&expected===role;
+   for(const [type,name] of [['save','保存填写'],[item.status==='draft'?'submit':'advance',item.status==='draft'?'提交办理 →':`${kinds[t.workflow[item.step]?.kind]??'完成'}并继续 →`]]){const b=button(name,wrap(()=>act(type,note.value)),type==='save'?'':'primary');b.disabled=!allowed;inspector.append(b);}
+   if(item.status==='active'&&t.workflow[item.step].kind!=='receipt'){const b=button('退回填报人',wrap(()=>act('return',note.value)));b.disabled=!allowed;inspector.append(b);}
+   const attach=el('input');attach.type='file';attach.hidden=true;attach.setAttribute('aria-label','添加业务附件');attach.onchange=wrap(async()=>{const f=attach.files[0];if(!f)return;if(f.size>10*1024*1024)throw Error('单个附件不能超过 10 MB');const total=workspace.cases.reduce((s,c)=>s+c.attachments.reduce((v,a)=>v+a.size,0),0);if(total+f.size>60*1024*1024)throw Error('当前工作区附件已达 60 MB，请导出备份后另建工作包');const next=attachFile(item,{name:f.name,size:f.size,data:await readData(f)},role);workspace.cases[workspace.cases.indexOf(item)]=next;await persist();renderInspector();say('附件已保存，表内尚未保存的输入请点击“保存填写”。');});
+   const ab=button('＋ 添加照片 / 签署件',()=>attach.click());ab.disabled=!allowed;inspector.append(ab,attach);
+   for(const a of item.attachments)inspector.append(button(`↧ ${a.name}`,()=>{const bytes=Uint8Array.from(atob(a.data.split(',')[1]),c=>c.charCodeAt(0));download(a.name,bytes,'application/octet-stream');},'forms-attachment'));
+   const related=[...workspace.cases.filter(c=>c.id===item.relatedId||c.relatedId===item.id)];if(related.length){inspector.append(el('h4','关联业务'));for(const c of related)inspector.append(button(c.title,()=>{if(!clean())return;selected=c.id;draw();}));}
+   inspector.append(button('下载打印版 HTML',()=>{if(!clean())return;download(`${item.template.code||'业务表单'}-打印版.html`,printableForm(item),'text/html;charset=utf-8');say('打印版已下载。用普通浏览器打开，可从浏览器菜单打印或保存 PDF；请核对分页。');}));
+  }
+  const flow=el('ol',undefined,'forms-flow');[{id:'draft',label:'填写',role:kind==='cases'?item.submitter:'填报人'},...t.workflow,{id:'archive',label:'归档',role:'保留历史'}].forEach((s,i)=>{const li=el('li');if(kind==='cases'&&(item.status==='complete'?i===t.workflow.length+1:i===item.step+1))li.className='current';li.append(el('strong',s.label),el('small',s.role));flow.append(li);});inspector.append(el('h4','这份表的办理路径'),flow);
+  if(kind==='cases'){
+   const last=item.events.at(-1);const journey=el('div',undefined,'forms-operation');journey.append(el('strong','刚才发生了什么'),el('p',last?`${last.role} → ${last.from} → ${last.to}\n本地业务记录已保存，修订 ${last.revision}。`:'填写内容后提交，才会保存业务状态并交给下一位。'));inspector.append(journey,el('h4',`办理记录 · ${item.events.length}`));
+   for(const e of [...item.events].reverse()){const detail=el('details',undefined,'forms-event');detail.append(el('summary',`${e.role} · ${e.type==='attachment'?'添加附件':e.type==='save'?'保存填写':`${e.from} → ${e.to}`}`),el('p',new Date(e.at).toLocaleString('zh-CN')),el('p',e.note||'无附加意见'));for(const d of e.diff)detail.append(el('p',`${d.field}：${d.before||'空'} → ${d.after||'空'}`));detail.append(button('查看当时表单',()=>{const d=modal(`修订 ${e.revision} · ${e.role}`);const view=el('div',undefined,'forms-paper');const snapshot={...item,values:e.values,status:'complete'};renderBlocks(t.blocks,view,t,snapshot);d.append(view);}));inspector.append(detail);}
+  }
+  inspector.append(el('p','保留原文与办理记录。本地角色推演不等于真实账号权限，姓名文本不等于电子签章。','forms-boundary'));
+ }
+ upload.onchange=wrap(async()=>{
+  if(!clean()){upload.value='';return;}
+  const files=Array.from(upload.files);if(files.length>10)throw Error('一次最多导入 10 份 Word');const imported=[];const reports=[];
+  for(const file of files){say(`正在读取 ${file.name}…`);await new Promise(r=>requestAnimationFrame(r));try{const bytes=new Uint8Array(await file.arrayBuffer());const xml=extractDocumentXML(bytes,unzipSync);const parsed=parseWordXML(xml,{name:file.name,sourceId:uid()});imported.push(...parsed.templates);reports.push(`${file.name}：${parsed.stats.templates} 份模板 / ${parsed.stats.tables} 个表格`);}catch(e){reports.push(`${file.name}：未导入，${e.message}`);}}
+  workspace.templates.push(...imported);kind='templates';selected=imported[0]?.id??selected;await persist();draw();say(reports.join('；')+'。请核对模板结构，确认填写区与流程。');upload.value='';
+ });
+ packInput.onchange=wrap(async()=>{if(!clean()){packInput.value='';return;}const file=packInput.files[0];if(!file)return;if(file.size>100*1024*1024)throw Error('工作包不能超过 100 MB');const next=validateWorkspace(JSON.parse(await file.text()));const d=modal('恢复业务工作包');d.append(el('p',`将载入 ${next.templates.length} 份模板、${next.cases.length} 份业务。替换前会自动下载当前工作包作为备份。`),button('备份当前并恢复',wrap(async()=>{download('FlowLens-恢复前备份.json',JSON.stringify(workspace));await saveTail.catch(()=>{});await saveWorkspace(next);workspace=next;selected=null;draw();d.close();say('工作包已恢复。');}),'primary'));packInput.value='';});
+ try{workspace=await loadWorkspace();if(document.querySelector('meta[name="flowlens-demo"]')){if(!workspace.templates.length&&!workspace.cases.length){const {demoWorkspace}=await import('./forms-demo.mjs');workspace=demoWorkspace();await persist();}kind='cases';selected=workspace.cases[0]?.id??null;role=workspace.cases[0]?.submitter??'填报人';}ready=true;say('业务工作区已就绪。数据保存在当前浏览器，可导出工作包备份；Word 导入不调用模型。');}catch(e){say('本地存档读取失败，未覆盖原存档：'+e.message,true);importBtn.disabled=true;}
+ draw();
+}
