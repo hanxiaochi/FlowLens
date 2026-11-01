@@ -10,3 +10,6 @@
   仅用于 Node 测试读取 Word XML；浏览器运行使用原生 DOMParser。
 
 各依赖的版权与许可归其作者所有。本文件不替项目自身授予开源许可；项目尚未指定许可证。
+
+- fake-indexeddb 6.2.7 — Apache-2.0，https://github.com/dumbmatter/fakeIndexedDB
+  仅用于开发测试事务取消和独立连接的版本冲突，不随静态 demo 分发。
