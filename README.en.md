@@ -1,6 +1,6 @@
 # FlowLens
 
-[简体中文](README.md) · **English** · [v1.3.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.3.0)
+[简体中文](README.md) · **English** · [v1.4.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.4.0)
 
 **[Try the live demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -22,9 +22,21 @@ No installation or API key needed. Start with a fictional supervision applicatio
 
 [1.3 release notes and acceptance](docs/release-1.3.0.md)
 
+## 1.4 adds a shared team workspace
+
+Import an application package into the self-hosted team service, create accounts, and assign project roles. A supervisor can issue an instruction, a contractor can reply using a separate account, and a records officer can archive it. The server stores forms, attachments, and the account behind each operation.
+
+![Shared team workspace](docs/images/team-workspace-1.4.jpg)
+
+The server checks project roles, workflow stages, and record revisions. Repeated requests reuse their result. This release also adds account deactivation, password changes, audit history, versioned template publication, and SQLite backup and restore tools.
+
+Download `FlowLens-1.4.0-team.zip`, install Node.js 24 LTS, initialize the administrator, then run `npm start`. The team runtime uses Node built-ins and needs no npm dependencies. See the [deployment guide (Chinese)](docs/team-deployment.md) and [release acceptance](docs/release-1.4.0.md).
+
+The public demo runs locally in your browser. The shared service is self-hosted and intended for a small-team pilot. Customer workflows, external hosting, TLS, and operating capacity need acceptance in the target environment.
+
 ## Watch the walkthrough
 
-Follow the updated application through detail rows, linked forms, review returns, package restoration, and development handoff.
+The 1.3 design-workspace video follows the application through detail rows, linked forms, review returns, package restoration, and development handoff.
 
 https://github.com/user-attachments/assets/3a3c4347-98a1-4a2f-bd33-750183186221
 
@@ -56,7 +68,7 @@ You do not need to understand the whole system before you can try it, change it,
 
 You do not need an API key to start. Three built-in examples cover team management and approvals, a product catalog, and service tickets. Their interactions, execution traces, and 3D deployment scenes work offline.
 
-Install [Node.js](https://nodejs.org/) 22 or a newer LTS version, then run:
+Install [Node.js](https://nodejs.org/) 24 or a newer LTS version, then run:
 
 ```sh
 git clone https://github.com/hanxiaochi/FlowLens.git
@@ -116,13 +128,13 @@ The API key stays in the local Node process memory and must be entered again aft
 
 ## Current limits
 
-FlowLens helps people understand, test, and discuss a product design. Version 1.0 is not a complete production application generator.
+FlowLens helps people understand, test, and discuss a product design. The self-hosted team service adds shared business execution.
 
 - Screenshot reconstruction is approximate, not pixel-perfect. Inferred business rules need human review.
 - The current model covers CRUD operations, roles, references, state transitions, and numeric conditions. Complex transactions, arbitrary code, and complex date calculations are outside its scope.
-- The backend and database in the demo are simulated. Exported contracts and SQL are starting points; real authentication, record-level access, concurrency, and operations still need implementation.
-- Projects support local storage and file handoff, but not live multi-user collaboration.
-- The local server listens only on loopback. It is not configured for public hosting. The 3D scene requires WebGL.
+- The backend and database in the demo are simulated. Exported contracts and SQL are starting points; the team service now provides accounts, project access, revision checks, and backups. Record-level access and production integrations need project-specific work.
+- The team service supports shared project workflows. Users refresh to fetch changes from colleagues. Push updates and record-level confidentiality remain future work.
+- The design server defaults to loopback. External access to the team service requires HTTPS and a correctly configured origin. The 3D scene requires WebGL.
 - The current application interface is Chinese. This README and the English video help English-speaking readers follow the workflow; they do not imply that the app has a complete English localization.
 
 ## Working on the code

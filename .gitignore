@@ -4,6 +4,10 @@ node_modules/
 !.env.example
 .local/
 dist/
+dist-team/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 *.log
 .DS_Store
 Thumbs.db

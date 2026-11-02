@@ -4,8 +4,10 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test engine.test.mjs model.test.mjs layout.test.mjs diagrams.test.mjs narration.test.mjs data.test.mjs export.test.mjs deployment.test.mjs image-input.test.mjs generation.test.mjs migration.test.mjs forms.test.mjs demo.test.mjs forms-delivery.test.mjs apps.test.mjs",
-    "build:demo": "node scripts/build-demo.mjs"
+    "test": "node --test engine.test.mjs model.test.mjs layout.test.mjs diagrams.test.mjs narration.test.mjs data.test.mjs export.test.mjs deployment.test.mjs image-input.test.mjs generation.test.mjs migration.test.mjs forms.test.mjs demo.test.mjs forms-delivery.test.mjs apps.test.mjs team.test.mjs",
+    "build:demo": "node scripts/build-demo.mjs",
+    "start:team": "node team-server.mjs",
+    "build:team": "node scripts/build-team.mjs"
   },
   "dependencies": {
     "fflate": "^0.8.3",
@@ -16,9 +18,9 @@
     "@xmldom/xmldom": "^0.9.12",
     "fake-indexeddb": "^6.2.7"
   },
-  "version": "1.3.0",
+  "version": "1.4.0",
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "description": "把产品想法变成可以操作、可以解释的系统原型。"
 }

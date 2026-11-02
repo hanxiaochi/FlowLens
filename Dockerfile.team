@@ -1,0 +1,10 @@
+FROM node:24-bookworm-slim
+WORKDIR /app
+COPY --chown=node:node team-server.mjs team-store.mjs team-ui.js team.html team.css forms-store.mjs forms-model.mjs forms-schema.mjs forms-rules.mjs forms-print.mjs forms.css forms-detail-ui.js apps-model.mjs ./
+COPY --chown=node:node scripts/team-admin.mjs ./scripts/team-admin.mjs
+RUN mkdir /data && chown node:node /data
+USER node
+ENV HOST=0.0.0.0 PORT=4186 FLOWLENS_DATABASE=/data/team.sqlite
+EXPOSE 4186
+HEALTHCHECK --interval=30s --timeout=5s CMD node -e "require('node:http').get('http://127.0.0.1:4186/health',{headers:{host:new URL(process.env.FLOWLENS_ORIGIN).host}},r=>{r.resume();if(r.statusCode!==200)process.exit(1)}).on('error',()=>process.exit(1))"
+CMD ["node", "team-server.mjs"]

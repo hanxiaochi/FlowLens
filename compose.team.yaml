@@ -1,0 +1,32 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.team
+    environment:
+      FLOWLENS_ORIGIN: https://${FLOWLENS_DOMAIN:?Set FLOWLENS_DOMAIN}
+    volumes:
+      - team-data:/data
+    restart: unless-stopped
+    init: true
+    mem_limit: 1g
+    cpus: 1.0
+  gateway:
+    image: caddy:2
+    environment:
+      FLOWLENS_DOMAIN: ${FLOWLENS_DOMAIN:?Set FLOWLENS_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - gateway-data:/data
+      - gateway-config:/config
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+volumes:
+  team-data:
+  gateway-data:
+  gateway-config:
