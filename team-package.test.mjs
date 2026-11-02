@@ -45,6 +45,13 @@ test('standalone distribution starts without dependencies and its CLI restores d
     const session = await store.login('admin', password);
     store.importApplication(session.user, applicationDemo());
     store.setMembership(session.user, {userId: session.user.id, projectId: 'demo-project', roles: ['专业监理']});
+    const record = store.visibleWorkspace(session.user).workspace.cases[0];
+    const attachmentBytes = Buffer.from('Fictional inspection evidence\n附件恢复验收\n\x00\xff', 'utf8');
+    store.command(session.user, {
+      type: 'attachment', recordId: record.id, expectedRevision: record.revision,
+      operationId: crypto.randomUUID(),
+      attachment: {name: '验收附件.bin', data: 'data:application/octet-stream;base64,' + attachmentBytes.toString('base64')}
+    });
     const before = store.visibleWorkspace(session.user);
     const backup = join(directory, 'backup.sqlite');
     const backedUp = cli(['backup', backup]);
@@ -58,6 +65,10 @@ test('standalone distribution starts without dependencies and its CLI restores d
     assert.throws(() => store.session(session.token), /过期/);
     const newSession = await store.login('admin', password);
     assert.deepEqual(store.visibleWorkspace(newSession.user), before);
+    const restoredAttachment = store.visibleWorkspace(newSession.user).workspace.cases[0].attachments.at(-1);
+    assert.equal(restoredAttachment.name, '验收附件.bin');
+    assert.equal(restoredAttachment.size, attachmentBytes.length);
+    assert.deepEqual(Buffer.from(restoredAttachment.data.split(',')[1], 'base64'), attachmentBytes);
     store.close(); store = null;
     const bytes = await readFile(restoredDatabase);
     assert.notEqual(cli(['restore', backup], restoredDatabase).status, 0);

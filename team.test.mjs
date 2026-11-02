@@ -8,8 +8,44 @@ import {openTeamStore} from './team-store.mjs';
 import {createTeamServer} from './team-server.mjs';
 import {applicationDemo} from './apps-demo.mjs';
 import {createProject} from './apps-model.mjs';
+import {DatabaseSync} from 'node:sqlite';
 
 const password = 'test-only-long-password';
+
+test('a failure after workspace and audit writes rolls back the whole command and allows retry', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'flowlens-rollback-'));
+  const filename = join(directory, 'team.sqlite');
+  const store = openTeamStore(filename);
+  const inspection = new DatabaseSync(filename);
+  try {
+    const user = await store.createUser(null, {username: 'admin', name: 'Admin', password});
+    store.importApplication(user, applicationDemo());
+    store.setMembership(user, {userId: user.id, projectId: 'demo-project', roles: ['专业监理']});
+    const before = store.visibleWorkspace(user);
+    const auditBefore = store.audit(user);
+    const rowBefore = inspection.prepare('SELECT * FROM workspace').get();
+    const record = before.workspace.cases[0];
+    const command = {type: 'save', recordId: record.id, expectedRevision: record.revision, operationId: crypto.randomUUID(), values: {issue: 'Recovered transaction'}};
+    // Requests are written after both the workspace and audit within the transaction.
+    inspection.exec("CREATE TRIGGER reject_request BEFORE INSERT ON requests BEGIN SELECT RAISE(ABORT, 'injected write failure'); END");
+    assert.throws(() => store.command(user, command), /injected write failure/);
+    assert.deepEqual(store.visibleWorkspace(user), before);
+    assert.deepEqual(store.audit(user), auditBefore);
+    assert.deepEqual(inspection.prepare('SELECT * FROM workspace').get(), rowBefore);
+    assert.equal(inspection.prepare('SELECT COUNT(*) AS n FROM requests WHERE id=?').get(command.operationId).n, 0);
+    inspection.exec('DROP TRIGGER reject_request');
+    const result = store.command(user, command);
+    assert.equal(result.record.values.issue, 'Recovered transaction');
+    assert.equal(result.record.revision, record.revision + 1);
+    assert.deepEqual(store.command(user, command), result);
+    assert.equal(store.audit(user).length, auditBefore.length + 1);
+    assert.equal(inspection.prepare('SELECT COUNT(*) AS n FROM requests WHERE id=?').get(command.operationId).n, 1);
+  } finally {
+    inspection.close();
+    store.close();
+    await rm(directory, {recursive: true, force: true});
+  }
+});
 test('shared workspace enforces project roles, revisions and request identity across restart and backup', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'flowlens-team-'));
   let store = openTeamStore(join(directory, 'team.sqlite'));
