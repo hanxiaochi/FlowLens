@@ -57,11 +57,20 @@ export function createTeamServer({database = resolve(root, '.local/team.sqlite')
         const address = req.socket.remoteAddress;
         const now = Date.now();
         for (const [key, value] of attempts) if (value.until < now) attempts.delete(key);
-        const attempt = attempts.get(address) ?? {count: 0, until: now + 15 * 60000};
-        if (attempt.count >= 20) fail(429, '登录尝试过多，请稍后再试');
-        attempt.count++;
-        attempts.set(address, attempt);
+        const username = typeof input.username === 'string' ? input.username.toLowerCase().slice(0, 64) : '';
+        const accountKey = address + '\0' + username;
+        const accountAttempt = attempts.get(accountKey) ?? {count: 0, until: now + 15 * 60000};
+        const addressAttempt = attempts.get(address) ?? {count: 0, until: now + 15 * 60000};
+        if (accountAttempt.count >= 20 || addressAttempt.count >= 100) fail(429, '登录尝试过多，请稍后再试');
+        // Reserve before hashing so concurrent requests cannot bypass either limit.
+        accountAttempt.count++;
+        addressAttempt.count++;
+        attempts.set(accountKey, accountAttempt);
+        attempts.set(address, addressAttempt);
         const result = await store.login(input.username, input.password);
+        // Successful logins do not consume the shared proxy's failure allowance.
+        accountAttempt.count--;
+        addressAttempt.count--;
         return send(res, 200, {user: result.user}, {'Set-Cookie': cookie(result.token, 8 * 3600)});
       }
       const token = (req.headers.cookie ?? '').split(';').map(item => item.trim()).find(item => item.startsWith(cookieName + '='))?.slice(cookieName.length + 1);

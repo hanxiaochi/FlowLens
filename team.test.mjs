@@ -114,6 +114,20 @@ test('HTTP session cookies, same-origin protection and authenticated API boundar
     assert.equal((await fetch(base + '/.local/team.sqlite', {headers})).status, 404);
     await fetch(base + '/api/team/logout', {method: 'POST', headers: authenticated, body: '{}'});
     assert.equal((await fetch(base + '/api/team/me', {headers: authenticated})).status, 401);
+    // Many successful users can share a reverse proxy without exhausting its limit.
+    for (let index = 0; index < 22; index++) {
+      assert.equal((await fetch(base + '/api/team/login', {method: 'POST', headers, body: JSON.stringify({username: 'admin', password})})).status, 200);
+    }
+    const failures = await Promise.all(Array.from({length: 25}, () => fetch(base + '/api/team/login', {method: 'POST', headers, body: JSON.stringify({username: 'missing', password})})));
+    assert.equal(failures.filter(result => result.status === 401).length, 20);
+    assert.equal(failures.filter(result => result.status === 429).length, 5);
+    assert.equal((await fetch(base + '/api/team/login', {method: 'POST', headers, body: JSON.stringify({username: 'MISSING', password})})).status, 429);
+    assert.equal((await fetch(base + '/api/team/login', {method: 'POST', headers, body: JSON.stringify({username: 'admin', password})})).status, 200);
+    // Varying account names still consumes the source address failure allowance.
+    for (let index = 0; index < 80; index++) {
+      assert.equal((await fetch(base + '/api/team/login', {method: 'POST', headers, body: JSON.stringify({username: 'missing-' + index, password})})).status, 401);
+    }
+    assert.equal((await fetch(base + '/api/team/login', {method: 'POST', headers, body: JSON.stringify({username: 'admin', password})})).status, 429);
   } finally {
     await new Promise(resolve => server.close(resolve));
     await rm(directory, {recursive: true, force: true});

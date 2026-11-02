@@ -1,6 +1,6 @@
 # FlowLens
 
-[简体中文](README.md) · **English** · [v1.4.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.4.0)
+[简体中文](README.md) · **English** · [v1.4.1 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.4.1)
 
 **[Try the live demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -32,7 +32,7 @@ Import an application package into the self-hosted team service, create accounts
 
 The server checks project roles, workflow stages, and record revisions. Repeated requests reuse their result. This release also adds account deactivation, password changes, audit history, versioned template publication, and SQLite backup and restore tools.
 
-Download `FlowLens-1.4.0-team.zip`, install Node.js 24 LTS, initialize the administrator, then run `npm start`. The team runtime uses Node built-ins and needs no npm dependencies. See the [deployment guide (Chinese)](docs/team-deployment.md) and [release acceptance](docs/release-1.4.0.md).
+Download `FlowLens-1.4.1-team.zip`, install Node.js 24 LTS, initialize the administrator, then run `npm start`. The team runtime uses Node built-ins and needs no npm dependencies. See the [deployment guide (Chinese)](docs/team-deployment.md) and [release acceptance](docs/release-1.4.1.md).
 
 The public demo runs locally in your browser. The shared service is self-hosted and intended for a small-team pilot. Customer workflows, external hosting, TLS, and operating capacity need acceptance in the target environment.
 

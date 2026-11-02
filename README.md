@@ -1,6 +1,6 @@
 # FlowLens
 
-**简体中文** · [English](README.en.md) · [v1.4.0 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.4.0)
+**简体中文** · [English](README.en.md) · [v1.4.1 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.4.1)
 
 **[直接打开在线 Demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -28,7 +28,7 @@ Windows 和 Ubuntu 已分别通过 70 项回归，Linux 容器已走通启动、
 
 服务端会检查角色、阶段和修订号。重复请求复用原结果，过期页面不能覆盖新内容。新增了账号停用、密码修改、审计记录、表式版本发布，以及 SQLite 备份恢复工具。
 
-下载发布页中的 `FlowLens-1.4.0-team.zip`，安装 Node.js 24 LTS，按部署指南初始化管理员后运行 `npm start`。协作包使用 Node 内置模块，可以离线启动。[部署与恢复指南](docs/team-deployment.md) · [本版验收](docs/release-1.4.0.md) · [持续交付计划](docs/delivery-plan.md)
+下载发布页中的 `FlowLens-1.4.1-team.zip`，安装 Node.js 24 LTS，按部署指南初始化管理员后运行 `npm start`。协作包使用 Node 内置模块，可以离线启动。[部署与恢复指南](docs/team-deployment.md) · [本版验收](docs/release-1.4.1.md) · [持续交付计划](docs/delivery-plan.md)
 
 公开 Demo 提供浏览器本地体验。团队服务需自托管，适合先用脱敏资料做小团队试运行。真实客户流程、外部主机、证书和容量仍需在目标环境验收。
 
