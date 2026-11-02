@@ -1,8 +1,10 @@
+import {validateApplications} from './apps-model.mjs';
+import {validateDecisionRules} from './forms-rules.mjs';
 import {validateWorkflow} from './forms-model.mjs';
 import {validateField,validateFieldValue} from './forms-schema.mjs';
-export const emptyWorkspace=()=>({format:'flowlens-forms',version:2,templates:[],cases:[]});
+export const emptyWorkspace=()=>({format:'flowlens-forms',version:3,templates:[],cases:[],applications:[],projects:[]});
 export function validateWorkspace(value){
- if(value?.format!=='flowlens-forms'||![1,2].includes(value.version)||!Array.isArray(value.templates)||!Array.isArray(value.cases)||value.templates.length>2000||value.cases.length>3000)throw Error('不是有效的业务表单工作包');
+ if(value?.format!=='flowlens-forms'||![1,2,3].includes(value.version)||!Array.isArray(value.templates)||!Array.isArray(value.cases)||value.templates.length>2000||value.cases.length>3000)throw Error('不是有效的业务表单工作包');
  const ids=new Set();let cells=0;
  const string=(s,max=20000)=>{if(typeof s!=='string'||s.length>max)throw Error('工作包文字字段无效');};
  function blocks(list,depth=0){
@@ -12,7 +14,7 @@ export function validateWorkspace(value){
    for(const row of b.rows){if(!Array.isArray(row))throw Error('表格行无效');for(const c of row){string(c.id,200);string(c.text);if(!Number.isInteger(c.colspan)||c.colspan<1||c.colspan>100||!Number.isInteger(c.rowspan)||c.rowspan<1||c.rowspan>10000)throw Error('合并单元格无效');blocks(c.blocks,depth+1);}}
   }
  }
- function template(t){if(!Number.isSafeInteger(t.version)||t.version<1)throw Error('模板版本无效');string(t.id,200);string(t.title,500);string(t.source,500);string(t.code,100);blocks(t.blocks);validateWorkflow(t.workflow);
+ function template(t){if(!Number.isSafeInteger(t.version)||t.version<1)throw Error('模板版本无效');string(t.id,200);string(t.title,500);if(t.submitterRole!==undefined){string(t.submitterRole,100);if(!t.submitterRole.trim())throw Error('发起角色不能为空');}string(t.source,500);string(t.code,100);blocks(t.blocks);validateWorkflow(t.workflow);validateDecisionRules(t);
   if(!Array.isArray(t.fields)||t.fields.length>10000)throw Error('字段数量无效');const fieldIds=new Set();
   const blockIds=new Set();const walk=bs=>{for(const b of bs){blockIds.add(b.id);if(b.type==='table')for(const row of b.rows)for(const c of row){blockIds.add(c.id);walk(c.blocks);}}};walk(t.blocks);
   for(const f of t.fields){string(f.id,200);string(f.label,500);validateField(f);if(fieldIds.has(f.id)||!blockIds.has(f.id)||!['draft',...t.workflow.map(x=>x.id)].includes(f.owner))throw Error('填写区关联无效');fieldIds.add(f.id);}
@@ -26,9 +28,10 @@ export function validateWorkspace(value){
   for(const a of r.attachments){string(a.name,500);if(typeof a.data!=='string'||a.data.length>14*1024*1024||!/^data:[\w.+/-]*;base64,[A-Za-z0-9+/=]*$/.test(a.data))throw Error('附件格式无效');}
  }
  for(const r of value.cases)if(r.relatedId&&!cases.has(r.relatedId))throw Error('关联单据不存在');
+ validateApplications(value);
  return structuredClone(value);
 }
-export function upgradeWorkspace(value){const next=validateWorkspace(value);next.version=2;return next;}
+export function upgradeWorkspace(value){const next=validateWorkspace(value);next.version=3;next.applications??=[];next.projects??=[];return next;}
 export function createWorkspaceStore(factory=globalThis.indexedDB,name='flowlens-business-forms'){
  let connection;
  async function db(){if(!connection)connection=new Promise((resolve,reject)=>{const req=factory.open(name,1);req.onupgradeneeded=()=>req.result.createObjectStore('workspace');req.onsuccess=()=>resolve(req.result);req.onerror=()=>{connection=null;reject(req.error);};});return connection;}
