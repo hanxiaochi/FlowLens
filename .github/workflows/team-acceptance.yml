@@ -9,6 +9,9 @@ on:
       - 'apps*.mjs'
       - 'scripts/*team*'
       - 'Dockerfile.team'
+      - 'compose.team.yaml'
+      - 'deploy/Caddyfile'
+      - '.dockerignore'
       - 'package*.json'
       - '.github/workflows/team-acceptance.yml'
 permissions:
@@ -39,3 +42,4 @@ jobs:
         with:
           node-version: 24
       - run: node scripts/verify-team-container.mjs
+      - run: node scripts/verify-team-compose.mjs
