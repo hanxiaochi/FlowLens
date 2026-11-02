@@ -1,20 +1,18 @@
 # FlowLens
 
-**简体中文** · [English](README.en.md) · [v1.2.0 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.2.0)
+**简体中文** · [English](README.en.md) · [v1.3.0 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.3.0)
 
 **[直接打开在线 Demo →](https://hanxiaochi.github.io/FlowLens/)**
 
-不用安装，也不用填 API Key。先试一份虚构的监理整改表，或切到交互实验室体验审批与 3D 部署。公开版关闭 AI 生成，填写内容保存在自己的浏览器里。[演示版说明](docs/public-demo.md)
+不用安装，也不用填 API Key。先试一套虚构的工程监理应用，或切到交互实验室体验审批与 3D 部署。公开版关闭 AI 生成，填写内容保存在自己的浏览器里。[演示版说明](docs/public-demo.md)
 
 **把现成的 Word 业务表格，变成能填写、能流转、能讲清楚的系统样例。**
 
-![虚构工程表单进入监理审核](docs/images/forms-demo.png)
+![多表应用与项目工作台](docs/images/application-workspace-1.3.jpg)
 
-先试一份表：专业监理发出指令 → 施工单位回复 → 监理复查，必要时退回整改 → 资料员归档。再点“系统设计”和“开发交付”，看到的仍是这份表，不会跳到另一套员工示例。
+一张指令单发出去，施工单位拿它发起整改回复，监理复查后再形成归档记录。每张表都有自己的编号和办理历史，项目资料和上游内容可以直接带过来。
 
-**1.2 新增：** 有类型的字段、可配置退回阶段、保存冲突保护，以及包含接口、SQL 和本地验证器的交付包。[完整说明与验收](docs/release-1.2.0.md)
-
-![同一份整改业务的系统定义](docs/images/business-definition-1.2.jpg)
+**1.3 已支持应用工作台、多项目、角色待办、跨表字段带入、可增删的明细行，以及确认后生效的自然语言规则草案。** 整套应用可以导出，换个浏览器恢复后继续办理。[本次更新与验收](docs/release-1.3.0.md)
 
 [反馈卡住的步骤](https://github.com/hanxiaochi/FlowLens/issues/new?template=trial-feedback.yml) · [分享介绍与试用计划](docs/launch-kit.md)
 
@@ -22,13 +20,13 @@
 
 ## 先看一遍怎么用
 
-下面的视频介绍 1.0 的原型与系统推演；新增的业务表单入口见下方说明。
+新版三分钟演示从工程监理工作台开始，走过明细填写、指令与回复关联、退回重提、应用恢复和开发交付。
 
-https://github.com/user-attachments/assets/28391070-49bd-4f0b-bb1a-9981a34142cb
+https://github.com/user-attachments/assets/38d1eb67-6578-40bb-aacc-599f04eefb60
 
-**3 分 36 秒，中文旁白与字幕。** 从提交五天请假开始，看看审批规则、数据变化和 3D 部署怎样连起来，最后导出给开发的资料。
+**中文合成旁白与字幕，3 分 02 秒。** 视频使用实际操作中采集的页面画面，按步骤剪辑。演示数据均为虚构。
 
-[观看 / 下载完整视频](https://github.com/hanxiaochi/FlowLens/releases/download/v1.0.0/FlowLens-1.0-guide.zh-CN.mp4) · [章节与文字稿](docs/video-guide.md) · [下载字幕](https://github.com/hanxiaochi/FlowLens/releases/download/v1.0.0/FlowLens-1.0-guide.zh-CN.srt)
+[观看 / 下载视频](https://github.com/hanxiaochi/FlowLens/releases/download/v1.3.0/FlowLens-1.3-guide.zh-CN.mp4) · [章节与文字稿](docs/video-guide.md) · [下载字幕](https://github.com/hanxiaochi/FlowLens/releases/download/v1.3.0/FlowLens-1.3-guide.zh-CN.srt)
 
 有一个产品想法，却不知道该怎么跟开发讲清楚；画好了原型，又发现页面背后的权限、流程、数据库还没想明白。FlowLens 就是从这个问题开始做的。
 
@@ -65,7 +63,7 @@ npm start
 
 Windows 用户也可以双击 `启动 FlowLens.cmd`，首次启动会安装运行依赖。想省去这一步，可以到 [Releases](https://github.com/hanxiaochi/FlowLens/releases) 下载带运行依赖的压缩包，解压后双击启动。压缩包仍然需要安装 Node.js；内置样例不需要联网，AI 生成需要连接模型服务。
 
-## 建议这样试一遍
+## 原型实验室也可以这样试
 
 1. 选「团队与审批」，提交一条请假申请。
 2. 跟着右侧的播放步骤，看请求如何经过检查、规则判断和数据写入。也可以一格一格往下走。

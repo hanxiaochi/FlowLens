@@ -1,4 +1,5 @@
-import {validateFieldValue} from './forms-schema.mjs';
+import {validateDecisionRules} from './forms-rules.mjs';
+import {validateFieldValue,missingDetailValues} from './forms-schema.mjs';
 export const uid=()=>globalThis.crypto.randomUUID();
 const clone=x=>structuredClone(x);
 export function validateWorkflow(steps){
@@ -7,11 +8,12 @@ export function validateWorkflow(steps){
 }
 export function createCase(template,{title='',project='',role='填报人',relatedId=null}={}){
  validateWorkflow(template.workflow);
+ validateDecisionRules(template);
  if(typeof title!=='string'||title.length>500||typeof project!=='string'||project.length>500||typeof role!=='string'||!role.trim()||role.length>100)throw Error('业务名称、项目或填报角色无效或过长');
  return {id:uid(),title:title.trim()||template.title,project,relatedId,template:clone(template),values:{},attachments:[],submitter:role,status:'draft',step:-1,revision:0,events:[],createdAt:new Date().toISOString()};
 }
 export function canEdit(record,field,role){return record.status!=='complete'&&((record.status==='draft'&&role===record.submitter&&field.owner==='draft')||(record.status==='active'&&record.template.workflow[record.step]?.role===role&&field.owner===record.template.workflow[record.step].id));}
-export function missingRequired(record,owner){return record.template.fields.filter(f=>f.required&&f.owner===owner&&!String(record.values[f.id]??'').trim());}
+export function missingRequired(record,owner){return record.template.fields.filter(f=>f.owner===owner&&((f.required&&!String(record.values[f.id]??'').trim())||missingDetailValues(f,record.values[f.id])));}
 export function applyOperation(record,{type,role,values={},note='',at=new Date().toISOString(),expectedRevision=record.revision,operationId=uid()}){
  if(typeof operationId!=='string'||!operationId.trim()||operationId.length>200)throw Error('操作编号无效');
  const previous=record.events.find(e=>e.operationId===operationId);if(previous){if(previous.role!==role||previous.type!==type)throw Error('操作编号已用于其他办理');return clone(record);}
@@ -34,7 +36,9 @@ export function applyOperation(record,{type,role,values={},note='',at=new Date()
  }else if(type==='submit'||type==='advance'){
   if(type==='submit'&&r.status!=='draft'||type==='advance'&&r.status!=='active')throw Error('当前状态不能执行此操作');
   const missing=missingRequired(r,current?.id??'draft');if(missing.length)throw Error('请填写必填项：'+missing.map(f=>f.label).join('、'));
-  r.step++;r.status=r.step>=r.template.workflow.length?'complete':'active';
+  const decision=(r.template.decisionRules??[]).find(rule=>rule.stageId===current?.id&&r.values[rule.fieldId]===rule.equals);
+  if(decision){if(!note.trim())throw Error('条件触发退回，请填写办理意见作为原因');r.step=decision.returnTo==='draft'?-1:r.template.workflow.findIndex(stage=>stage.id===decision.returnTo);r.status=r.step<0?'draft':'active';}
+  else{r.step++;r.status=r.step>=r.template.workflow.length?'complete':'active';}
  }else if(type!=='save')throw Error('未知操作');
  r.revision++;
  const to=r.status==='complete'?'归档':r.status==='draft'?'填报':r.template.workflow[r.step].label;

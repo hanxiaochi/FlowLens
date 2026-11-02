@@ -1,10 +1,10 @@
 # FlowLens
 
-[简体中文](README.md) · **English** · [v1.2.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.2.0)
+[简体中文](README.md) · **English** · [v1.3.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.3.0)
 
 **[Try the live demo →](https://hanxiaochi.github.io/FlowLens/)**
 
-No installation or API key needed. Start with a fictional instruction and rectification form, or explore approvals and 3D deployment in the interaction lab. AI generation is disabled in the public demo; your edits stay in your browser. The demo interface is currently in Chinese.
+No installation or API key needed. Start with a fictional supervision application, or explore approvals and 3D deployment in the interaction lab. AI generation is disabled in the public demo; your edits stay in your browser. The demo interface is currently in Chinese.
 
 **Click a button. See where the request goes and what changes in the data.**
 
@@ -16,23 +16,23 @@ No installation or API key needed. Start with a fictional instruction and rectif
 
 [Product audit and proposed next steps (Chinese)](docs/fde-product-audit-2026-11-02.md) · [Discovery and acceptance worksheet (Chinese)](docs/fde-discovery-worksheet.md)
 
-**New in 1.2:** The selected form now drives the system view, typed data schema, API draft and handoff ZIP. Reviewers can return a record to a specific earlier stage. Failed saves keep the committed state unchanged, and stale browser tabs cannot overwrite newer work. The ZIP includes a dependency-free Node.js rule verifier. This is still a local simulation, not a multiuser backend.
+**New in 1.3** — Organize templates into an application, create projects, filter pending work by role, and carry fields from a completed instruction into its reply and archive record. Add repeating detail rows, preview supported natural-language rules, and export a restorable application with versioned API and SQL drafts.
 
-![One business definition across the handoff](docs/images/business-definition-1.2.jpg)
+![Application and project workspace](docs/images/application-workspace-1.3.jpg)
 
-[1.2 release notes and acceptance (Chinese)](docs/release-1.2.0.md)
+[1.3 release notes and acceptance](docs/release-1.3.0.md)
 
 ## Watch the walkthrough
 
-This video covers the 1.0 prototype and system simulation. The new business forms workspace is described below.
+Follow the updated application through detail rows, linked forms, review returns, package restoration, and development handoff.
 
-https://github.com/user-attachments/assets/16c04fa8-d317-42ba-b5b7-97d5c65ea38b
+https://github.com/user-attachments/assets/3a3c4347-98a1-4a2f-bd33-750183186221
 
-**English narration and subtitles, 3 minutes 55 seconds.** Follow a five-day leave request through approvals, data changes, system diagrams, and a 3D deployment scene, then export the design for development.
+**English synthesized narration and subtitles, 3 minutes.** This step-by-step video uses captures from the actual Chinese interface and fictional data.
 
-[Watch / download the video](https://github.com/hanxiaochi/FlowLens/releases/download/v1.0.0/FlowLens-1.0-guide.en.mp4) · [Chapters and transcript](docs/video-guide.en.md) · [Download subtitles](https://github.com/hanxiaochi/FlowLens/releases/download/v1.0.0/FlowLens-1.0-guide.en.srt)
+[Watch / download](https://github.com/hanxiaochi/FlowLens/releases/download/v1.3.0/FlowLens-1.3-guide.en.mp4) · [Chapters and transcript](docs/video-guide.en.md) · [Subtitles](https://github.com/hanxiaochi/FlowLens/releases/download/v1.3.0/FlowLens-1.3-guide.en.srt)
 
-The recording uses the current Chinese interface, with English chapter titles, narration, and subtitles. It runs a built-in example; no paid model calls are made during the walkthrough.
+The rule assistant uses a documented local grammar and requires confirmation before applying a draft. Application data lives in the current browser. Production use needs server authentication, project permissions, shared storage, and operational backups.
 
 ## Why this exists
 

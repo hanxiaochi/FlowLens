@@ -9,3 +9,43 @@ body.forms-active .crumb{font-size:0}body.forms-active .crumb span,body.forms-ac
 
 .forms-workspace[hidden],.forms-delivery[hidden]{display:none}
 .forms-delivery{margin:20px 0;padding:28px;max-width:1400px}.forms-delivery>p{line-height:1.8;white-space:pre-line}.forms-system-path{display:flex;gap:12px;flex-wrap:wrap;margin:22px 0}.forms-system-node{padding:20px;border:1px solid #bdc9bc;border-radius:22px;background:#edf3e6;flex:1;min-width:130px;color:#24342b}.forms-system-node small{display:block;margin-top:9px}.forms-schema-table{width:100%;border-collapse:collapse;font-size:13px}.forms-schema-table th,.forms-schema-table td{padding:14px;border-bottom:1px solid #d5dbd0;text-align:left;white-space:pre-line;overflow-wrap:anywhere;min-width:120px}.forms-contract-code{max-height:440px;overflow:auto;background:#1d2925;color:#e3eddf;padding:22px;border-radius:18px;font-size:12px}.forms-delivery h3{margin-top:28px}.forms-flow-edit{flex-wrap:wrap}
+
+.application-workspace[hidden] { display: none; }
+.application-navigation, .application-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.application-workspace label { display: grid; gap: 8px; font-size: 12px; margin: 12px 0; }
+.application-navigation select { min-width: 240px; max-width: 100%; }
+.application-hero { display: flex; justify-content: space-between; align-items: center; gap: 30px; margin: 24px 0; padding: 34px; border-radius: 30px; background: linear-gradient(120deg, #e5d9f2, #edf0dd); }
+.application-hero h2 { font-size: 30px; font-weight: 500; margin: 14px 0; }
+.application-controls { max-width: 480px; }
+.application-entries { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 18px; margin: 24px 0; }
+.application-entries article, .application-journey article { padding: 24px; border: 1px solid #e0d9e6; border-radius: 24px; background: #fff; box-shadow: 0 8px 28px #45314b08; }
+.application-entries h3 { font-size: 21px; font-weight: 500; margin: 16px 0; }
+.application-workspace p { font-size: 13px; line-height: 1.9; }
+.application-workspace small { color: #796785; }
+.application-workspace button { font-size: 12px; margin: 4px; }
+.application-inbox { background: #f1ecf6; padding: 24px; border-radius: 24px; }
+.application-inbox button { text-align: left; }
+.application-journey { margin: 28px 0; display: grid; gap: 14px; }
+.application-journey article { border-left: 5px solid #b4c491; }
+.application-template-picker { max-height: 320px; overflow: auto; }
+.application-template-picker label { display: flex; align-items: center; flex-direction: row-reverse; justify-content: start; }
+.detail-field fieldset { border: 1px solid #d6c8e1; border-radius: 12px; padding: 12px; margin: 10px 0; display: flex; gap: 10px; flex-wrap: wrap; }
+.detail-field legend { color: #74528d; }
+.detail-field label { display: grid; gap: 6px; flex: 1; min-width: 110px; }
+.detail-field input, .detail-field select { width: 100%; box-sizing: border-box; font: inherit; padding: 8px; }
+.detail-field button { font-size: 11px; }
+.detail-column-editor { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 12px 0; }
+.detail-column-editor input { max-width: 180px; }
+.detail-column-editor label { display: flex; margin: 5px; }
+.forms-flow-edit { grid-template-columns: 20px 1fr 1fr 90px 130px 65px; }
+@media (max-width: 760px) {
+ .application-hero { display: block; padding: 22px; }
+ .application-hero h2 { font-size: 24px; }
+ .application-navigation select { min-width: 0; width: 100%; }
+ .forms-flow-edit { grid-template-columns: 20px 1fr; }
+}
+
+.forms-utilities { position: relative; }
+.forms-utilities>summary { cursor: pointer; padding: 12px 16px; border-radius: 16px; border: 1px solid #e4dfe8; background: #fff; font-size: 12px; }
+.forms-utilities[open]>.forms-toolbar { position: absolute; right: 0; top: 40px; z-index: 5; width: 250px; padding: 14px; background: #f8f5fb; border: 1px solid #ded5e8; box-shadow: 0 12px 35px #45314b22; border-radius: 16px; }
+.forms-intro { margin-bottom: 8px; }.forms-intro .forms-toolbar { max-width: 480px; }
