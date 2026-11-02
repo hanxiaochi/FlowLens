@@ -85,4 +85,6 @@ Windows 可通过 `$env:FLOWLENS_DATABASE` 设置路径。恢复命令拒绝覆�
 
 ## 交付验收
 
+2026-11-03 在 GitHub Actions 的 Windows 与 Ubuntu runner 上分别通过 70 项回归，并完成协作包和公开体验构建。Linux Docker 验证完成镜像构建、账号登录、应用导入、角色授权、业务写入、容器重启、请求重试、在线备份和恢复，恢复数据库的旧会话已清空。此记录覆盖单容器运行，Compose、Caddy 证书签发与目标服务器容量需在实际部署时验证。[验收运行记录](https://github.com/hanxiaochi/FlowLens/actions/runs/41478163175)
+
 按 `docs/delivery-plan.md` 验证两个独立账号、越权拒绝、过期修订冲突、重复请求、重启恢复和备份还原。管理员从管理后台导出审计证据或查看最近记录，业务方核对指令、回复、复查归档是否符合实际职责。

@@ -29,7 +29,7 @@
 
 顺序写入测量在 Ryzen 7 9800X3D、31 GiB 可见内存的本机完成，测试进程 RSS 约 213 MiB，样例无附件。这组结果仅描述本机顺序事务，生产并发人数和低配置主机容量需另测。
 
-本机未安装 Docker，因此容器镜像构建、外部域名证书与 Linux 主机运行尚未验收。已验证的是原生 Node 运行包与 SQLite 备份恢复。部署示例的 1 GiB 内存配置需要在目标主机复测。
+发布时本机未安装 Docker，验收覆盖原生 Node 运行包与 SQLite 备份恢复。发布后于 2026-11-03 补充 GitHub Actions 验收，Windows 和 Ubuntu 分别通过 70 项回归，Linux Docker 在 1 GiB 限制下完成构建、启动、业务写入、重启、幂等重试、在线备份和恢复。外部域名证书、Compose 部署和目标主机容量仍需实测。[运行记录](https://github.com/hanxiaochi/FlowLens/actions/runs/41478163175)
 
 ## 使用与迁移
 
@@ -63,4 +63,4 @@ FlowLens 1.4 adds a self-hosted team workspace with accounts, project roles, sha
 
 69 automated tests passed. Browser acceptance used separate supervisor and contractor accounts across an instruction, a returned rectification reply, backup restoration, resubmission, and final archive. Seven additional checks passed against the standalone runtime, including concurrent HTTP writes and restoration.
 
-Node.js 24 LTS is required. Docker, external TLS, Linux hosting, and real-customer capacity remain target-environment acceptance tasks. The public demo stays browser-local with AI disabled. The README videos cover the 1.3 design workspace.
+Node.js 24 LTS is required. Post-release verification on November 3 added 70 passing tests on both Windows and Ubuntu, plus Linux Docker build, startup, write, restart, retry, backup, and restore checks with a 1 GiB container limit. Compose, external TLS, and customer-host capacity remain target-environment acceptance tasks. The public demo stays browser-local with AI disabled. The README videos cover the 1.3 design workspace. [Acceptance run](https://github.com/hanxiaochi/FlowLens/actions/runs/41478163175)

@@ -24,6 +24,8 @@ No installation or API key needed. Start with a fictional supervision applicatio
 
 ## 1.4 adds a shared team workspace
 
+Windows and Ubuntu each pass 70 regression tests. Linux container acceptance covers startup, writes, restart, backup, and restore. Relevant code changes trigger these checks automatically. [Cross-platform acceptance run](https://github.com/hanxiaochi/FlowLens/actions/runs/41478163175)
+
 Import an application package into the self-hosted team service, create accounts, and assign project roles. A supervisor can issue an instruction, a contractor can reply using a separate account, and a records officer can archive it. The server stores forms, attachments, and the account behind each operation.
 
 ![Shared team workspace](docs/images/team-workspace-1.4.jpg)
