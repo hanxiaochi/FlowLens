@@ -28,7 +28,7 @@ No installation or API key needed. Start with a fictional supervision applicatio
 
 Post-release tests on main verify full rollback and retry after a late transaction failure, plus byte-for-byte attachment restoration. Windows and Ubuntu now each pass 71 tests. [Latest acceptance](https://github.com/hanxiaochi/FlowLens/actions/runs/41480784477) · [Delivery audit (Chinese)](docs/delivery-plan.md)
 
-A Windows LAN pilot has passed five-account HTTPS workflow and restore checks on the server itself. Access from another computer and real-business approval remain pending. [Pilot status (Chinese)](docs/delivery-plan.md)
+A Windows LAN pilot has passed five-account HTTPS workflow, restore, and browser UI checks on the server itself. Access from another computer and real-business approval remain pending. [Pilot status (Chinese)](docs/delivery-plan.md)
 
 Import an application package into the self-hosted team service, create accounts, and assign project roles. A supervisor can issue an instruction, a contractor can reply using a separate account, and a records officer can archive it. The server stores forms, attachments, and the account behind each operation.
 

@@ -24,7 +24,7 @@
 
 发布后主分支补充了事务尾部写入失败的回滚重试测试，以及附件逐字节恢复检查，Windows、Ubuntu 各通过 71 项测试。[最新验收](https://github.com/hanxiaochi/FlowLens/actions/runs/41480784477) · [交付目标逐项审查](docs/delivery-plan.md)
 
-Windows 内网试点已完成服务器本机的五账号 HTTPS 办理和恢复演练，其他电脑访问与真实业务确认仍待验收。[试点进展](docs/delivery-plan.md)
+Windows 内网试点已完成服务器本机的五账号 HTTPS 办理、恢复演练和浏览器页面复验，其他电脑访问与真实业务确认仍待验收。[试点进展](docs/delivery-plan.md)
 
 确认好表式和流程后，把整个应用包导入团队协作服务。管理员为不同项目分配账号和角色，监理发出指令，施工单位用自己的账号回复，资料员最后归档。记录、附件和实际操作者都保存在服务器里。
 
