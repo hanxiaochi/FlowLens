@@ -1,4 +1,5 @@
 import http from 'node:http';
+import {projectArchiveLimit} from './team-project-check.mjs';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {resolve, extname} from 'node:path';
@@ -14,6 +15,7 @@ export function createTeamServer({database = resolve(root, '.local/team.sqlite')
   const store = openTeamStore(database);
   const attempts = new Map();
   let exportingProject = false;
+  let checkingProject = false;
   const cookie = (token, age) => `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${canonical.protocol === 'https:' ? '; Secure' : ''}`;
   function send(res, status, value, extra = {}) {
     if (res.destroyed || res.writableEnded) return;
@@ -106,6 +108,21 @@ export function createTeamServer({database = resolve(root, '.local/team.sqlite')
         if (path === '/api/team/operations') return send(res, 200, {...store.operations(user), uptimeSeconds: Math.floor(process.uptime()), memoryBytes: process.memoryUsage().rss});
         if (path === '/api/team/delivery') return send(res, 200, store.deliveryReport(user, new URL(req.url, origin).searchParams.get('scope') || 'instance', origin));
         fail(404, '接口不存在');
+      }
+      if (path === '/api/team/project-check') {
+        store.requireAdmin(user);
+        if (req.headers['content-type'] !== 'application/zip') fail(415, '请上传 ZIP 资料包');
+        if (checkingProject) fail(503, '正在检查另一份资料包，请稍后重试');
+        checkingProject = true;
+        try {
+          const chunks = []; let length = 0;
+          for await (const chunk of req) {
+            length += chunk.length;
+            if (length > projectArchiveLimit) fail(413, '资料 ZIP 最大 66 MiB');
+            chunks.push(chunk);
+          }
+          return send(res, 200, store.checkProjectArchive(user, Buffer.concat(chunks)));
+        } finally { checkingProject = false; }
       }
       const input = await body(req, ['/api/team/import', '/api/team/definitions'].includes(path) ? 32 * 1024 * 1024 : path === '/api/team/command' ? 15 * 1024 * 1024 : 64 * 1024);
       if (path === '/api/team/logout') { store.logout(token); return send(res, 200, {ok: true}, {'Set-Cookie': cookie('', 0)}); }

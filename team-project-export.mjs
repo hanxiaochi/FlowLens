@@ -23,6 +23,7 @@ export function buildProjectArchive(workspace, projectId, readAttachment) {
   let totalBytes = 0;
   function addFile(path, data) {
     const bytes = Buffer.isBuffer(data) ? data : Buffer.from(data);
+    if (manifest.length >= 10000) throw Object.assign(Error('单次资料包最多 10000 个文件'), {status: 413});
     totalBytes += bytes.length;
     if (totalBytes > projectExportLimit) throw Object.assign(Error('项目资料超过单次导出 64 MiB 上限，请联系维护人员使用数据库备份交接。'), {status: 413});
     files[path] = bytes;

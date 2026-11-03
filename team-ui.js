@@ -83,7 +83,7 @@ function accountView() {
   const controls = node('div', undefined, 'toolbar');
   controls.append(button('我的项目', async () => { if (!clean()) return; selectedId = ''; await refresh(); home(); }), button('修改密码', () => { if (clean()) passwordView(); }), button('退出登录', async () => { if (!clean()) return; await api('logout', {}); user = null; workspace = null; selectedId = ''; loginView(); }));
   controls.append(button('下载草稿并重新登录', () => { draft(); user = null; selectedId = ''; pending = null; deliveryDraft = null; loginView(); }));
-  if (user.admin) controls.append(button('管理后台', async () => { if (clean()) await adminView(); }), button('运行状态', async () => { if (clean()) await operationsView(); }));
+  if (user.admin) controls.append(button('资料包检查', () => { if (clean()) projectCheckView(); }), button('管理后台', async () => { if (clean()) await adminView(); }), button('运行状态', async () => { if (clean()) await operationsView(); }));
   if (user.admin) controls.append(button('交付检查', async () => { if (clean()) await deliveryView(); }));
   account.append(controls);
 }
@@ -335,6 +335,41 @@ async function operationsView() {
   content.append(recovery, button('刷新运行状态', operationsView), button('下载运行状态报告', () => download('FlowLens-运行状态.json', JSON.stringify(status, null, 2))));
   say('已读取管理员运行状态。');
 }
+function projectCheckView() {
+  selectedId = ''; content.replaceChildren(); accountView();
+  const panel = node('section', undefined, 'panel stack');
+  panel.append(node('h1', '接手前，先检查资料'), node('p', '选择 FlowLens 项目资料 ZIP。检查文件完整性、附件和单据关联，并与当前实例核对编号。ZIP 最大 66 MiB，展开内容最大 64 MiB。本次检查完成后，业务资料仍需交接双方确认。'));
+  const file = input('选择项目资料 ZIP', 'file'); file.accept = '.zip';
+  const results = node('section', undefined, 'panel stack');
+  file.onchange = () => { results.replaceChildren(); say(file.files[0] ? '已选择 ' + file.files[0].name + '，请点击上传并检查。' : '请选择项目资料包。'); };
+  const check = button('上传并检查资料包', async () => {
+    const selected = file.files[0]; if (!selected) throw Error('请选择项目资料 ZIP');
+    if (selected.size > 66 * 1024 * 1024) throw Error('资料 ZIP 最大 66 MiB');
+    results.replaceChildren();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 120000);
+    say('正在上传并检查资料包，可以取消后重试。');
+    const cancel = node('button', '取消检查'); cancel.type = 'button'; cancel.onclick = () => controller.abort(); notice.append(cancel);
+    try {
+      const response = await fetch('/api/team/project-check', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/zip', 'X-FlowLens-Request': '1'}, body: selected, signal: controller.signal});
+      const report = await response.json();
+      if (!response.ok) throw Object.assign(Error(report.error || '检查失败'), {status: response.status});
+      results.append(node('h2', '文件完整性检查通过'), node('p', report.project.name), node('p', report.records + ' 份业务 · ' + report.attachments + ' 个附件 · ' + report.files + ' 个文件'), node('p', report.notice), node('p', report.nextStep));
+      results.append(node('h3', '当前实例编号冲突 · ' + report.conflicts.length));
+      for (const conflict of report.conflicts) results.append(node('p', ({projects: '项目', applications: '应用', templates: '表式', cases: '业务'})[conflict.kind] + ' · ' + conflict.name + '（' + conflict.id + '）' + (conflict.sameDefinition === null ? '' : conflict.sameDefinition ? ' · 定义一致' : ' · 定义不同')));
+      results.append(node('h3', '需要确认的办理角色'), node('p', report.requiredRoles.join('、')));
+      results.append(node('h3', '历史操作者 · ' + report.historicalActors.length));
+      for (const actor of report.historicalActors) results.append(node('p', actor.name + ' · ' + actor.id));
+      results.append(node('p', '历史操作者信息来自资料包，后续恢复需单独确认当前账号与项目角色。'), button('下载检查报告', () => download('FlowLens-资料检查.json', JSON.stringify(report, null, 2))));
+      say('检查完成，请核对报告中的差异和待确认事项。');
+    } catch (error) {
+      if (controller.signal.aborted) { say('检查已取消或等待超时，可以重新尝试。'); return; }
+      throw error;
+    } finally { clearTimeout(timer); }
+  }, 'primary');
+  panel.append(label('项目资料包', file), check); content.append(panel, results);
+}
+
 async function adminView() {
   const data = await api('admin'); await refresh(); content.replaceChildren(); accountView();
   content.append(node('h1', '应用、成员与项目权限'));

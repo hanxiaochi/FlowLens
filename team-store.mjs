@@ -1,3 +1,4 @@
+import {checkProjectArchive} from './team-project-check.mjs';
 import {buildProjectArchive} from './team-project-export.mjs';
 import {DatabaseSync, backup} from 'node:sqlite';
 import {randomBytes, randomUUID, scrypt as derive, timingSafeEqual, createHash} from 'node:crypto';
@@ -401,6 +402,8 @@ export function openTeamStore(filename) {
   }
   return {
     createUser, login, session, visibleWorkspace, importApplication, updateDefinitions, setMembership, command, changePassword, resetPassword, operations, deliveryReport, updateDelivery, attachment, projectArchive,
+    checkProjectArchive: (user, bytes) => { admin(user); return checkProjectArchive(bytes, workspace()); },
+    requireAdmin: user => admin(user),
     logout: token => db.prepare('DELETE FROM sessions WHERE token=?').run(digest(token)),
     users: user => { admin(user); return db.prepare('SELECT * FROM users ORDER BY username').all().map(publicUser); },
     memberships: user => { admin(user); return db.prepare('SELECT user_id AS userId,project_id AS projectId,roles FROM members').all().map(row => ({...row, roles: JSON.parse(row.roles)})); },

@@ -46,12 +46,12 @@ test('attachment HTTP downloads require current project access and new clients r
     const bytes = Buffer.from([0, 255, 1, 129]);
     const record = store.command(member, {type: 'attachment', recordId: source.id, expectedRevision: source.revision, operationId: crypto.randomUUID(), attachment: {name: '证明".bin', data: 'data:application/octet-stream;base64,' + bytes.toString('base64')}}, {inlineAttachments: false}).record;
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-    function request(path, {data, cookie, modern = true} = {}) {
+    function request(path, {data, cookie, rawBody, modern = true} = {}) {
       return new Promise((resolve, reject) => {
-        const req = http.request({hostname: '127.0.0.1', port: server.address().port, path, method: data ? 'POST' : 'GET', headers: {Host: '127.0.0.1:4186', 'Content-Type': 'application/json', 'X-FlowLens-Request': '1', ...(modern ? {'X-FlowLens-Client': '2'} : {}), ...(cookie ? {Cookie: cookie} : {})}}, response => {
+        const req = http.request({hostname: '127.0.0.1', port: server.address().port, path, method: data || rawBody ? 'POST' : 'GET', headers: {Host: '127.0.0.1:4186', 'Content-Type': rawBody ? 'application/zip' : 'application/json', 'X-FlowLens-Request': '1', ...(modern ? {'X-FlowLens-Client': '2'} : {}), ...(cookie ? {Cookie: cookie} : {})}}, response => {
           const chunks = []; response.on('data', chunk => chunks.push(chunk)); response.on('end', () => resolve({status: response.statusCode, headers: response.headers, bytes: Buffer.concat(chunks)}));
         });
-        req.on('error', reject); req.end(data ? JSON.stringify(data) : undefined);
+        req.on('error', reject); req.end(rawBody ?? (data ? JSON.stringify(data) : undefined));
       });
     }
     const login = await request('/api/team/login', {data: {username: 'member', password}});
@@ -69,6 +69,17 @@ test('attachment HTTP downloads require current project access and new clients r
     assert.equal(exported.status, 200);
     assert.equal(exported.headers['content-type'], 'application/zip');
     assert.ok(unzipSync(exported.bytes)['index.html']);
+    assert.equal((await request('/api/team/project-check', {cookie, rawBody: exported.bytes})).status, 403);
+    const adminLogin = await request('/api/team/login', {data: {username: 'admin', password}});
+    const adminCookie = adminLogin.headers['set-cookie'][0].split(';')[0];
+    const checked = await request('/api/team/project-check', {cookie: adminCookie, rawBody: exported.bytes});
+    assert.equal(checked.status, 200);
+    assert.equal(JSON.parse(checked.bytes).integrityPassed, true);
+    const beforeCheckFailure = store.visibleWorkspace(admin, {inlineAttachments: false});
+    assert.equal((await request('/api/team/project-check', {cookie: adminCookie, rawBody: Buffer.from('invalid zip')})).status, 400);
+    assert.deepEqual(store.visibleWorkspace(admin, {inlineAttachments: false}), beforeCheckFailure);
+    assert.equal((await request('/api/team/project-check', {cookie: adminCookie, rawBody: exported.bytes})).status, 200);
+
     const modern = JSON.parse((await request('/api/team/workspace', {cookie})).bytes);
     assert.equal(modern.workspace.cases[0].attachments[0].data, undefined);
     const legacy = JSON.parse((await request('/api/team/workspace', {cookie, modern: false})).bytes);
