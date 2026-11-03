@@ -1,6 +1,6 @@
 # FlowLens
 
-**简体中文** · [English](README.en.md) · [v1.10.2 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.10.2)
+**简体中文** · [English](README.en.md) · [v1.11.0 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.11.0)
 
 **[直接打开在线 Demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -18,7 +18,14 @@
 
 [需求研究与下一阶段缺口](docs/fde-product-audit-2026-11-02.md) · [业务访谈与交付验收工作单](docs/fde-discovery-worksheet.md)
 
-主分支正在开发 1.11 的普通业务跨刷新恢复。请求发送前会写入浏览器恢复存储，刷新后可继续确认。跨刷新、多标签页与存储失败已通过部分开发版验收，附件、重新登录及环境变更的端到端检查继续推进。当前云端和发行版为 1.10.2。[开发进展](docs/delivery-plan.md)
+## 1.11 刷新后继续确认上一次操作
+
+业务操作先写入当前浏览器，再发送给服务器。断线或刷新后，用原账号登录“恢复待确认操作”，可以继续确认、下载原请求，或先查看项目。多标签页、重新登录、8 MiB 附件及存储失败已有实际验收，104 项回归通过。[使用范围与验收](docs/release-1.11.0.md)
+
+恢复记录保存在当前浏览器。填写中尚未点击业务按钮的内容，可通过“下载当前草稿”保留。
+
+![恢复待确认操作](docs/images/request-recovery-1.11.png)
+
 
 ## 1.4 可以让团队一起办理了
 
@@ -80,7 +87,7 @@ Windows、Ubuntu 各通过 93 项回归，容器和云端五账号复验通过�
 
 服务端会检查角色、阶段和修订号。重复请求复用原结果，过期页面不能覆盖新内容。新增了账号停用、密码修改、审计记录、表式版本发布，以及 SQLite 备份恢复工具。
 
-下载发布页中的 `FlowLens-1.9.0-team.zip`，安装 Node.js 24 LTS，按部署指南初始化管理员后运行 `npm start`。协作包附带所需运行文件，可以离线启动。[部署与恢复指南](docs/team-deployment.md) · [本版验收](docs/release-1.9.0.md) · [持续交付计划](docs/delivery-plan.md)
+下载发布页中的 `FlowLens-1.11.0-team.zip`，安装 Node.js 24 LTS，按部署指南初始化管理员后运行 `npm start`。协作包附带所需运行文件，可以离线启动。[部署与恢复指南](docs/team-deployment.md) · [本版验收](docs/release-1.11.0.md) · [持续交付计划](docs/delivery-plan.md)
 
 公开 Demo 提供浏览器本地体验。团队服务需自托管，适合先用脱敏资料做小团队试运行。云端技术验收已有记录，真实客户流程、持续容量和维护交接仍需继续验证。
 

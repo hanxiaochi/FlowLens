@@ -1,6 +1,6 @@
 # FlowLens
 
-[简体中文](README.md) · **English** · [v1.10.2 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.10.2)
+[简体中文](README.md) · **English** · [v1.11.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.11.0)
 
 **[Try the live demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -22,7 +22,14 @@ No installation or API key needed. Start with a fictional supervision applicatio
 
 [1.3 release notes and acceptance](docs/release-1.3.0.md)
 
-The main branch is preparing ordinary business-request recovery for 1.11. Requests are staged in browser storage before sending and can be resumed after a reload. Development checks cover reloads, competing tabs and storage failure. End-to-end checks for attachments, re-login and changed service environments are still in progress. The deployed release remains 1.10.2. [Development progress (Chinese)](docs/delivery-plan.md)
+## 1.11 resumes business actions after a reload
+
+Business requests are stored in the current browser before they are sent. After a lost response or page reload, sign in with the original account to confirm the action, download its original request, or inspect the project first. Acceptance covers competing tabs, re-login, an 8 MiB attachment and storage failure, alongside 104 regression tests. [Scope and acceptance (Chinese)](docs/release-1.11.0.md)
+
+Recovery records stay in this browser's site data. Text still being edited can be preserved with the draft download control.
+
+![Pending business recovery](docs/images/request-recovery-1.11.png)
+
 
 ## 1.4 adds a shared team workspace
 
@@ -84,7 +91,7 @@ Import an application package into the self-hosted team service, create accounts
 
 The server checks project roles, workflow stages, and record revisions. Repeated requests reuse their result. This release also adds account deactivation, password changes, audit history, versioned template publication, and SQLite backup and restore tools.
 
-Download `FlowLens-1.9.0-team.zip`, install Node.js 24 LTS, initialize the administrator, then run `npm start`. The team runtime bundles its required files and needs no npm install. See the [deployment guide (Chinese)](docs/team-deployment.md) and [release acceptance](docs/release-1.9.0.md).
+Download `FlowLens-1.11.0-team.zip`, install Node.js 24 LTS, initialize the administrator, then run `npm start`. The team runtime bundles its required files and needs no npm install. See the [deployment guide (Chinese)](docs/team-deployment.md) and [release acceptance](docs/release-1.11.0.md).
 
 The public demo runs locally in your browser. The shared service is self-hosted and intended for a small-team pilot. Cloud technical acceptance is recorded. Customer workflows, sustained capacity, and maintenance handover still need validation.
 
