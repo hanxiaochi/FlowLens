@@ -178,12 +178,16 @@ async function openRecord(id) {
 async function command(data) {
   if (pending) throw Error('上一项业务操作的结果尚未确认，请先点击“重试原请求”，或下载草稿并重新读取。');
   const request = {...data, operationId: crypto.randomUUID(), expectedInstanceId: serviceContext.instanceId, expectedUserId: user.id};
+  let operationTitle = current()?.title ?? '业务操作';
   if (data.type === 'create') {
     const template = workspace.templates.find(template => template.id === data.templateId);
     if (!template) throw Error('当前表式不可用，请重新读取项目。');
     request.expectedTemplateVersion = template.version;
+    operationTitle = template.title;
   }
-  const entry = await recovery.stage(user.id, serviceContext.instanceId, request, current()?.title ?? workspace.projects.find(project => project.id === projectId)?.name ?? '业务操作');
+  const projectName = workspace.projects.find(project => project.id === projectId)?.name;
+  const description = projectName ? projectName + ' · ' + operationTitle : operationTitle;
+  const entry = await recovery.stage(user.id, serviceContext.instanceId, request, description);
   pending = entry.request;
   await sendPending();
 }
