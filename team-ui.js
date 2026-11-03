@@ -225,6 +225,10 @@ async function recoveryView() {
   const entries = await recovery.list(user.id);
   accountView(); content.replaceChildren();
   content.append(node('h1', '恢复待确认操作'), node('p', '这里保留了当前浏览器中这个账号尚未完成确认的原请求。先核对服务器上的业务，再决定继续确认或移除本机记录。'));
+  content.append(button('保留记录并查看项目', async () => {
+    acceptSession(await api('me')); pending = null; selectedId = ''; selectedRecord = null;
+    await refresh(); home(); say('原请求保留在本机恢复列表，可从“恢复待确认操作”返回。');
+  }));
   if (!entries.length) content.append(node('p', '当前没有待确认操作。'));
   const actionNames = {create: '新建单据', save: '保存填写', submit: '提交办理', advance: '办理并继续', return: '退回修改', attachment: '添加附件'};
   for (const entry of entries) {

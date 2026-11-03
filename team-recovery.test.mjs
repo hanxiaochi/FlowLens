@@ -81,3 +81,22 @@ test('a failed database open can be retried without reloading the page', async (
     assert.equal((await store.list('user-a')).length, 1);
   } finally { await store.close(); }
 });
+
+test('failed cleanup retains a large attachment request for another confirmation attempt', async () => {
+  const store = createRecoveryStore(new IDBFactory());
+  const remove = IDBObjectStore.prototype.delete;
+  try {
+    const input = request({type: 'attachment', attachment: {name: 'fictional.bin', data: 'data:application/octet-stream;base64,' + Buffer.alloc(8 * 1024 * 1024, 1).toString('base64')}});
+    const entry = await store.stage('user-a', 'instance-a', input);
+    IDBObjectStore.prototype.delete = function (key) {
+      const operation = remove.call(this, key);
+      operation.addEventListener('success', () => this.transaction.abort());
+      return operation;
+    };
+    await assert.rejects(store.remove('user-a', entry.operationId));
+    assert.equal((await store.list('user-a'))[0].request.attachment.data, input.attachment.data);
+    IDBObjectStore.prototype.delete = remove;
+    await store.remove('user-a', entry.operationId);
+    assert.deepEqual(await store.list('user-a'), []);
+  } finally { IDBObjectStore.prototype.delete = remove; await store.close(); }
+});
