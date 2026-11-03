@@ -22,6 +22,8 @@ No installation or API key needed. Start with a fictional supervision applicatio
 
 [1.3 release notes and acceptance](docs/release-1.3.0.md)
 
+The main branch is preparing ordinary business-request recovery for 1.11. Service-context checks, account binding and request deadlines have development checks in place. Durable browser recovery is still being implemented. The deployed release remains 1.10.2. [Development progress (Chinese)](docs/delivery-plan.md)
+
 ## 1.4 adds a shared team workspace
 
 1.4.1 fixes successful logins exhausting a shared proxy's login allowance. Windows and Ubuntu each pass 70 regression tests. Linux container and Compose/Caddy checks cover writes, backup restoration, and HTTPS re-login. Relevant code changes trigger these checks automatically. [Cross-platform acceptance run](https://github.com/hanxiaochi/FlowLens/actions/runs/41479752796)

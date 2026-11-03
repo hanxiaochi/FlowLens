@@ -18,6 +18,8 @@
 
 [需求研究与下一阶段缺口](docs/fde-product-audit-2026-11-02.md) · [业务访谈与交付验收工作单](docs/fde-discovery-worksheet.md)
 
+主分支正在开发 1.11 的普通业务跨刷新恢复。服务环境与账号校验、请求超时已有开发版验收，浏览器持久恢复仍在实现。当前云端和发行版为 1.10.2。[开发进展](docs/delivery-plan.md)
+
 ## 1.4 可以让团队一起办理了
 
 1.4.1 修复团队经由代理访问时正常登录误触发限流的问题。Windows 和 Ubuntu 各通过 70 项回归，Linux 容器及 Compose/Caddy 已走通写入、备份恢复与 HTTPS 重新登录。每次相关代码更新会自动复验。[跨平台交付验收](https://github.com/hanxiaochi/FlowLens/actions/runs/41479752796)
