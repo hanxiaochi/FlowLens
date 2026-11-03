@@ -3,7 +3,7 @@ import {validateDecisionRules} from './forms-rules.mjs';
 import {validateWorkflow} from './forms-model.mjs';
 import {validateField,validateFieldValue} from './forms-schema.mjs';
 export const emptyWorkspace=()=>({format:'flowlens-forms',version:3,templates:[],cases:[],applications:[],projects:[]});
-export function validateWorkspace(value,{allowAttachmentReferences=false}={}){
+export function validateWorkspace(value,{allowAttachmentReferences=false,copy=true}={}){
  if(value?.format!=='flowlens-forms'||![1,2,3].includes(value.version)||!Array.isArray(value.templates)||!Array.isArray(value.cases)||value.templates.length>2000||value.cases.length>3000)throw Error('不是有效的业务表单工作包');
  const ids=new Set();let cells=0;
  const string=(s,max=20000)=>{if(typeof s!=='string'||s.length>max)throw Error('工作包文字字段无效');};
@@ -34,7 +34,7 @@ export function validateWorkspace(value,{allowAttachmentReferences=false}={}){
  }
  for(const r of value.cases)if(r.relatedId&&!cases.has(r.relatedId))throw Error('关联单据不存在');
  validateApplications(value);
- return structuredClone(value);
+ return copy ? structuredClone(value) : value;
 }
 export function upgradeWorkspace(value,options){const next=validateWorkspace(value,options);next.version=3;next.applications??=[];next.projects??=[];return next;}
 export function createWorkspaceStore(factory=globalThis.indexedDB,name='flowlens-business-forms'){
