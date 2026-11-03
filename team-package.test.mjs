@@ -45,6 +45,12 @@ test('standalone distribution starts without dependencies and its CLI restores d
     assert.equal(health, 200);
     const session = await store.login('admin', password);
     const originalContext = store.serviceContext(session.user);
+    const reopened = spawnSync(process.execPath, ['--input-type=module', '-e', "import {openTeamStore} from './team-store.mjs'; const store = openTeamStore(process.env.FLOWLENS_DATABASE); console.log(JSON.stringify(store.serviceContext({id: process.env.FLOWLENS_TEST_USER_ID}))); store.close();"], {
+      cwd: output, encoding: 'utf8', timeout: 15000,
+      env: {...process.env, FLOWLENS_DATABASE: database, FLOWLENS_TEST_USER_ID: session.user.id}
+    });
+    assert.equal(reopened.status, 0, reopened.stderr);
+    assert.deepEqual(JSON.parse(reopened.stdout), originalContext);
     const delivery = store.deliveryReport(session.user);
     store.updateDelivery(session.user, {scope: 'instance', checkId: 'https', expectedRevision: 0, expectedContextFingerprint: delivery.contextFingerprint, expectedRestoreMarker: delivery.restoreMarker, operationId: crypto.randomUUID(), status: 'passed', reviewer: 'Package tester', evidence: 'Fictional package acceptance'});
     store.importApplication(session.user, applicationDemo());
