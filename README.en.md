@@ -1,6 +1,6 @@
 # FlowLens
 
-[简体中文](README.md) · **English** · [v1.6.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.6.0)
+[简体中文](README.md) · **English** · [v1.7.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.7.0)
 
 **[Try the live demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -32,6 +32,12 @@ A Windows LAN pilot has passed five-account HTTPS workflow, restore, and browser
 
 An owner-hosted Tencent Cloud pilot has since passed public-IP HTTPS, five-role workflow, concurrent-write conflict, and database restoration checks. Daily backups are enabled. Real-business approval and longer-term operation remain under validation. [Cloud acceptance and screenshot](docs/cloud-pilot-2026-11-03.md)
 
+## 1.7 exports a project handoff archive
+
+Download a project ZIP from the team workspace. It includes printable forms, workflow history, linked records, original attachments and a SHA256 manifest. Extract the archive and open index.html to find each document. The server checks current project access, limits an export to 64 MiB, and releases its transfer slot when a download ends or is interrupted. Windows, Ubuntu and container acceptance pass, with 82 automated tests. [Release notes and remaining checks (Chinese)](docs/release-1.7.0.md)
+
+![Project handoff download](docs/images/project-handoff-1.7.png)
+
 ## 1.6 gives attachments their own storage
 
 Attachments now live as verified binary data in SQLite. Project pages load metadata and fetch files on demand, with current membership checks, cancellation and a download timeout. Existing databases migrate with a pre-migration snapshot, and backups include every attachment. The cloud pilot passed upload, byte-for-byte download and restore checks with three synthetic 8 MiB files. All 79 automated tests pass. Real workload capacity and customer workflows remain under validation. [Upgrade and acceptance notes (Chinese)](docs/release-1.6.0.md)
@@ -50,7 +56,7 @@ Import an application package into the self-hosted team service, create accounts
 
 The server checks project roles, workflow stages, and record revisions. Repeated requests reuse their result. This release also adds account deactivation, password changes, audit history, versioned template publication, and SQLite backup and restore tools.
 
-Download `FlowLens-1.6.0-team.zip`, install Node.js 24 LTS, initialize the administrator, then run `npm start`. The team runtime bundles its required files and needs no npm install. See the [deployment guide (Chinese)](docs/team-deployment.md) and [release acceptance](docs/release-1.5.0.md).
+Download `FlowLens-1.7.0-team.zip`, install Node.js 24 LTS, initialize the administrator, then run `npm start`. The team runtime bundles its required files and needs no npm install. See the [deployment guide (Chinese)](docs/team-deployment.md) and [release acceptance](docs/release-1.5.0.md).
 
 The public demo runs locally in your browser. The shared service is self-hosted and intended for a small-team pilot. Cloud technical acceptance is recorded. Customer workflows, sustained capacity, and maintenance handover still need validation.
 
