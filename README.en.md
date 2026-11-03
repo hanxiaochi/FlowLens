@@ -1,6 +1,6 @@
 # FlowLens
 
-[简体中文](README.md) · **English** · [v1.10.1 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.10.1)
+[简体中文](README.md) · **English** · [v1.10.2 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.10.2)
 
 **[Try the live demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -31,6 +31,8 @@ Post-release tests on main verify full rollback and retry after a late transacti
 A Windows LAN pilot has passed five-account HTTPS workflow, restore, and browser UI checks on the server itself. Access from another computer and real-business approval remain pending. [Pilot status (Chinese)](docs/delivery-plan.md)
 
 An owner-hosted Tencent Cloud pilot has since passed public-IP HTTPS, five-role workflow, concurrent-write conflict, and database restoration checks. Daily backups are enabled. Real-business approval and longer-term operation remain under validation. [Cloud acceptance and screenshot](docs/cloud-pilot-2026-11-03.md)
+
+1.10.2 protects unresolved business requests after a lost response. Repeated button clicks preserve the original operation, and a failed list refresh is distinguished from a failed save. Browser fault-injection checks cover creation and save retries. [Scope and recovery guidance (Chinese)](docs/release-1.10.2.md)
 
 1.10.1 removes a redundant workspace copy during server saves. In the same isolated 500-record test, two-minute sustained writes increased from 283 to 325 and request P95 fell from 730 ms to 569 ms. Cross-platform regression coverage now includes 94 tests, with five-account cloud verification passing. [Update and measurement scope (Chinese)](docs/release-1.10.1.md)
 

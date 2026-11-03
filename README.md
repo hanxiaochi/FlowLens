@@ -1,6 +1,6 @@
 # FlowLens
 
-**简体中文** · [English](README.en.md) · [v1.10.1 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.10.1)
+**简体中文** · [English](README.en.md) · [v1.10.2 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.10.2)
 
 **[直接打开在线 Demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -27,6 +27,8 @@
 Windows 内网试点已完成服务器本机的五账号 HTTPS 办理、恢复演练和浏览器页面复验，其他电脑访问与真实业务确认仍待验收。[试点进展](docs/delivery-plan.md)
 
 随后已在所有者的腾讯云服务器完成公网 IP HTTPS、五角色办理、并发冲突及数据库恢复验收，并启用每日备份。真实业务试点与长期运行观察继续推进。[云端验收与截图](docs/cloud-pilot-2026-11-03.md)
+
+1.10.2 补上断线后的业务重试保护。结果未确认时会保留原操作，避免再次点击按钮另建单据，并区分“业务已保存”和“清单刷新失败”。已通过浏览器故障注入验证。[修复范围与操作说明](docs/release-1.10.2.md)
 
 1.10.1 优化了保存时的重复复制。相同的 500 份虚构业务测试中，两分钟持续保存从 283 次增加到 325 次，请求 P95 从 730 ms 降到 569 ms。94 项跨平台回归和云端五账号核对通过。[更新与测量边界](docs/release-1.10.1.md)
 
