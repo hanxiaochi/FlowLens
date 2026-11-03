@@ -37,13 +37,14 @@ export function createRecoveryStore(factory = globalThis.indexedDB, name = 'flow
     });
   }
   return {
-    async stage(userId, instanceId, request, description = '') {
+    async stage(userId, instanceId, request, description = '', draft = null) {
       if (!userId || !instanceId || request.expectedUserId !== userId || request.expectedInstanceId !== instanceId || typeof request.operationId !== 'string') throw Error('恢复请求缺少当前账号或服务环境。');
       const target = request.type === 'create'
         ? ['create', request.projectId, request.templateId, request.sourceId ?? '', request.relationId ?? '']
         : ['record', request.recordId];
       if (target.some(value => typeof value !== 'string')) throw Error('恢复请求缺少业务编号。');
       const entry = {userId, instanceId, operationId: request.operationId, scope: [userId, instanceId, ...target], request: structuredClone(request), description, createdAt: new Date().toISOString()};
+      if (draft) entry.draft = structuredClone(draft);
       try { await transact('readwrite', records => records.add(entry)); }
       catch (error) {
         if (error.name === 'ConstraintError') throw Error('本机已有相同业务的待确认操作，请先从恢复入口处理。');

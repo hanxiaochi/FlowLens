@@ -49,7 +49,7 @@ export function renderDetailField(parent, field, value, editable) {
       if (editable) {
         const remove = element('button', `移除第 ${index + 1} 行`);
         remove.type = 'button';
-        remove.onclick = () => { rows.splice(index, 1); refreshTotals(); draw(); };
+        remove.onclick = () => { rows.splice(index, 1); refreshTotals(); draw(); backing.dispatchEvent(new Event('input', {bubbles: true})); };
         card.append(remove);
       }
       host.append(card);
@@ -58,7 +58,7 @@ export function renderDetailField(parent, field, value, editable) {
       const add = element('button', '＋ 添加明细行');
       add.type = 'button';
       add.disabled = rows.length >= 100;
-      add.onclick = () => { rows.push({}); refreshTotals(); draw(); };
+      add.onclick = () => { rows.push({}); refreshTotals(); draw(); backing.dispatchEvent(new Event('input', {bubbles: true})); };
       host.append(add);
     }
     if (!rows.length) host.append(element('p', '尚未填写明细'));

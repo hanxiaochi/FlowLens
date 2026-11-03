@@ -100,3 +100,16 @@ test('failed cleanup retains a large attachment request for another confirmation
     assert.deepEqual(await store.list('user-a'), []);
   } finally { IDBObjectStore.prototype.delete = remove; await store.close(); }
 });
+
+test('recovery retains an isolated source-draft version for cleanup after reload', async () => {
+  const factory = new IDBFactory();
+  let store = createRecoveryStore(factory);
+  try {
+    const reference = {draftId: 'draft-a', version: 4};
+    const entry = await store.stage('user-a', 'instance-a', request(), 'Record', reference);
+    reference.version = 5;
+    await store.close(); store = createRecoveryStore(factory);
+    assert.deepEqual((await store.list('user-a'))[0].draft, {draftId: 'draft-a', version: 4});
+    assert.equal(entry.request.draft, undefined);
+  } finally { await store.close(); }
+});

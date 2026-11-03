@@ -5,6 +5,7 @@ import {printableForm} from './forms-print.mjs';
 import {deliveryStatusLabels} from './team-delivery.mjs';
 import {teamJsonRequest} from './team-http.mjs';
 import {createRecoveryStore} from './team-recovery.mjs';
+import {createDraftStore} from './team-drafts.mjs';
 
 const content = document.querySelector('#content');
 const account = document.querySelector('#account');
@@ -12,6 +13,8 @@ const notice = document.querySelector('#notice');
 let user, workspace, memberships = [], selectedId = '', projectId = '', busy = false, pending = null;
 let serviceContext = null;
 const recovery = createRecoveryStore();
+const drafts = createDraftStore();
+let editorSession = null, pendingDraft = null;
 let deliveryDraft = null;
 let selectedRecord = null, listing = null, roleOptions = {};
 let listQuery = {page: 1, filter: 'all', search: ''};
@@ -99,6 +102,7 @@ function accountView() {
   controls.append(button('我的项目', async () => { if (!clean()) return; selectedId = ''; await refresh(); home(); }), button('修改密码', () => { if (clean()) passwordView(); }), button('退出登录', async () => { if (!clean()) return; await api('logout', {}); user = null; workspace = null; selectedId = ''; loginView(); }));
   controls.append(button('下载草稿并重新登录', () => { draft(); user = null; selectedId = ''; pending = null; deliveryDraft = null; loginView(); }));
   controls.append(button('恢复待确认操作', async () => { if (clean()) await recoveryView(); }));
+  controls.append(button('本机填写草稿', async () => { if (clean()) await draftsView(); }));
   if (user.admin) controls.append(button('资料包检查', () => { if (clean()) projectCheckView(); }), button('管理后台', async () => { if (clean()) await adminView(); }), button('运行状态', async () => { if (clean()) await operationsView(); }));
   if (user.admin) controls.append(button('交付检查', async () => { if (clean()) await deliveryView(); }));
   if (user.admin && savedProjectRestore()) controls.append(button('继续待确认恢复', () => { if (clean()) restoreRetryView(); }));
@@ -190,8 +194,11 @@ async function command(data) {
   }
   const projectName = workspace.projects.find(project => project.id === projectId)?.name;
   const description = projectName ? projectName + ' · ' + operationTitle : operationTitle;
-  const entry = await recovery.stage(user.id, serviceContext.instanceId, request, description);
+  if (editorSession?.recordId === data.recordId) await editorSession.saving;
+  const draftReference = editorSession?.recordId === data.recordId ? editorSession.saved : null;
+  const entry = await recovery.stage(user.id, serviceContext.instanceId, request, description, draftReference);
   pending = entry.request;
+  pendingDraft = entry.draft ?? null;
   await sendPending();
 }
 function updatePendingControls() {
@@ -206,7 +213,7 @@ async function sendPending() {
     result = await api('command', pending);
   } catch (error) {
     if (error.status === 400) {
-      try { await recovery.remove(pending.expectedUserId, pending.operationId); pending = null; }
+      try { await recovery.remove(pending.expectedUserId, pending.operationId); pending = null; pendingDraft = null; }
       catch { updatePendingControls(); throw Error('服务器已拒绝该请求，但本机记录清理失败，请从恢复入口处理。'); }
     }
     updatePendingControls();
@@ -214,16 +221,25 @@ async function sendPending() {
     throw error;
   }
   selectedId = result.record.id; selectedRecord = result.record; projectId = result.record.projectId;
-  try { await recovery.remove(pending.expectedUserId, pending.operationId); }
+  try {
+    if (pendingDraft) await drafts.remove(pending.expectedUserId, pendingDraft.draftId, pendingDraft.version);
+    await recovery.remove(pending.expectedUserId, pending.operationId);
+  }
   catch { recordView(); throw Error('业务已保存，但本机恢复记录清理失败。请重试原请求确认并清理。'); }
-  pending = null;
+  pending = null; pendingDraft = null;
   try { await refresh(); recordView(); say('已保存到服务器。'); }
   catch (error) { recordView(); throw Error('业务已保存，但清单刷新失败。请稍后重新读取。' + error.message); }
 }
 async function enterWorkspace() {
   await refresh(); home();
-  try { if ((await recovery.list(user.id)).length) await recoveryView(); }
-  catch (error) { say('本机恢复记录无法读取，提交前需解决存储问题。' + error.message, true); }
+  try {
+    if ((await recovery.list(user.id)).length) { await recoveryView(); return; }
+  }
+  catch (error) { say('本机恢复记录无法读取，提交前需解决存储问题。' + error.message, true); return; }
+  try {
+    const count = (await drafts.list(user.id)).length;
+    if (count) say('发现 ' + count + ' 份本机填写草稿，可从“本机填写草稿”核对恢复。');
+  } catch (error) { say('本机填写草稿无法读取，请使用下载草稿保留填写内容。' + error.message, true); }
 }
 async function recoveryView() {
   acceptSession(await api('me'));
@@ -247,7 +263,7 @@ async function recoveryView() {
     preview.append(node('pre', JSON.stringify({...entry.request, attachment: entry.request.attachment ? {name: entry.request.attachment.name} : undefined}, null, 2).slice(0, 4000)), node('p', '摘要最多显示 4000 字符，完整原请求可下载。'));
     const resume = button('继续确认原请求', async () => {
       if (pending && pending.operationId !== entry.operationId) throw Error('请先处理当前待确认操作。');
-      pending = entry.request; await sendPending();
+      pending = entry.request; pendingDraft = entry.draft ?? null; await sendPending();
     }, 'primary'); resume.disabled = !matches;
     const reviewed = input('已核对服务器状态', 'checkbox');
     const remove = button('移除这条本机记录', async () => {
@@ -307,7 +323,7 @@ function renderBlocks(parent, blocks, record, role) {
     parent.append(table);
   }
 }
-function recordView() {
+function recordView(restoredDraft = null) {
   accountView(); content.replaceChildren();
   const record = current(); if (!record) { home(); return; }
   const role = roleFor(record); const editable = roles().includes(role) && record.status !== 'complete';
@@ -315,11 +331,13 @@ function recordView() {
   toolbar.append(button('返回项目', async () => { if (clean()) { selectedId = ''; await refresh(); home(); } }), button('下载当前草稿', draft), button('下载草稿并重新读取', async () => { draft(); pending = null; await refresh(); recordView(); say('已重新读取服务器版本，请核对已下载草稿中的内容。'); }), button('下载打印版', () => { if (clean()) download('FlowLens-业务打印.html', printableForm(record, {shared: true}), 'text/html'); }));
   content.append(toolbar, node('h1', record.title), node('p', record.project + ' · 修订 ' + record.revision + ' · ' + (record.status === 'complete' ? '已归档' : '当前办理角色 ' + role), 'muted'));
   const layout = node('div', undefined, 'record-layout'); const form = node('article', undefined, 'panel record-form');
-  renderBlocks(form, record.template.blocks, record, role);
+  const restoredValues = Object.fromEntries(record.template.fields.filter(field => canEdit(record, field, role) && roles().includes(role) && typeof restoredDraft?.values[field.id] === 'string').map(field => [field.id, restoredDraft.values[field.id]]));
+  renderBlocks(form, record.template.blocks, {...record, values: {...record.values, ...restoredValues}}, role);
   const side = node('aside', undefined, 'panel sidebar');
   const actions = node('div', undefined, 'record-actions');
   if (editable) {
     const note = node('textarea'); note.id = 'operation-note'; note.setAttribute('aria-label', '办理意见'); note.placeholder = '退回时请说明原因';
+    note.value = restoredDraft?.note ?? '';
     actions.append(label('办理意见', note));
     const execute = type => command({type, recordId: record.id, expectedRevision: record.revision, values: values(), note: note.value});
     actions.append(button('保存填写', () => execute('save')), button(record.status === 'draft' ? '提交办理' : '办理并继续', () => execute(record.status === 'draft' ? 'submit' : 'advance'), 'primary'));
@@ -354,7 +372,105 @@ function recordView() {
     item.append(node('strong', (event.actor?.external ? '外部历史 · ' + event.actor.name : event.actor?.name || '导入前记录') + ' · ' + event.role), node('p', event.from + ' → ' + event.to), node('p', event.note), node('small', event.at)); side.append(item);
   }
   layout.append(form, side); content.append(layout);
+  editorSession = {
+    draftId: crypto.randomUUID(), userId: user.id, instanceId: serviceContext.instanceId,
+    recordId: record.id, recordRevision: record.revision,
+    version: 0, saved: null, saving: Promise.resolve()
+  };
+  const draftStatus = node('p', '填写内容会保存在当前浏览器。提交前离开仍会提醒；清除网站数据会删除本机草稿。', 'draft-info');
+  draftStatus.setAttribute('role', 'status'); side.prepend(draftStatus);
+  const session = editorSession;
+  const remember = () => {
+    if (pending || !editable || session !== editorSession) return;
+    const version = ++session.version;
+    const snapshot = {
+      userId: session.userId, draftId: session.draftId, instanceId: session.instanceId,
+      recordId: record.id, recordRevision: record.revision, version,
+      values: values(), note: content.querySelector('#operation-note')?.value ?? '',
+      description: record.project + ' · ' + record.title, fields: record.template.fields,
+      labels: Object.fromEntries(record.template.fields.map(field => [field.id, field.label]))
+    };
+    draftStatus.textContent = '正在保存本机草稿…';
+    session.saving = drafts.save(snapshot).then(saved => {
+      if (!session.saved || saved.version > session.saved.version) session.saved = {draftId: saved.draftId, version: saved.version};
+      if (version === session.version) { draftStatus.classList.remove('status-warning'); draftStatus.textContent = '本机草稿已保存 · ' + new Date(saved.updatedAt).toLocaleTimeString() + '。业务尚未提交服务器。'; }
+    }).catch(error => {
+      if (version === session.version) { draftStatus.textContent = '本机草稿保存失败。' + error.message + ' 请使用“下载当前草稿”。'; draftStatus.classList.add('status-warning'); }
+    });
+  };
+  layout.addEventListener('input', event => { if (event.target.type !== 'file') remember(); });
+  layout.addEventListener('change', event => { if (event.target.type !== 'file') remember(); });
   updatePendingControls();
+  if (restoredDraft) remember();
+}
+
+function draftValue(field, value) {
+  const result = node('dd');
+  if (field?.type === 'table' && value) {
+    try {
+      const rows = JSON.parse(value);
+      if (!Array.isArray(rows)) throw Error('Invalid table');
+      rows.forEach((row, index) => {
+        result.append(node('p', '第 ' + (index + 1) + ' 行'));
+        for (const column of field.columns) result.append(node('p', column.label + ' · ' + (row[column.id] ?? '')));
+      });
+      if (!rows.length) result.append(node('p', '尚未填写明细'));
+      return result;
+    } catch { /* Older drafts can still be downloaded with their original content. */ }
+  }
+  result.textContent = field?.type === 'boolean' && ['true', 'false'].includes(value) ? (value === 'true' ? '是' : '否') : value;
+  return result;
+}
+
+async function draftsView() {
+  acceptSession(await api('me'));
+  selectedId = ''; selectedRecord = null; editorSession = null;
+  const entries = await drafts.list(user.id);
+  accountView(); content.replaceChildren();
+  content.append(node('h1', '本机填写草稿'), node('p', '这里保留当前账号在这个浏览器中填写过的草稿。每个编辑页面单独保存。先查看服务器单据，再决定是否带回填写区。'));
+  if (!entries.length) content.append(node('p', '当前没有本机填写草稿。'));
+  for (const entry of entries) {
+    const card = node('article', undefined, 'panel');
+    card.append(node('h2', entry.description), node('p', new Date(entry.updatedAt).toLocaleString() + ' · 原单据修订 ' + entry.recordRevision));
+    const preview = node('details'); preview.append(node('summary', '查看填写内容'));
+    const fields = node('dl', undefined, 'record-summary');
+    for (const [key, value] of Object.entries(entry.values)) fields.append(node('dt', entry.labels?.[key] ?? key), draftValue(entry.fields?.find(field => field.id === key), value));
+    fields.append(node('dt', '办理意见'), node('dd', entry.note)); preview.append(fields); card.append(preview);
+    const review = button('核对服务器单据', async () => {
+      acceptSession(await api('me'));
+      if (entry.userId !== user.id || entry.instanceId !== serviceContext.instanceId) throw Error('账号或服务环境已变化，请下载草稿并人工核对。');
+      const result = await api('record?recordId=' + encodeURIComponent(entry.recordId));
+      selectedRecord = result.record; selectedId = result.record.id; projectId = result.record.projectId;
+      await refresh(); recordView();
+      const compare = node('section', undefined, 'panel');
+      compare.append(node('h2', '核对后带回填写区'), node('p', '草稿来自修订 ' + entry.recordRevision + '，服务器当前修订 ' + current().revision + '。原草稿会保留，新编辑另存一份。'));
+      const differences = node('dl', undefined, 'record-summary');
+      for (const [key, value] of Object.entries(entry.values)) {
+        if (value === (current().values[key] ?? '')) continue;
+        const field = current().template.fields.find(field => field.id === key);
+        differences.append(node('dt', (entry.labels?.[key] ?? key) + ' · 服务器'), draftValue(field, current().values[key] ?? ''), node('dt', (entry.labels?.[key] ?? key) + ' · 草稿'), draftValue(entry.fields?.find(field => field.id === key) ?? field, value));
+      }
+      differences.append(node('dt', '草稿办理意见'), node('dd', entry.note));
+      const apply = button('将草稿带回填写区', () => {
+        if (!clean()) return;
+        recordView(entry); say('草稿已带回可编辑字段，请核对后保存或提交。原草稿仍在本机列表。');
+      });
+      apply.disabled = current().revision !== entry.recordRevision || current().status === 'complete' || !roles().includes(roleFor(current()));
+      compare.append(differences, apply, button('下载这份草稿', () => download('FlowLens-本机草稿-' + entry.draftId + '.json', JSON.stringify(entry, null, 2))));
+      if (apply.disabled) compare.append(node('p', '单据版本或办理权限已变化，请参考草稿人工核对填写。', 'status-warning'));
+      content.prepend(compare);
+    });
+    review.disabled = entry.instanceId !== serviceContext.instanceId;
+    const reviewed = input('已核对本机草稿', 'checkbox');
+    const remove = button('移除此草稿', async () => {
+      if (!await drafts.remove(entry.userId, entry.draftId, entry.version)) throw Error('这份草稿有新的编辑，请重新读取列表后核对。');
+      await draftsView();
+    }); remove.disabled = true; reviewed.onchange = () => { remove.disabled = !reviewed.checked; };
+    card.append(review, button('下载草稿', () => download('FlowLens-本机草稿-' + entry.draftId + '.json', JSON.stringify(entry, null, 2))), label('我已核对，可以移除此草稿', reviewed), remove);
+    if (review.disabled) card.append(node('p', '草稿来自其他服务环境，可下载后人工核对。', 'status-warning'));
+    content.append(card);
+  }
+  say('本机草稿仅在当前浏览器保留，下载后可另行备份。');
 }
 function passwordView() {
   content.replaceChildren(); const panel = node('section', undefined, 'panel login'); panel.append(node('h2', '修改密码'));

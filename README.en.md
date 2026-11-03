@@ -224,4 +224,6 @@ Found a problem or have an idea? Open an [issue](https://github.com/hanxiaochi/F
 
 ## Development status
 
-Version 1.12 is in development on main. Record cards show a short preview of the first three populated fields from each record’s saved template, together with its ID. All 105 local tests pass; search and opening the matching record have been checked in the browser. The published release and cloud app remain on 1.11.0. Autosave for unsubmitted edits is still being designed. Use Save or Download draft for now.
+Version 1.12 is in development on main. The published release and cloud app remain on 1.11.0. Record cards show a short preview of three populated fields and the record ID. Local drafts retain text, detail rows and action notes in this browser. The header provides access after reload, and recovery shows differences against the server record. Changed revisions require manual reconciliation. Each editing page keeps a separate draft.
+
+All 111 local tests pass. Browser checks cover draft recovery, cleanup of the submitted draft version, stale-revision protection, draft download after storage failure, and the narrow-screen record list. Multi-tab, permission-change and combined failure acceptance is still in progress. Clearing site data deletes local drafts. Use Save or Submit to store business changes on the server.

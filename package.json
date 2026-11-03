@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test engine.test.mjs model.test.mjs layout.test.mjs diagrams.test.mjs narration.test.mjs data.test.mjs export.test.mjs deployment.test.mjs image-input.test.mjs generation.test.mjs migration.test.mjs forms.test.mjs demo.test.mjs forms-delivery.test.mjs apps.test.mjs team.test.mjs team-package.test.mjs team-project-check.test.mjs team-project-restore.test.mjs team-read-model.test.mjs team-http.test.mjs team-recovery.test.mjs",
+    "test": "node --test engine.test.mjs model.test.mjs layout.test.mjs diagrams.test.mjs narration.test.mjs data.test.mjs export.test.mjs deployment.test.mjs image-input.test.mjs generation.test.mjs migration.test.mjs forms.test.mjs demo.test.mjs forms-delivery.test.mjs apps.test.mjs team.test.mjs team-package.test.mjs team-project-check.test.mjs team-project-restore.test.mjs team-read-model.test.mjs team-http.test.mjs team-recovery.test.mjs team-drafts.test.mjs",
     "build:demo": "node scripts/build-demo.mjs",
     "start:team": "node team-server.mjs",
     "build:team": "node scripts/build-team.mjs"
@@ -18,7 +18,7 @@
     "@xmldom/xmldom": "^0.9.12",
     "fake-indexeddb": "^6.2.7"
   },
-  "version": "1.12.0-dev.1",
+  "version": "1.12.0-dev.2",
   "engines": {
     "node": ">=24"
   },
