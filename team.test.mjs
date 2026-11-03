@@ -46,9 +46,9 @@ test('attachment HTTP downloads require current project access and new clients r
     const bytes = Buffer.from([0, 255, 1, 129]);
     const record = store.command(member, {type: 'attachment', recordId: source.id, expectedRevision: source.revision, operationId: crypto.randomUUID(), attachment: {name: '证明".bin', data: 'data:application/octet-stream;base64,' + bytes.toString('base64')}}, {inlineAttachments: false}).record;
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-    function request(path, {data, cookie, rawBody, modern = true} = {}) {
+    function request(path, {data, cookie, rawBody, restoreOptions, modern = true} = {}) {
       return new Promise((resolve, reject) => {
-        const req = http.request({hostname: '127.0.0.1', port: server.address().port, path, method: data || rawBody ? 'POST' : 'GET', headers: {Host: '127.0.0.1:4186', 'Content-Type': rawBody ? 'application/zip' : 'application/json', 'X-FlowLens-Request': '1', ...(modern ? {'X-FlowLens-Client': '2'} : {}), ...(cookie ? {Cookie: cookie} : {})}}, response => {
+        const req = http.request({hostname: '127.0.0.1', port: server.address().port, path, method: data || rawBody ? 'POST' : 'GET', headers: {Host: '127.0.0.1:4186', 'Content-Type': rawBody ? 'application/zip' : 'application/json', 'X-FlowLens-Request': '1', ...(modern ? {'X-FlowLens-Client': '2'} : {}), ...(restoreOptions ? {'X-FlowLens-Restore': encodeURIComponent(JSON.stringify(restoreOptions))} : {}), ...(cookie ? {Cookie: cookie} : {})}}, response => {
           const chunks = []; response.on('data', chunk => chunks.push(chunk)); response.on('end', () => resolve({status: response.statusCode, headers: response.headers, bytes: Buffer.concat(chunks)}));
         });
         req.on('error', reject); req.end(rawBody ?? (data ? JSON.stringify(data) : undefined));
@@ -79,6 +79,17 @@ test('attachment HTTP downloads require current project access and new clients r
     assert.equal((await request('/api/team/project-check', {cookie: adminCookie, rawBody: Buffer.from('invalid zip')})).status, 400);
     assert.deepEqual(store.visibleWorkspace(admin, {inlineAttachments: false}), beforeCheckFailure);
     assert.equal((await request('/api/team/project-check', {cookie: adminCookie, rawBody: exported.bytes})).status, 200);
+    const checkedReport = JSON.parse(checked.bytes);
+    const restoreOptions = {operationId: crypto.randomUUID(), projectName: 'HTTP restored project', archiveSha256: checkedReport.archiveSha256, expectedRevision: checkedReport.targetRevision, memberships: [{userId: member.id, roles: ['专业监理']}]};
+    const preview = await request('/api/team/project-restore-preview', {cookie: adminCookie, rawBody: exported.bytes, restoreOptions});
+    assert.equal(preview.status, 200);
+    const confirmedOptions = {...restoreOptions, confirmed: true, planFingerprint: JSON.parse(preview.bytes).planFingerprint};
+    assert.equal((await request('/api/team/project-restore', {cookie, rawBody: exported.bytes, restoreOptions: confirmedOptions})).status, 403);
+    const restored = await request('/api/team/project-restore', {cookie: adminCookie, rawBody: exported.bytes, restoreOptions: confirmedOptions});
+    assert.equal(restored.status, 200);
+    assert.deepEqual((await request('/api/team/project-restore', {cookie: adminCookie, rawBody: exported.bytes, restoreOptions: confirmedOptions})).bytes, restored.bytes);
+    assert.equal(store.visibleWorkspace(admin, {inlineAttachments: false}).workspace.projects.length, 2);
+
 
     const modern = JSON.parse((await request('/api/team/workspace', {cookie})).bytes);
     assert.equal(modern.workspace.cases[0].attachments[0].data, undefined);

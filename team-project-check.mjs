@@ -66,7 +66,7 @@ function archiveEntries(bytes) {
   return entries;
 }
 
-export function checkProjectArchive(input, current) {
+export function inspectProjectArchive(input, current) {
   const bytes = Buffer.isBuffer(input) ? input : Buffer.from(input);
   const entries = archiveEntries(bytes);
   const files = new Map();
@@ -123,12 +123,17 @@ export function checkProjectArchive(input, current) {
       if (existing) conflicts.push({kind: key, id: incoming.id, name: incoming.title || incoming.name || incoming.id, incomingRevision: incoming.revision ?? null, currentRevision: existing.revision ?? null, sameDefinition: key === 'templates' || key === 'applications' ? isDeepStrictEqual(existing, incoming) : null});
     }
   }
-  return {
+  const report = {
     checkedAt: new Date().toISOString(), archiveSha256: hash(bytes), integrityPassed: true,
     project: {id: project.project.id, name: project.project.name}, records: workspace.cases.length,
     attachments: attachmentCount, files: files.size, expandedBytes: entries.reduce((sum, entry) => sum + entry.original, 0),
     targetRevision: current.storageRevision, conflicts, requiredRoles: [...new Set([...workspace.templates, ...workspace.cases.map(record => record.template)].flatMap(template => [template.submitterRole || '填报人', ...template.workflow.map(stage => stage.role)]))], historicalActors: [...historicalActors.values()],
     nextStep: conflicts.length ? '存在已有编号，请先核对差异与恢复目标。' : '编号未冲突，仍需确认表式、当前成员权限和历史账号对应。',
-    notice: '文件检查通过。清单由资料包提供，业务真实性需交接双方确认。本次仅检查，恢复功能尚未开放。'
+    notice: '文件检查通过。清单由资料包提供，业务真实性需交接双方确认。请先预览恢复方案，再确认目标项目和成员安排。'
   };
+  return {report, workspace, files};
+}
+
+export function checkProjectArchive(input, current) {
+  return inspectProjectArchive(input, current).report;
 }

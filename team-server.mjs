@@ -34,7 +34,7 @@ export function createTeamServer({database = resolve(root, '.local/team.sqlite')
     try { return JSON.parse(Buffer.concat(chunks).toString()); }
     catch { fail(400, 'JSON 内容无效'); }
   }
-  const server = http.createServer(async (req, res) => {
+  const server = http.createServer({maxHeaderSize: 96 * 1024}, async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'same-origin');
@@ -109,7 +109,7 @@ export function createTeamServer({database = resolve(root, '.local/team.sqlite')
         if (path === '/api/team/delivery') return send(res, 200, store.deliveryReport(user, new URL(req.url, origin).searchParams.get('scope') || 'instance', origin));
         fail(404, '接口不存在');
       }
-      if (path === '/api/team/project-check') {
+      if (['/api/team/project-check', '/api/team/project-restore-preview', '/api/team/project-restore'].includes(path)) {
         store.requireAdmin(user);
         if (req.headers['content-type'] !== 'application/zip') fail(415, '请上传 ZIP 资料包');
         if (checkingProject) fail(503, '正在检查另一份资料包，请稍后重试');
@@ -121,7 +121,15 @@ export function createTeamServer({database = resolve(root, '.local/team.sqlite')
             if (length > projectArchiveLimit) fail(413, '资料 ZIP 最大 66 MiB');
             chunks.push(chunk);
           }
-          return send(res, 200, store.checkProjectArchive(user, Buffer.concat(chunks)));
+          const bytes = Buffer.concat(chunks);
+          if (path === '/api/team/project-check') return send(res, 200, store.checkProjectArchive(user, bytes));
+          if ((req.headers['x-flowlens-restore'] ?? '').length > 65536) fail(413, '恢复参数过大，请减少本次成员安排');
+          let options;
+          try { options = JSON.parse(decodeURIComponent(req.headers['x-flowlens-restore'] ?? '')); }
+          catch { fail(400, '恢复参数无效，请重新预览'); }
+          if (!options || typeof options !== 'object' || Array.isArray(options)) fail(400, '恢复参数无效');
+          if (path === '/api/team/project-restore-preview') return send(res, 200, store.previewProjectRestore(user, bytes, options));
+          return send(res, 200, store.restoreProject(user, bytes, options));
         } finally { checkingProject = false; }
       }
       const input = await body(req, ['/api/team/import', '/api/team/definitions'].includes(path) ? 32 * 1024 * 1024 : path === '/api/team/command' ? 15 * 1024 * 1024 : 64 * 1024);

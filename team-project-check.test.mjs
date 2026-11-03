@@ -81,7 +81,7 @@ test('project checker bounds actual deflate output and rejects invalid project r
     central = expanded.indexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02]), central + 4);
   }
   assert.throws(() => checkProjectArchive(expanded, emptyWorkspace()), /解压失败/);
-  for (const change of [project => { project.records[0].relatedId = 'missing'; }, project => { project.records[0].projectId = 'outside'; }, project => { project.records[0].template.version = -1; }]) {
+  for (const change of [project => { project.records[0].relatedId = 'missing'; }, project => { project.records[0].projectId = 'outside'; }, project => { project.records[0].template.version = -1; }, project => { project.records[0].provenance = [{fieldId: 'project', value: 'x', source: 'record', sourceRevision: 1}]; }]) {
     assert.throws(() => checkProjectArchive(mutate(archive, files => { const project = JSON.parse(Buffer.from(files['project.json'])); change(project); files['project.json'] = Buffer.from(JSON.stringify(project)); }, {manifest: true}), emptyWorkspace()));
   }
 });

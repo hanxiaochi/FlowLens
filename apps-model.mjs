@@ -126,13 +126,13 @@ export function validateApplications(workspace) {
       const source = workspace.cases.find(item => item.id === record.relatedId);
       if (!source || source.appId !== record.appId || source.projectId !== record.projectId) throw Error('关联业务必须属于同一项目');
     }
-    if (record.link && (record.link.sourceId !== record.relatedId || !Number.isSafeInteger(record.link.sourceRevision) || record.link.sourceRevision < 0 || typeof record.link.relationId !== 'string' || typeof record.link.label !== 'string' || !Array.isArray(record.link.mappings))) throw Error('关联来源快照无效');
+    if (record.link && (!record.relatedId || record.link.sourceId !== record.relatedId || !Number.isSafeInteger(record.link.sourceRevision) || record.link.sourceRevision < 0 || typeof record.link.relationId !== 'string' || typeof record.link.label !== 'string' || !Array.isArray(record.link.mappings))) throw Error('关联来源快照无效');
     if (record.provenance !== undefined) {
       if (!Array.isArray(record.provenance) || record.provenance.length > 1000) throw Error('字段来源快照无效');
       for (const entry of record.provenance) {
         if (!entry || !record.template.fields.some(field => field.id === entry.fieldId) || typeof entry.value !== 'string' || !['project', 'record'].includes(entry.source)) throw Error('字段来源快照无效');
         if (entry.source === 'project' && entry.sourceId !== record.projectId) throw Error('字段项目来源无效');
-        if (entry.source === 'record' && (entry.sourceId !== record.relatedId || !Number.isSafeInteger(entry.sourceRevision))) throw Error('字段上游来源无效');
+        if (entry.source === 'record' && (typeof entry.sourceId !== 'string' || !record.relatedId || entry.sourceId !== record.relatedId || !Number.isSafeInteger(entry.sourceRevision))) throw Error('字段上游来源无效');
       }
     }
   }

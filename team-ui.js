@@ -85,6 +85,7 @@ function accountView() {
   controls.append(button('下载草稿并重新登录', () => { draft(); user = null; selectedId = ''; pending = null; deliveryDraft = null; loginView(); }));
   if (user.admin) controls.append(button('资料包检查', () => { if (clean()) projectCheckView(); }), button('管理后台', async () => { if (clean()) await adminView(); }), button('运行状态', async () => { if (clean()) await operationsView(); }));
   if (user.admin) controls.append(button('交付检查', async () => { if (clean()) await deliveryView(); }));
+  if (user.admin && localStorage.getItem('flowlens.restore.' + user.id)) controls.append(button('继续待确认恢复', () => { if (clean()) restoreRetryView(); }));
   account.append(controls);
 }
 function loginView() {
@@ -229,6 +230,7 @@ function recordView() {
   } else actions.append(node('p', record.status === 'complete' ? '这份业务已完成归档。' : '等待项目中的 ' + role + ' 办理。'));
   const retry = button('重试原请求', sendPending); retry.id = 'retry-request'; retry.hidden = !pending; actions.append(retry);
   side.append(actions);
+  if (record.restoration) side.append(node('p', '恢复来源 · ' + record.restoration.sourceProjectName), node('p', '本次恢复由 ' + record.restoration.restoredBy.name + ' 于 ' + record.restoration.restoredAt + ' 执行。', 'muted'));
   for (const attachment of record.attachments) side.append(button('下载附件 · ' + attachment.name, async () => {
     if (attachment.data) { const link = node('a'); link.href = attachment.data; link.download = attachment.name; link.click(); return; }
     await downloadFromServer('/api/team/attachment?recordId=' + encodeURIComponent(record.id) + '&attachmentId=' + encodeURIComponent(attachment.id), attachment.name);
@@ -243,7 +245,7 @@ function recordView() {
   side.append(node('h3', '办理历史'));
   for (const event of [...record.events].reverse()) {
     const item = node('div', undefined, 'event');
-    item.append(node('strong', (event.actor?.name || '导入前记录') + ' · ' + event.role), node('p', event.from + ' → ' + event.to), node('p', event.note), node('small', event.at)); side.append(item);
+    item.append(node('strong', (event.actor?.external ? '外部历史 · ' + event.actor.name : event.actor?.name || '导入前记录') + ' · ' + event.role), node('p', event.from + ' → ' + event.to), node('p', event.note), node('small', event.at)); side.append(item);
   }
   layout.append(form, side); content.append(layout);
 }
@@ -360,7 +362,7 @@ function projectCheckView() {
       results.append(node('h3', '需要确认的办理角色'), node('p', report.requiredRoles.join('、')));
       results.append(node('h3', '历史操作者 · ' + report.historicalActors.length));
       for (const actor of report.historicalActors) results.append(node('p', actor.name + ' · ' + actor.id));
-      results.append(node('p', '历史操作者信息来自资料包，后续恢复需单独确认当前账号与项目角色。'), button('下载检查报告', () => download('FlowLens-资料检查.json', JSON.stringify(report, null, 2))));
+      results.append(node('p', '历史操作者信息来自资料包，后续恢复需单独确认当前账号与项目角色。'), button('下载检查报告', () => download('FlowLens-资料检查.json', JSON.stringify(report, null, 2))), button('准备恢复到新项目', () => projectRestoreView(selected, report), 'primary'));
       say('检查完成，请核对报告中的差异和待确认事项。');
     } catch (error) {
       if (controller.signal.aborted) { say('检查已取消或等待超时，可以重新尝试。'); return; }
@@ -369,6 +371,102 @@ function projectCheckView() {
   }, 'primary');
   panel.append(label('项目资料包', file), check); content.append(panel, results);
 }
+
+async function restoreArchiveRequest(path, file, options) {
+  const encoded = encodeURIComponent(JSON.stringify(options));
+  if (encoded.length > 65536) throw Error('恢复参数过大，请减少本次成员安排');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 120000);
+  try {
+    const response = await fetch('/api/team/' + path, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/zip', 'X-FlowLens-Request': '1', 'X-FlowLens-Restore': encoded}, body: file, signal: controller.signal});
+    const result = await response.json();
+    if (!response.ok) throw Object.assign(Error(result.error || '恢复请求失败'), {status: response.status});
+    return result;
+  } finally { clearTimeout(timer); }
+}
+function showRestorePlan(panel, plan) {
+  panel.append(node('h2', '目标项目 · ' + plan.projectName), node('p', '新增 ' + plan.newApplications + ' 个应用、' + plan.newTemplates + ' 份表式和 ' + plan.newRecords + ' 份业务。'), node('p', '附件合计 ' + plan.attachmentBytes + ' 字节，恢复后工作区元数据 ' + plan.projectedMetadataBytes + ' 字节。'));
+  for (const member of plan.assignments) panel.append(node('p', member.name + ' · ' + member.roles.join('、')));
+  panel.append(node('p', '尚未分配的角色 · ' + (plan.unassignedRoles.join('、') || '全部已安排')), node('p', '原编号映射保存在恢复报告中。已填写内容及业务编号文本原样保留。历史操作者将标记为外部历史，后续办理由目标项目成员完成。'));
+}
+async function submitProjectRestore(file, saved) {
+  // Persist the confirmed request before sending so a lost response can be retried after reload.
+  const key = 'flowlens.restore.' + user.id;
+  localStorage.setItem(key, JSON.stringify(saved));
+  accountView();
+  say('正在恢复。若连接中断，可从顶部继续重试同一次恢复。');
+  let result;
+  try { result = await restoreArchiveRequest('project-restore', file, saved.options); }
+  catch (error) {
+    if (!error.status) throw Error('暂未收到恢复结果，请点击顶部“继续待确认恢复”重试同一次请求。');
+    throw error;
+  }
+  localStorage.removeItem(key);
+  projectId = result.projectId; await refresh(); home();
+  say('已恢复到 ' + result.projectName + '。请核对单据、附件与成员安排。');
+  content.prepend(button('下载本次恢复报告', () => download('FlowLens-项目恢复.json', JSON.stringify(result, null, 2))));
+}
+function restoreRetryView() {
+  const key = 'flowlens.restore.' + user.id;
+  const saved = JSON.parse(localStorage.getItem(key));
+  if (!saved) { say('当前没有待重试恢复。'); return; }
+  selectedId = ''; content.replaceChildren(); accountView();
+  const panel = node('section', undefined, 'panel stack project-check');
+  panel.append(node('h1', '继续已确认的恢复'), node('p', '重新选择同一份 ZIP。服务器会复用已完成的结果，或在重新核验后继续原请求。'));
+  showRestorePlan(panel, saved.plan);
+  const file = input('重选原项目 ZIP', 'file'); file.accept = '.zip';
+  panel.append(label('原资料包 · ' + saved.filename, file), button('重试已确认恢复', async () => {
+    const selected = file.files[0]; if (!selected) throw Error('请选择原资料包');
+    if (selected.size > 66 * 1024 * 1024) throw Error('资料 ZIP 最大 66 MiB');
+    await submitProjectRestore(selected, saved);
+  }, 'primary'), button('放弃本次重试并返回项目核对', async () => {
+    localStorage.removeItem(key); await refresh(); home(); say('已结束本次重试，请先核对项目列表，再决定是否重新恢复。');
+  }));
+  content.append(panel);
+}
+async function projectRestoreView(file, report) {
+  if (localStorage.getItem('flowlens.restore.' + user.id)) { restoreRetryView(); return; }
+  const data = await api('admin');
+  selectedId = ''; content.replaceChildren(); accountView();
+  const panel = node('section', undefined, 'panel stack project-check');
+  panel.append(node('h1', '恢复到一个新项目'), node('p', '确认资料来源后，设置目标项目和办理成员。系统会创建独立编号，并保留原单据关联与外部历史。'));
+  const name = input('恢复后的项目名称'); name.maxLength = 200; name.value = (report.project.name + ' · 恢复副本').slice(0, 200);
+  panel.append(label('新项目名称', name));
+  const choices = node('div', undefined, 'cards');
+  const selections = [];
+  const preview = node('section', undefined, 'panel stack project-check');
+  name.oninput = () => preview.replaceChildren();
+  for (const member of data.users.filter(item => !item.disabled)) {
+    const card = node('section', undefined, 'card stack'); card.append(node('h3', member.name + ' · ' + member.username));
+    for (const role of report.requiredRoles) {
+      const check = input(member.name + ' · ' + role, 'checkbox'); check.onchange = () => preview.replaceChildren();
+      const row = label(role, check); row.className = 'check'; card.append(row);
+      selections.push({userId: member.id, role, check});
+    }
+    choices.append(card);
+  }
+  panel.append(node('p', '勾选本项目的办理角色。未分配的角色可以在恢复后由管理员补充。'), choices, button('预览恢复方案', async () => {
+    preview.replaceChildren();
+    const assignments = new Map();
+    for (const item of selections.filter(item => item.check.checked)) {
+      if (!assignments.has(item.userId)) assignments.set(item.userId, []);
+      assignments.get(item.userId).push(item.role);
+    }
+    const options = {operationId: crypto.randomUUID(), projectName: name.value, archiveSha256: report.archiveSha256, expectedRevision: report.targetRevision, memberships: [...assignments].map(([userId, roles]) => ({userId, roles}))};
+    const plan = await restoreArchiveRequest('project-restore-preview', file, options);
+    showRestorePlan(preview, plan);
+    const acknowledgement = input('我已核对资料来源和恢复方案', 'checkbox');
+    const confirm = button('确认恢复到 ' + plan.projectName, async () => {
+      if (!acknowledgement.checked) throw Error('请先核对并确认恢复方案');
+      await submitProjectRestore(file, {filename: file.name, plan, options: {...options, planFingerprint: plan.planFingerprint, confirmed: true}});
+    }, 'primary');
+    confirm.disabled = true; acknowledgement.onchange = () => { confirm.disabled = !acknowledgement.checked; };
+    preview.append(label('我已核对资料来源和恢复方案', acknowledgement), confirm);
+    say('请核对目标项目、成员安排和新增内容，再确认恢复。');
+  }));
+  content.append(panel, preview);
+}
+
 
 async function adminView() {
   const data = await api('admin'); await refresh(); content.replaceChildren(); accountView();

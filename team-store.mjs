@@ -1,4 +1,5 @@
-import {checkProjectArchive} from './team-project-check.mjs';
+import {prepareProjectRestore} from './team-project-restore.mjs';
+import {checkProjectArchive, inspectProjectArchive} from './team-project-check.mjs';
 import {buildProjectArchive} from './team-project-export.mjs';
 import {DatabaseSync, backup} from 'node:sqlite';
 import {randomBytes, randomUUID, scrypt as derive, timingSafeEqual, createHash} from 'node:crypto';
@@ -260,12 +261,67 @@ export function openTeamStore(filename) {
       return result;
     } catch (error) { db.exec('ROLLBACK'); throw error; }
   }
+  function restorePlan(user, bytes, options) {
+    admin(user);
+    const current = workspace();
+    if (options.expectedRevision !== current.storageRevision) fail(409, '当前实例已变化，请重新检查并预览恢复');
+    const inspection = inspectProjectArchive(bytes, current);
+    const prepared = prepareProjectRestore(inspection, options, user);
+    const assignments = options.memberships.map(membership => {
+      const member = db.prepare('SELECT id,name,disabled FROM users WHERE id=?').get(membership.userId);
+      if (!member || member.disabled) fail(409, '目标成员不存在或已停用，请重新安排');
+      return {userId: member.id, name: member.name, roles: membership.roles};
+    });
+    for (const key of ['projects', 'applications', 'templates', 'cases']) {
+      if (prepared.workspace[key].some(item => current[key].some(existing => existing.id === item.id))) fail(409, '此恢复方案的编号已存在，请重新生成操作编号');
+      current[key].push(...prepared.workspace[key]);
+    }
+    upgradeWorkspace(current, {allowAttachmentReferences: true});
+    const metadataBytes = Buffer.byteLength(JSON.stringify(current));
+    if (metadataBytes > 32 * 1024 * 1024) fail(413, '恢复后工作区元数据超过 32 MiB，请选择独立实例');
+    const fingerprint = digest(JSON.stringify({archiveSha256: inspection.report.archiveSha256, operationId: options.operationId, projectName: options.projectName.trim(), expectedRevision: options.expectedRevision, assignments}));
+    const assignedRoles = new Set(assignments.flatMap(item => item.roles));
+    const plan = {planFingerprint: fingerprint, archiveSha256: inspection.report.archiveSha256, targetRevision: current.storageRevision, projectId: prepared.project.id, projectName: prepared.project.name, newApplications: 1, newTemplates: prepared.workspace.templates.length, newRecords: prepared.workspace.cases.length, attachmentBytes: prepared.workspace.cases.reduce((sum, record) => sum + record.attachments.reduce((total, file) => total + file.size, 0), 0), projectedMetadataBytes: metadataBytes, assignments, unassignedRoles: inspection.report.requiredRoles.filter(role => !assignedRoles.has(role)), mappings: prepared.mappings};
+    return {inspection, prepared, current, plan};
+  }
+  function previewProjectRestore(user, bytes, options) {
+    return transaction(() => restorePlan(user, bytes, options).plan);
+  }
+  function restoreProject(user, bytes, options) {
+    admin(user);
+    if (options.confirmed !== true || typeof options.planFingerprint !== 'string') fail(400, '请先预览并明确确认恢复方案');
+    if (typeof options.operationId !== 'string' || !/^[\w-]{8,100}$/.test(options.operationId)) fail(400, '恢复操作编号无效');
+    const fingerprint = digest(JSON.stringify({type: 'project.restore', archive: digest(bytes), options}));
+    return transaction(() => {
+      admin(user);
+      const prior = db.prepare('SELECT * FROM requests WHERE id=?').get(options.operationId);
+      if (prior) {
+        if (prior.user_id !== user.id || prior.fingerprint !== fingerprint) fail(409, '操作编号已用于不同请求');
+        return JSON.parse(prior.result);
+      }
+      const {inspection, current, plan} = restorePlan(user, bytes, options);
+      if (plan.planFingerprint !== options.planFingerprint) fail(409, '恢复方案或成员信息已变化，请重新预览');
+      for (const record of inspection.workspace.cases) for (const file of record.attachments) {
+        const data = inspection.files.get(file.exportPath);
+        const existing = db.prepare('SELECT size,data FROM attachment_blobs WHERE id=?').get(file.blobId);
+        if (existing && (existing.size !== file.size || digest(existing.data) !== file.blobId)) fail(500, '现有附件内容校验失败');
+        db.prepare('INSERT OR IGNORE INTO attachment_blobs(id,size,data) VALUES(?,?,?)').run(file.blobId, file.size, data);
+      }
+      writeWorkspace(current);
+      for (const member of plan.assignments) db.prepare('INSERT INTO members(user_id,project_id,roles) VALUES(?,?,?)').run(member.userId, plan.projectId, JSON.stringify(member.roles));
+      audit(user, 'project.restore', plan.projectId);
+      const result = {restored: true, ...plan};
+      db.prepare('INSERT INTO requests VALUES(?,?,?,?)').run(options.operationId, user.id, fingerprint, JSON.stringify(result));
+      return result;
+    });
+  }
   function importApplication(user, input) {
     admin(user);
     const incoming = upgradeWorkspace(input);
     if (!incoming.applications.length || incoming.cases.some(item => !item.appId)) fail(400, '请导入整个应用包，业务需属于应用和项目');
     for (const record of incoming.cases) {
       delete record.createdBy;
+      if (record.restoration) { record.sourceRestoration = record.restoration; delete record.restoration; }
       for (const event of record.events) delete event.actor;
     }
     return transaction(() => {
@@ -401,7 +457,7 @@ export function openTeamStore(filename) {
     });
   }
   return {
-    createUser, login, session, visibleWorkspace, importApplication, updateDefinitions, setMembership, command, changePassword, resetPassword, operations, deliveryReport, updateDelivery, attachment, projectArchive,
+    createUser, login, session, visibleWorkspace, importApplication, updateDefinitions, setMembership, command, changePassword, resetPassword, operations, deliveryReport, updateDelivery, attachment, projectArchive, previewProjectRestore, restoreProject,
     checkProjectArchive: (user, bytes) => { admin(user); return checkProjectArchive(bytes, workspace()); },
     requireAdmin: user => admin(user),
     logout: token => db.prepare('DELETE FROM sessions WHERE token=?').run(digest(token)),
