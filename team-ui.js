@@ -99,7 +99,7 @@ function accountView() {
   if (!user) return;
   account.append(node('span', user.name + ' · ' + user.username));
   const controls = node('div', undefined, 'toolbar');
-  controls.append(button('我的项目', async () => { if (!clean()) return; selectedId = ''; await refresh(); home(); }), button('修改密码', () => { if (clean()) passwordView(); }), button('退出登录', async () => { if (!clean()) return; await api('logout', {}); user = null; workspace = null; selectedId = ''; loginView(); }));
+  controls.append(button('我的项目', async () => { if (!clean()) return; selectedId = ''; await refresh(); home(); }), button('修改密码', () => { if (clean()) passwordView(); }), button('退出登录', async () => { if (!clean()) return; await api('logout', {}); user = null; workspace = null; selectedId = ''; loginView(); say('已退出登录。'); }));
   controls.append(button('下载草稿并重新登录', () => { draft(); user = null; selectedId = ''; pending = null; deliveryDraft = null; loginView(); }));
   controls.append(button('恢复待确认操作', async () => { if (clean()) await recoveryView(); }));
   controls.append(button('本机填写草稿', async () => { if (clean()) await draftsView(); }));
@@ -180,7 +180,7 @@ function home() {
 async function openRecord(id) {
   if (!clean()) return;
   const result = await api('record?recordId=' + encodeURIComponent(id));
-  selectedRecord = result.record; selectedId = result.record.id; projectId = result.record.projectId; recordView();
+  selectedRecord = result.record; selectedId = result.record.id; projectId = result.record.projectId; recordView(); say('已读取服务器单据。');
 }
 async function command(data) {
   if (pending) throw Error('上一项业务操作的结果尚未确认，请先点击“重试原请求”，或下载草稿并重新读取。');
@@ -205,9 +205,18 @@ function updatePendingControls() {
   const form = content.querySelector('.record-form'); if (form) form.inert = !!pending;
   const note = content.querySelector('#operation-note'); if (note) note.disabled = !!pending;
   const retry = content.querySelector('#retry-request'); if (retry) retry.hidden = !pending;
+  const status = content.querySelector('#local-draft-status');
+  if (status && pending) {
+    status.dataset.pending = 'true';
+    status.textContent = '原请求已保存在本机，请按上方提示确认结果或完成清理。';
+  } else if (status?.dataset.pending) {
+    delete status.dataset.pending;
+    status.textContent = '请核对填写内容，修改后可再次保存或提交。';
+  }
 }
 async function sendPending() {
   if (!pending) throw Error('当前没有待确认的业务操作。');
+  updatePendingControls();
   let result;
   try {
     result = await api('command', pending);
@@ -378,7 +387,7 @@ function recordView(restoredDraft = null) {
     version: 0, saved: null, saving: Promise.resolve()
   };
   const draftStatus = node('p', '填写内容会保存在当前浏览器。提交前离开仍会提醒；清除网站数据会删除本机草稿。', 'draft-info');
-  draftStatus.setAttribute('role', 'status'); side.prepend(draftStatus);
+  draftStatus.id = 'local-draft-status'; draftStatus.setAttribute('role', 'status'); side.prepend(draftStatus);
   const session = editorSession;
   const remember = () => {
     if (pending || !editable || session !== editorSession) return;
@@ -459,6 +468,7 @@ async function draftsView() {
       compare.append(differences, apply, button('下载这份草稿', () => download('FlowLens-本机草稿-' + entry.draftId + '.json', JSON.stringify(entry, null, 2))));
       if (apply.disabled) compare.append(node('p', '单据版本或办理权限已变化，请参考草稿人工核对填写。', 'status-warning'));
       content.prepend(compare);
+      say('已读取服务器单据，请核对草稿差异。');
     });
     review.disabled = entry.instanceId !== serviceContext.instanceId;
     const reviewed = input('已核对本机草稿', 'checkbox');
