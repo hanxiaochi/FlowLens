@@ -1,3 +1,9 @@
+export async function draftForRecord(editor, recordId) {
+  if (!editor || !recordId || editor.recordId !== recordId) return null;
+  await editor.saving;
+  return editor.saved;
+}
+
 // Drafts belong to one editor session. Opening another tab creates another ID.
 export function createDraftStore(factory = globalThis.indexedDB, name = 'flowlens-team-drafts') {
   let connection;
@@ -45,7 +51,7 @@ export function createDraftStore(factory = globalThis.indexedDB, name = 'flowlen
       for (const key of ['userId', 'draftId', 'instanceId', 'recordId']) {
         if (typeof draft[key] !== 'string' || !draft[key]) throw Error('草稿缺少账号、环境或单据标识。');
       }
-      if (!Number.isSafeInteger(draft.version) || draft.version < 1 || !Number.isSafeInteger(draft.recordRevision) || draft.recordRevision < 1) throw Error('草稿版本无效。');
+      if (!Number.isSafeInteger(draft.version) || draft.version < 1 || !Number.isSafeInteger(draft.recordRevision) || draft.recordRevision < 0) throw Error('草稿版本无效。');
       if (!draft.values || typeof draft.values !== 'object' || Array.isArray(draft.values) || Object.values(draft.values).some(value => typeof value !== 'string') || typeof draft.note !== 'string') throw Error('草稿填写内容无效。');
       try {
         return await transaction('readwrite', (store, done, fail) => {

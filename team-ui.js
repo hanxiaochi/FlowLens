@@ -5,7 +5,7 @@ import {printableForm} from './forms-print.mjs';
 import {deliveryStatusLabels} from './team-delivery.mjs';
 import {teamJsonRequest} from './team-http.mjs';
 import {createRecoveryStore} from './team-recovery.mjs';
-import {createDraftStore} from './team-drafts.mjs';
+import {createDraftStore, draftForRecord} from './team-drafts.mjs';
 
 const content = document.querySelector('#content');
 const account = document.querySelector('#account');
@@ -194,8 +194,7 @@ async function command(data) {
   }
   const projectName = workspace.projects.find(project => project.id === projectId)?.name;
   const description = projectName ? projectName + ' · ' + operationTitle : operationTitle;
-  if (editorSession?.recordId === data.recordId) await editorSession.saving;
-  const draftReference = editorSession?.recordId === data.recordId ? editorSession.saved : null;
+  const draftReference = await draftForRecord(editorSession, data.recordId);
   const entry = await recovery.stage(user.id, serviceContext.instanceId, request, description, draftReference);
   pending = entry.request;
   pendingDraft = entry.draft ?? null;

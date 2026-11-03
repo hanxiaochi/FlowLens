@@ -1,9 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {IDBFactory, IDBObjectStore} from 'fake-indexeddb';
-import {createDraftStore} from './team-drafts.mjs';
+import {createDraftStore, draftForRecord} from './team-drafts.mjs';
 
 const draft = (overrides = {}) => ({userId: 'user-a', draftId: crypto.randomUUID(), instanceId: 'instance-a', recordId: 'record-a', recordRevision: 3, version: 1, values: {issue: 'Original', items: '[{}]'}, note: 'Review note', ...overrides});
+
+test('new business commands work without an editor and record commands await their own draft', async () => {
+  assert.equal(await draftForRecord(null, undefined), null);
+  assert.equal(await draftForRecord(null, 'record-a'), null);
+  let finish;
+  const editor = {recordId: 'record-a', saved: null};
+  editor.saving = new Promise(resolve => { finish = () => { editor.saved = {draftId: 'draft-a', version: 2}; resolve(); }; });
+  assert.equal(await draftForRecord(editor, undefined), null);
+  assert.equal(await draftForRecord(editor, 'record-b'), null);
+  let completed = false;
+  const waiting = draftForRecord(editor, 'record-a').then(value => { completed = true; return value; });
+  await Promise.resolve(); assert.equal(completed, false);
+  finish(); assert.deepEqual(await waiting, {draftId: 'draft-a', version: 2});
+});
 
 test('drafts survive reopening, retain editing baseline, and isolate accounts and tabs', async () => {
   const factory = new IDBFactory();
@@ -76,10 +90,28 @@ test('a failed draft-store opening can retry and malformed drafts cannot replace
     await assert.rejects(store.list('user-a'));
     blocked = false;
     const input = draft(), saved = await store.save(input);
-    for (const changed of [{userId: ''}, {version: NaN}, {recordRevision: 0}, {values: []}, {values: {x: 1}}, {note: null}]) {
+    for (const changed of [{userId: ''}, {version: NaN}, {recordRevision: -1}, {values: []}, {values: {x: 1}}, {note: null}]) {
       await assert.rejects(store.save({...input, version: 2, ...changed}));
     }
     assert.deepEqual(await store.list('user-a'), [saved]);
+  } finally { await store.close(); }
+});
+
+test('new blank records at revision zero retain drafts across reopening', async () => {
+  const {applicationDemo} = await import('./apps-demo.mjs');
+  const {startProjectCase} = await import('./apps-model.mjs');
+  const fixture = applicationDemo();
+  const template = fixture.templates[0];
+  fixture.applications[0].bindings = [];
+  const result = startProjectCase(fixture, {appId: fixture.applications[0].id, projectId: fixture.projects[0].id, templateId: template.id, role: template.submitterRole});
+  assert.equal(result.record.revision, 0);
+  const factory = new IDBFactory();
+  let store = createDraftStore(factory);
+  try {
+    const saved = await store.save(draft({recordId: result.record.id, recordRevision: result.record.revision}));
+    await store.close(); store = createDraftStore(factory);
+    assert.deepEqual(await store.list(saved.userId), [saved]);
+    assert.equal(await store.remove(saved.userId, saved.draftId, saved.version), true);
   } finally { await store.close(); }
 });
 
