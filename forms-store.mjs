@@ -3,7 +3,7 @@ import {validateDecisionRules} from './forms-rules.mjs';
 import {validateWorkflow} from './forms-model.mjs';
 import {validateField,validateFieldValue} from './forms-schema.mjs';
 export const emptyWorkspace=()=>({format:'flowlens-forms',version:3,templates:[],cases:[],applications:[],projects:[]});
-export function validateWorkspace(value){
+export function validateWorkspace(value,{allowAttachmentReferences=false}={}){
  if(value?.format!=='flowlens-forms'||![1,2,3].includes(value.version)||!Array.isArray(value.templates)||!Array.isArray(value.cases)||value.templates.length>2000||value.cases.length>3000)throw Error('不是有效的业务表单工作包');
  const ids=new Set();let cells=0;
  const string=(s,max=20000)=>{if(typeof s!=='string'||s.length>max)throw Error('工作包文字字段无效');};
@@ -25,13 +25,18 @@ export function validateWorkspace(value){
   if(!r.values||typeof r.values!=='object'||Array.isArray(r.values)||!Array.isArray(r.events)||!Array.isArray(r.attachments))throw Error('实例记录无效');
   for(const [k,v] of Object.entries(r.values)){string(v);const f=r.template.fields.find(f=>f.id===k);if(!f)throw Error('未知填写字段');validateFieldValue(f,v);}
   for(const e of r.events){string(e.role,100);string(e.at,100);string(e.note);string(e.from,500);string(e.to,500);if(!Array.isArray(e.diff)||!e.values)throw Error('历史记录无效');for(const d of e.diff){string(d.field,500);string(d.before);string(d.after);}}
-  for(const a of r.attachments){string(a.name,500);if(typeof a.data!=='string'||a.data.length>14*1024*1024||!/^data:[\w.+/-]*;base64,[A-Za-z0-9+/=]*$/.test(a.data))throw Error('附件格式无效');}
+  for(const a of r.attachments){
+   string(a.name,500);
+   if(allowAttachmentReferences&&a.data===undefined){
+    if(typeof a.blobId!=='string'||!(/^[a-f0-9]{64}$/).test(a.blobId)||!Number.isSafeInteger(a.size)||a.size<0||typeof a.mediaType!=='string'||!/^[\w.+/-]*$/.test(a.mediaType)||typeof a.id!=='string'||!a.id)throw Error('附件引用无效');
+   }else if(typeof a.data!=='string'||a.data.length>14*1024*1024||!/^data:[\w.+/-]*;base64,[A-Za-z0-9+/=]*$/.test(a.data))throw Error('附件格式无效');
+  }
  }
  for(const r of value.cases)if(r.relatedId&&!cases.has(r.relatedId))throw Error('关联单据不存在');
  validateApplications(value);
  return structuredClone(value);
 }
-export function upgradeWorkspace(value){const next=validateWorkspace(value);next.version=3;next.applications??=[];next.projects??=[];return next;}
+export function upgradeWorkspace(value,options){const next=validateWorkspace(value,options);next.version=3;next.applications??=[];next.projects??=[];return next;}
 export function createWorkspaceStore(factory=globalThis.indexedDB,name='flowlens-business-forms'){
  let connection;
  async function db(){if(!connection)connection=new Promise((resolve,reject)=>{const req=factory.open(name,1);req.onupgradeneeded=()=>req.result.createObjectStore('workspace');req.onsuccess=()=>resolve(req.result);req.onerror=()=>{connection=null;reject(req.error);};});return connection;}
