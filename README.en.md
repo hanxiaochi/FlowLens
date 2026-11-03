@@ -1,6 +1,6 @@
 # FlowLens
 
-[简体中文](README.md) · **English** · [v1.4.1 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.4.1)
+[简体中文](README.md) · **English** · [v1.5.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.5.0)
 
 **[Try the live demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -32,7 +32,11 @@ A Windows LAN pilot has passed five-account HTTPS workflow, restore, and browser
 
 An owner-hosted Tencent Cloud pilot has since passed public-IP HTTPS, five-role workflow, concurrent-write conflict, and database restoration checks. Daily backups are enabled. Real-business approval and longer-term operation remain under validation. [Cloud acceptance and screenshot](docs/cloud-pilot-2026-11-03.md)
 
-Main is developing operations and delivery acceptance features. Admin capacity reporting, verified backup records, and restore markers have passed 72 cross-platform tests and local browser checks. Delivery check records are next, followed by a staged release and cloud upgrade. [Plan and pending decisions](docs/delivery-plan.md)
+## 1.5 operations and delivery checks
+
+Admins can inspect capacity, account counts, verified backup metadata, and restore markers. Instance and project checklists retain reviewers, evidence, recording accounts, and history. Revision and configuration guards handle concurrent changes, and restoration triggers review. The cloud service has been backed up and upgraded. Windows and Ubuntu each pass 73 tests. [Release notes](docs/release-1.5.0.md) · [Plan and pending decisions](docs/delivery-plan.md)
+
+![Cloud delivery check records](docs/images/delivery-checks-1.5.png)
 
 Import an application package into the self-hosted team service, create accounts, and assign project roles. A supervisor can issue an instruction, a contractor can reply using a separate account, and a records officer can archive it. The server stores forms, attachments, and the account behind each operation.
 
@@ -40,7 +44,7 @@ Import an application package into the self-hosted team service, create accounts
 
 The server checks project roles, workflow stages, and record revisions. Repeated requests reuse their result. This release also adds account deactivation, password changes, audit history, versioned template publication, and SQLite backup and restore tools.
 
-Download `FlowLens-1.4.1-team.zip`, install Node.js 24 LTS, initialize the administrator, then run `npm start`. The team runtime uses Node built-ins and needs no npm dependencies. See the [deployment guide (Chinese)](docs/team-deployment.md) and [release acceptance](docs/release-1.4.1.md).
+Download `FlowLens-1.5.0-team.zip`, install Node.js 24 LTS, initialize the administrator, then run `npm start`. The team runtime uses Node built-ins and needs no npm dependencies. See the [deployment guide (Chinese)](docs/team-deployment.md) and [release acceptance](docs/release-1.5.0.md).
 
 The public demo runs locally in your browser. The shared service is self-hosted and intended for a small-team pilot. Cloud technical acceptance is recorded. Customer workflows, sustained capacity, and maintenance handover still need validation.
 

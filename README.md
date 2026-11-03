@@ -1,6 +1,6 @@
 # FlowLens
 
-**简体中文** · [English](README.en.md) · [v1.4.1 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.4.1)
+**简体中文** · [English](README.en.md) · [v1.5.0 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.5.0)
 
 **[直接打开在线 Demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -28,7 +28,11 @@ Windows 内网试点已完成服务器本机的五账号 HTTPS 办理、恢复�
 
 随后已在所有者的腾讯云服务器完成公网 IP HTTPS、五角色办理、并发冲突及数据库恢复验收，并启用每日备份。真实业务试点与长期运行观察继续推进。[云端验收与截图](docs/cloud-pilot-2026-11-03.md)
 
-主分支正在开发运行维护与交付验收功能。管理员运行状态页、备份校验记录和恢复标记已通过 72 项跨平台测试及本机浏览器检查，接着补交付检查记录。该阶段完成后发布升级。[下一阶段计划与待确认项](docs/delivery-plan.md)
+## 1.5 运行状态与交付检查
+
+管理员现在可以查看数据容量、账号数量、备份校验记录和恢复时间。需要业务方确认的表式、职责及维护安排，也能按项目留下依据、记录人和历史。多人修改会检查修订与配置，恢复后提示重新核验。云端已完成备份升级，Windows、Ubuntu 各通过 73 项测试。[本版更新](docs/release-1.5.0.md) · [下一阶段计划与待确认项](docs/delivery-plan.md)
+
+![云端交付检查记录](docs/images/delivery-checks-1.5.png)
 
 确认好表式和流程后，把整个应用包导入团队协作服务。管理员为不同项目分配账号和角色，监理发出指令，施工单位用自己的账号回复，资料员最后归档。记录、附件和实际操作者都保存在服务器里。
 
@@ -36,7 +40,7 @@ Windows 内网试点已完成服务器本机的五账号 HTTPS 办理、恢复�
 
 服务端会检查角色、阶段和修订号。重复请求复用原结果，过期页面不能覆盖新内容。新增了账号停用、密码修改、审计记录、表式版本发布，以及 SQLite 备份恢复工具。
 
-下载发布页中的 `FlowLens-1.4.1-team.zip`，安装 Node.js 24 LTS，按部署指南初始化管理员后运行 `npm start`。协作包使用 Node 内置模块，可以离线启动。[部署与恢复指南](docs/team-deployment.md) · [本版验收](docs/release-1.4.1.md) · [持续交付计划](docs/delivery-plan.md)
+下载发布页中的 `FlowLens-1.5.0-team.zip`，安装 Node.js 24 LTS，按部署指南初始化管理员后运行 `npm start`。协作包使用 Node 内置模块，可以离线启动。[部署与恢复指南](docs/team-deployment.md) · [本版验收](docs/release-1.5.0.md) · [持续交付计划](docs/delivery-plan.md)
 
 公开 Demo 提供浏览器本地体验。团队服务需自托管，适合先用脱敏资料做小团队试运行。云端技术验收已有记录，真实客户流程、持续容量和维护交接仍需继续验证。
 
