@@ -25,8 +25,11 @@ if (action === 'restore') {
   } finally { source.close(); }
   // Existing browser sessions must authenticate again after a restore.
   const restored = new DatabaseSync(filename);
-  restored.exec('DELETE FROM sessions');
-  restored.close();
+  try {
+    restored.exec('BEGIN IMMEDIATE; DELETE FROM sessions; CREATE TABLE IF NOT EXISTS maintenance (key TEXT PRIMARY KEY, data TEXT NOT NULL); DELETE FROM maintenance;');
+    restored.prepare('INSERT INTO maintenance VALUES(?,?)').run('lastRestore', JSON.stringify({completedAt: new Date().toISOString()}));
+    restored.exec('COMMIT');
+  } finally { restored.close(); }
   console.log('备份已恢复，请用新数据库启动服务并重新登录');
 } else {
   if (!['init', 'backup', 'reset-password'].includes(action)) throw Error('支持 init、backup、restore、reset-password 命令');

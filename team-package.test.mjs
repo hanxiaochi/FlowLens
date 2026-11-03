@@ -57,13 +57,17 @@ test('standalone distribution starts without dependencies and its CLI restores d
     const backedUp = cli(['backup', backup]);
     assert.equal(backedUp.status, 0, backedUp.stderr);
     assert.notEqual(cli(['backup', backup]).status, 0);
+    const backupWithHistory = join(directory, 'backup-with-history.sqlite');
+    assert.equal(cli(['backup', backupWithHistory]).status, 0);
     await new Promise(resolve => server.close(resolve)); server = null; store = null;
-    const restored = cli(['restore', backup], restoredDatabase);
+    const restored = cli(['restore', backupWithHistory], restoredDatabase);
     assert.equal(restored.status, 0, restored.stderr);
     const {openTeamStore} = await import(pathToFileURL(join(output, 'team-store.mjs')));
     store = openTeamStore(restoredDatabase);
     assert.throws(() => store.session(session.token), /过期/);
     const newSession = await store.login('admin', password);
+    assert.equal(store.operations(newSession.user).lastBackup, null);
+    assert.ok(store.operations(newSession.user).lastRestore.completedAt);
     assert.deepEqual(store.visibleWorkspace(newSession.user), before);
     const restoredAttachment = store.visibleWorkspace(newSession.user).workspace.cases[0].attachments.at(-1);
     assert.equal(restoredAttachment.name, '验收附件.bin');

@@ -1,7 +1,7 @@
 import {DatabaseSync, backup} from 'node:sqlite';
 import {randomBytes, randomUUID, scrypt as derive, timingSafeEqual, createHash} from 'node:crypto';
 import {promisify} from 'node:util';
-import {mkdirSync} from 'node:fs';
+import {mkdirSync, statSync, statfsSync, createReadStream, chmodSync} from 'node:fs';
 import {dirname} from 'node:path';
 import {emptyWorkspace, upgradeWorkspace} from './forms-store.mjs';
 import {startProjectCase} from './apps-model.mjs';
@@ -34,6 +34,7 @@ export function openTeamStore(filename) {
     CREATE TABLE IF NOT EXISTS workspace (id INTEGER PRIMARY KEY CHECK(id=1), revision INTEGER NOT NULL, data TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS requests (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, fingerprint TEXT NOT NULL, result TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS audit (sequence INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, user_id TEXT NOT NULL, action TEXT NOT NULL, target TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS maintenance (key TEXT PRIMARY KEY, data TEXT NOT NULL);
     PRAGMA user_version=1;`);
   db.prepare('INSERT OR IGNORE INTO workspace VALUES (1,0,?)').run(JSON.stringify(emptyWorkspace()));
   function transaction(fn) {
@@ -60,6 +61,44 @@ export function openTeamStore(filename) {
     return row;
   }
   function admin(user) { if (!active(user).admin) fail(403, '需要管理员权限'); }
+  function operations(user) {
+    admin(user);
+    const current = workspace();
+    let diskFreeBytes = null;
+    try { const disk = statfsSync(dirname(filename)); diskFreeBytes = disk.bavail * disk.bsize; } catch {}
+    const maintenance = Object.fromEntries(db.prepare('SELECT key,data FROM maintenance').all().map(row => [row.key, JSON.parse(row.data)]));
+    return {
+      checkedAt: new Date().toISOString(),
+      workspaceBytes: db.prepare('SELECT length(CAST(data AS BLOB)) AS bytes FROM workspace WHERE id=1').get().bytes,
+      workspaceLimitBytes: 32 * 1024 * 1024,
+      workspaceRevision: current.storageRevision,
+      databaseBytes: statSync(filename).size,
+      databaseWalBytes: statSync(filename + '-wal', {throwIfNoEntry: false})?.size ?? 0,
+      diskFreeBytes,
+      projects: current.projects.length,
+      records: current.cases.length,
+      completedRecords: current.cases.filter(record => record.status === 'complete').length,
+      attachmentBytes: current.cases.reduce((total, record) => total + record.attachments.reduce((sum, file) => sum + file.size, 0), 0),
+      users: db.prepare('SELECT COUNT(*) AS total, COALESCE(SUM(disabled=0),0) AS enabled FROM users').get(),
+      lastBackup: maintenance.lastBackup ?? null,
+      lastRestore: maintenance.lastRestore ?? null
+    };
+  }
+  async function verifiedBackup(destination) {
+    await backup(db, destination);
+    chmodSync(destination, 0o600);
+    const snapshot = new DatabaseSync(destination, {readOnly: true});
+    let workspaceRevision;
+    try {
+      if (snapshot.prepare('PRAGMA integrity_check').get().integrity_check !== 'ok') throw Error('备份完整性检查失败');
+      workspaceRevision = snapshot.prepare('SELECT revision FROM workspace WHERE id=1').get().revision;
+    } finally { snapshot.close(); }
+    const hash = createHash('sha256');
+    for await (const chunk of createReadStream(destination)) hash.update(chunk);
+    const result = {completedAt: new Date().toISOString(), bytes: statSync(destination).size, sha256: hash.digest('hex'), workspaceRevision};
+    db.prepare('INSERT INTO maintenance(key,data) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET data=excluded.data').run('lastBackup', JSON.stringify(result));
+    return result;
+  }
   function roles(user, projectId) {
     const row = db.prepare('SELECT roles FROM members WHERE user_id=? AND project_id=?').get(user.id, projectId);
     return row ? JSON.parse(row.roles) : [];
@@ -257,7 +296,7 @@ export function openTeamStore(filename) {
     });
   }
   return {
-    createUser, login, session, visibleWorkspace, importApplication, updateDefinitions, setMembership, command, changePassword, resetPassword,
+    createUser, login, session, visibleWorkspace, importApplication, updateDefinitions, setMembership, command, changePassword, resetPassword, operations,
     logout: token => db.prepare('DELETE FROM sessions WHERE token=?').run(digest(token)),
     users: user => { admin(user); return db.prepare('SELECT * FROM users ORDER BY username').all().map(publicUser); },
     memberships: user => { admin(user); return db.prepare('SELECT user_id AS userId,project_id AS projectId,roles FROM members').all().map(row => ({...row, roles: JSON.parse(row.roles)})); },
@@ -273,7 +312,7 @@ export function openTeamStore(filename) {
       });
     },
     audit: user => { admin(user); return db.prepare('SELECT * FROM audit ORDER BY sequence DESC LIMIT 500').all(); },
-    backup: destination => backup(db, destination),
+    backup: verifiedBackup,
     close: () => db.close()
   };
 }

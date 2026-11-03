@@ -64,7 +64,7 @@ function accountView() {
   const controls = node('div', undefined, 'toolbar');
   controls.append(button('我的项目', async () => { if (!clean()) return; selectedId = ''; await refresh(); home(); }), button('修改密码', () => { if (clean()) passwordView(); }), button('退出登录', async () => { if (!clean()) return; await api('logout', {}); user = null; workspace = null; selectedId = ''; loginView(); }));
   controls.append(button('下载草稿并重新登录', () => { draft(); user = null; selectedId = ''; pending = null; loginView(); }));
-  if (user.admin) controls.append(button('管理后台', async () => { if (clean()) await adminView(); }));
+  if (user.admin) controls.append(button('管理后台', async () => { if (clean()) await adminView(); }), button('运行状态', async () => { if (clean()) await operationsView(); }));
   account.append(controls);
 }
 function loginView() {
@@ -229,6 +229,33 @@ function passwordView() {
   const oldPassword = input('原密码', 'password'), newPassword = input('新密码', 'password'); newPassword.minLength = 12;
   panel.append(label('原密码', oldPassword), label('新密码，至少 12 位', newPassword), button('保存密码并重新登录', async () => { await api('password', {oldPassword: oldPassword.value, newPassword: newPassword.value}); user = null; selectedId = ''; loginView(); say('密码已修改，所有会话已退出，请重新登录。'); }, 'primary'));
   content.append(panel);
+}
+async function operationsView() {
+  const status = await api('operations');
+  selectedId = ''; content.replaceChildren(); accountView();
+  const size = bytes => bytes === null ? '暂时无法读取' : (bytes / 1024 / 1024).toLocaleString(undefined, {maximumFractionDigits: 2}) + ' MiB';
+  const date = value => new Date(value).toLocaleString();
+  content.append(node('span', 'OPERATIONS', 'badge'), node('h1', '看清数据，接得住日常维护。'), node('p', '数据读取于 ' + date(status.checkedAt), 'muted'));
+  const grid = node('div', undefined, 'admin-grid');
+  const storage = node('section', undefined, 'panel stack');
+  const usage = node('meter'); usage.max = status.workspaceLimitBytes; usage.value = status.workspaceBytes; usage.setAttribute('aria-label', '工作区容量使用量');
+  storage.append(node('h2', '工作区容量'), node('strong', size(status.workspaceBytes) + ' / ' + size(status.workspaceLimitBytes), 'status-value'), usage);
+  storage.append(node('p', '工作区包含表式、业务内容和编码后的附件。数据库主文件及写入日志还包含账号、审计和幂等请求记录。', 'muted'));
+  if (status.workspaceBytes >= status.workspaceLimitBytes * 0.8) storage.append(node('p', '工作区接近实例上限，请联系维护人员评估容量。', 'status-warning'));
+  storage.append(node('p', '数据库主文件 ' + size(status.databaseBytes) + ' · 写入日志 ' + size(status.databaseWalBytes)), node('p', '所在文件系统可用 ' + size(status.diskFreeBytes)));
+  const business = node('section', undefined, 'panel stack');
+  business.append(node('h2', '业务与账号'), node('strong', status.records + ' 份业务 · ' + status.projects + ' 个项目', 'status-value'), node('p', '其中 ' + status.completedRecords + ' 份已归档'), node('p', '附件原始大小合计 ' + size(status.attachmentBytes)), node('p', status.users.enabled + ' 个启用账号 / 共 ' + status.users.total + ' 个账号'));
+  const service = node('section', undefined, 'panel stack');
+  service.append(node('h2', '当前进程'), node('strong', Math.floor(status.uptimeSeconds / 60) + ' 分钟', 'status-value'), node('p', '进程已运行时长'), node('p', '当前驻留内存 ' + size(status.memoryBytes)), node('p', '本页展示当前读取结果，定时任务、证书续期和主机告警由部署维护人员核对。', 'muted'));
+  grid.append(storage, business, service); content.append(grid);
+  const recovery = node('section', undefined, 'panel stack'); recovery.append(node('h2', '备份与恢复记录'));
+  if (status.lastBackup) {
+    recovery.append(node('p', '最近通过完整性校验的备份 ' + date(status.lastBackup.completedAt)), node('p', '备份大小 ' + size(status.lastBackup.bytes) + ' · 备份工作区修订 ' + status.lastBackup.workspaceRevision + ' · 当前修订 ' + status.workspaceRevision), node('code', status.lastBackup.sha256, 'status-checksum'));
+  } else recovery.append(node('p', '当前实例暂无已记录的备份成功结果。请维护人员执行备份命令，并核对生成文件。', 'status-warning'));
+  if (status.lastRestore) recovery.append(node('p', '最近恢复完成于 ' + date(status.lastRestore.completedAt) + '。恢复后的旧登录会话已清除。'));
+  recovery.append(node('p', '该记录覆盖备份生成及完整性检查。备份文件是否仍在、定时任务是否成功以及异地副本情况，需要维护人员另行核对。', 'muted'));
+  content.append(recovery, button('刷新运行状态', operationsView), button('下载运行状态报告', () => download('FlowLens-运行状态.json', JSON.stringify(status, null, 2))));
+  say('已读取管理员运行状态。');
 }
 async function adminView() {
   const data = await api('admin'); await refresh(); content.replaceChildren(); accountView();

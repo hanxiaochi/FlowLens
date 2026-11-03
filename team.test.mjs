@@ -1,7 +1,8 @@
 import http from 'node:http';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp, rm} from 'node:fs/promises';
+import {mkdtemp, rm, readFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {openTeamStore} from './team-store.mjs';
@@ -11,6 +12,46 @@ import {createProject} from './apps-model.mjs';
 import {DatabaseSync} from 'node:sqlite';
 
 const password = 'test-only-long-password';
+
+test('operations status is admin-only and backup evidence matches a verified snapshot', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'flowlens-operations-'));
+  const filename = join(directory, 'team.sqlite');
+  let store = openTeamStore(filename);
+  try {
+    const admin = await store.createUser(null, {username: 'admin', name: 'Private admin name', password});
+    const member = await store.createUser(admin, {username: 'member', name: 'Member', password});
+    store.importApplication(admin, applicationDemo());
+    const before = store.operations(admin);
+    assert.throws(() => store.operations(member), error => error.status === 403);
+    assert.equal(before.records, 1);
+    assert.equal(before.projects, 1);
+    assert.equal(before.users.enabled, 2);
+    assert.equal(before.lastBackup, null);
+    assert.equal(before.workspaceLimitBytes, 32 * 1024 * 1024);
+    assert.ok(before.workspaceBytes > 0);
+    assert.ok(before.databaseBytes > 0);
+    assert.ok(before.databaseWalBytes >= 0);
+    const target = join(directory, 'backup.sqlite');
+    const result = await store.backup(target);
+    const bytes = await readFile(target);
+    assert.equal(result.sha256, createHash('sha256').update(bytes).digest('hex'));
+    assert.equal(result.bytes, bytes.length);
+    assert.equal(result.workspaceRevision, before.workspaceRevision);
+    assert.deepEqual(store.operations(admin).lastBackup, result);
+    await assert.rejects(store.backup(join(directory, 'missing', 'failed.sqlite')));
+    assert.deepEqual(store.operations(admin).lastBackup, result);
+    const serialized = JSON.stringify(store.operations(admin));
+    assert.ok(!serialized.includes(directory));
+    assert.ok(!serialized.includes('Private admin name'));
+    assert.ok(!serialized.includes(password));
+    store.close();
+    const oldDatabase = new DatabaseSync(filename);
+    oldDatabase.exec('DROP TABLE maintenance'); oldDatabase.close();
+    store = openTeamStore(filename);
+    assert.equal(store.operations(admin).lastBackup, null);
+    assert.equal(store.operations(admin).records, 1);
+  } finally { store.close(); await rm(directory, {recursive: true, force: true}); }
+});
 
 test('a failure after workspace and audit writes rolls back the whole command and allows retry', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'flowlens-rollback-'));
@@ -124,7 +165,8 @@ test('HTTP session cookies, same-origin protection and authenticated API boundar
   const directory = await mkdtemp(join(tmpdir(), 'flowlens-http-'));
   const origin = 'http://127.0.0.1:4186';
   const {server, store} = createTeamServer({database: join(directory, 'team.sqlite'), origin});
-  await store.createUser(null, {username: 'admin', name: 'Admin', password});
+  const httpAdmin = await store.createUser(null, {username: 'admin', name: 'Admin', password});
+  await store.createUser(httpAdmin, {username: 'member', name: 'Member', password});
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const base = 'http://127.0.0.1:' + server.address().port;
   const fetch = (url, options = {}) => new Promise((resolve, reject) => {
@@ -138,12 +180,17 @@ test('HTTP session cookies, same-origin protection and authenticated API boundar
   const headers = {'Host': '127.0.0.1:4186', 'Content-Type': 'application/json', 'X-FlowLens-Request': '1'};
   try {
     assert.equal((await fetch(base + '/api/team/workspace', {headers})).status, 401);
+    assert.equal((await fetch(base + '/api/team/operations', {headers})).status, 401);
     assert.equal((await fetch(base + '/api/team/login', {method: 'POST', headers: {...headers, Origin: 'https://attacker.invalid'}, body: '{}'})).status, 403);
     const response = await fetch(base + '/api/team/login', {method: 'POST', headers, body: JSON.stringify({username: 'admin', password})});
     assert.equal(response.status, 200);
     const cookie = response.headers.get('set-cookie');
     assert.match(cookie, /HttpOnly; SameSite=Strict/);
     const authenticated = {...headers, Cookie: cookie.split(';')[0]};
+    assert.equal((await fetch(base + '/api/team/operations', {headers: authenticated})).status, 200);
+    const memberLogin = await fetch(base + '/api/team/login', {method: 'POST', headers, body: JSON.stringify({username: 'member', password})});
+    const memberCookie = memberLogin.headers.get('set-cookie').split(';')[0];
+    assert.equal((await fetch(base + '/api/team/operations', {headers: {...headers, Cookie: memberCookie}})).status, 403);
     assert.equal((await fetch(base + '/api/team/workspace', {headers: authenticated})).status, 200);
     const withoutMarker = {...authenticated}; delete withoutMarker['X-FlowLens-Request'];
     assert.equal((await fetch(base + '/api/team/logout', {method: 'POST', headers: withoutMarker, body: '{}'})).status, 403);

@@ -79,6 +79,7 @@ export function createTeamServer({database = resolve(root, '.local/team.sqlite')
         if (path === '/api/team/me') return send(res, 200, {user});
         if (path === '/api/team/workspace') return send(res, 200, store.visibleWorkspace(user));
         if (path === '/api/team/admin') return send(res, 200, {users: store.users(user), memberships: store.memberships(user), audit: store.audit(user)});
+        if (path === '/api/team/operations') return send(res, 200, {...store.operations(user), uptimeSeconds: Math.floor(process.uptime()), memoryBytes: process.memoryUsage().rss});
         fail(404, '接口不存在');
       }
       const input = await body(req, ['/api/team/import', '/api/team/definitions'].includes(path) ? 32 * 1024 * 1024 : path === '/api/team/command' ? 15 * 1024 * 1024 : 64 * 1024);
