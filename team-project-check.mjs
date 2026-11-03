@@ -10,7 +10,8 @@ const requireValid = (condition, message) => { if (!condition) throw Error(messa
 const filePattern = /^(index\.html|manifest\.json|project\.json|forms\/[1-9][0-9]*\.html|attachments\/[1-9][0-9]*-[1-9][0-9]*\.[a-z0-9]{1,10})$/;
 
 function archiveEntries(bytes) {
-  requireValid(bytes.length >= 22 && bytes.length <= projectArchiveLimit, '资料 ZIP 大小无效，最大 66 MiB');
+  requireValid(bytes.length >= 22, 'ZIP 文件不完整');
+  requireValid(bytes.length <= projectArchiveLimit, '资料 ZIP 最大 66 MiB');
   let end = bytes.length - 22;
   const minimum = Math.max(0, end - 65535);
   while (end >= minimum && (bytes.readUInt32LE(end) !== 0x06054b50 || end + 22 + bytes.readUInt16LE(end + 20) !== bytes.length)) end--;

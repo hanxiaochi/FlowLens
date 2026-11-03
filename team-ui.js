@@ -337,10 +337,10 @@ async function operationsView() {
 }
 function projectCheckView() {
   selectedId = ''; content.replaceChildren(); accountView();
-  const panel = node('section', undefined, 'panel stack');
+  const panel = node('section', undefined, 'panel stack project-check');
   panel.append(node('h1', '接手前，先检查资料'), node('p', '选择 FlowLens 项目资料 ZIP。检查文件完整性、附件和单据关联，并与当前实例核对编号。ZIP 最大 66 MiB，展开内容最大 64 MiB。本次检查完成后，业务资料仍需交接双方确认。'));
   const file = input('选择项目资料 ZIP', 'file'); file.accept = '.zip';
-  const results = node('section', undefined, 'panel stack');
+  const results = node('section', undefined, 'panel stack project-check');
   file.onchange = () => { results.replaceChildren(); say(file.files[0] ? '已选择 ' + file.files[0].name + '，请点击上传并检查。' : '请选择项目资料包。'); };
   const check = button('上传并检查资料包', async () => {
     const selected = file.files[0]; if (!selected) throw Error('请选择项目资料 ZIP');
