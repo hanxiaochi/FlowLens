@@ -22,7 +22,7 @@ export function storeRecordAttachments(db, record) {
       file.blobId = blobId; file.mediaType = mediaType; file.size = bytes.length;
       delete file.data;
     }
-    if (typeof file.id !== 'string' || !file.id || ids.has(file.id)) file.id = 'file-' + hash(record.id + '/' + index + '/' + file.blobId).slice(0, 32);
+    if (typeof file.id !== 'string' || !file.id || file.id.length > 200 || !file.id.isWellFormed() || ids.has(file.id)) file.id = 'file-' + hash(record.id + '/' + index + '/' + file.blobId).slice(0, 32);
     ids.add(file.id);
     const blob = db.prepare('SELECT size FROM attachment_blobs WHERE id=?').get(file.blobId);
     if (!blob || blob.size !== file.size) throw Error('附件内容缺失或大小不一致');

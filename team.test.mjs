@@ -13,6 +13,25 @@ import {DatabaseSync} from 'node:sqlite';
 
 const password = 'test-only-long-password';
 
+test('inline imports normalize legacy attachment metadata and reject external blob references', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'flowlens-attachment-import-'));
+  const store = openTeamStore(join(directory, 'team.sqlite'));
+  try {
+    const admin = await store.createUser(null, {username: 'admin', name: 'Admin', password});
+    const app = applicationDemo();
+    app.cases[0].attachments.push({id: '\ud800', name: 'legacy.bin', size: 999, blobId: 'f'.repeat(64), data: 'data:application/octet-stream;base64,VQ=='});
+    store.importApplication(admin, app);
+    const record = store.visibleWorkspace(admin, {inlineAttachments: false}).workspace.cases[0];
+    const file = record.attachments[0];
+    assert.equal(file.id.isWellFormed(), true);
+    assert.equal(file.size, 1);
+    assert.notEqual(file.blobId, 'f'.repeat(64));
+    assert.deepEqual(store.attachment(admin, record.id, file.id).data, Buffer.from([85]));
+    assert.equal(app.cases[0].attachments[0].id, '\ud800');
+    assert.throws(() => store.importApplication(admin, store.visibleWorkspace(admin, {inlineAttachments: false}).workspace), /附件格式/);
+  } finally { store.close(); await rm(directory, {recursive: true, force: true}); }
+});
+
 test('attachment HTTP downloads require current project access and new clients receive references', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'flowlens-attachment-http-'));
   const {server, store} = createTeamServer({database: join(directory, 'team.sqlite')});
