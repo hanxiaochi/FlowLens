@@ -213,9 +213,20 @@ function recordView() {
   side.append(actions);
   for (const attachment of record.attachments) side.append(button('下载附件 · ' + attachment.name, async () => {
     if (attachment.data) { const link = node('a'); link.href = attachment.data; link.download = attachment.name; link.click(); return; }
-    const response = await fetch('/api/team/attachment?recordId=' + encodeURIComponent(record.id) + '&attachmentId=' + encodeURIComponent(attachment.id), {credentials: 'same-origin'});
-    if (!response.ok) { const result = await response.json(); throw Object.assign(Error(result.error || '附件下载失败'), {status: response.status}); }
-    download(attachment.name, await response.blob(), 'application/octet-stream');
+    const controller = new AbortController(); let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, 120000);
+    say('正在下载 ' + attachment.name + '，可以取消后重试。');
+    const cancel = node('button', '取消附件下载'); cancel.type = 'button'; cancel.onclick = () => controller.abort(); notice.append(cancel);
+    try {
+      const response = await fetch('/api/team/attachment?recordId=' + encodeURIComponent(record.id) + '&attachmentId=' + encodeURIComponent(attachment.id), {credentials: 'same-origin', signal: controller.signal});
+      if (!response.ok) { const result = await response.json(); throw Object.assign(Error(result.error || '附件下载失败'), {status: response.status}); }
+      download(attachment.name, await response.blob(), 'application/octet-stream');
+      say('附件已交给浏览器下载，请查看下载列表。');
+    } catch (error) {
+      if (controller.signal.aborted && !timedOut) { say('已取消附件下载，可以重新尝试。'); return; }
+      if (timedOut) throw Error('附件下载超时，请检查网络后重试。');
+      throw error;
+    } finally { clearTimeout(timer); }
   }));
   const app = workspace.applications.find(item => item.id === record.appId);
   for (const relation of app.relations.filter(item => item.from === record.template.id)) {

@@ -64,7 +64,9 @@ try {
     } catch {}
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
-  assert.equal((await request('/health')).status, 200);
+  const health = await request('/health');
+  assert.equal(health.status, 200);
+  assert.equal(health.headers['alt-svc'], 'clear');
   assert.equal((await request('/')).status, 200);
   const admin = await login();
   assert.equal((await request('/api/team/import', applicationDemo(), admin.cookie)).status, 200);
