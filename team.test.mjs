@@ -1,4 +1,6 @@
 import http from 'node:http';
+import {unzipSync} from './team-vendor/fflate.mjs';
+import {buildProjectArchive, projectExportLimit} from './team-project-export.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp, rm, readFile, readdir} from 'node:fs/promises';
@@ -61,12 +63,19 @@ test('attachment HTTP downloads require current project access and new clients r
     assert.equal(download.headers['content-type'], 'application/octet-stream');
     assert.match(download.headers['content-disposition'], /filename\*=UTF-8''/);
     assert.deepEqual(download.bytes, bytes);
+    const exportPath = '/api/team/project-export?projectId=demo-project';
+    assert.equal((await request(exportPath)).status, 401);
+    const exported = await request(exportPath, {cookie});
+    assert.equal(exported.status, 200);
+    assert.equal(exported.headers['content-type'], 'application/zip');
+    assert.ok(unzipSync(exported.bytes)['index.html']);
     const modern = JSON.parse((await request('/api/team/workspace', {cookie})).bytes);
     assert.equal(modern.workspace.cases[0].attachments[0].data, undefined);
     const legacy = JSON.parse((await request('/api/team/workspace', {cookie, modern: false})).bytes);
     assert.ok(legacy.workspace.cases[0].attachments[0].data.startsWith('data:'));
     store.setMembership(admin, {userId: member.id, projectId: 'demo-project', roles: []});
     assert.equal((await request(path, {cookie})).status, 404);
+    assert.equal((await request(exportPath, {cookie})).status, 404);
   } finally { await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
 });
 
@@ -438,6 +447,112 @@ test('HTTP session cookies, same-origin protection and authenticated API boundar
     }
     assert.equal((await fetch(base + '/api/team/login', {method: 'POST', headers, body: JSON.stringify({username: 'admin', password})})).status, 429);
   } finally {
+    await new Promise(resolve => server.close(resolve));
+    await rm(directory, {recursive: true, force: true});
+  }
+});
+
+
+test('project handoff includes scoped records, offline forms and verified original files', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'flowlens-handoff-'));
+  const store = openTeamStore(join(directory, 'team.sqlite'));
+  try {
+    const admin = await store.createUser(null, {username: 'admin', name: 'Admin', password});
+    const member = await store.createUser(admin, {username: 'member', name: 'Member', password});
+    const app = applicationDemo();
+    const other = createProject(app.applications[0].id, 'Private project marker');
+    app.projects.push(other);
+    const otherRecord = structuredClone(app.cases[0]);
+    otherRecord.id = 'private-record'; otherRecord.projectId = other.id; otherRecord.project = other.name;
+    otherRecord.values = {}; otherRecord.provenance = []; app.cases.push(otherRecord);
+    app.projects[0].name = '<script>project</script>';
+    app.cases[0].attachments.push({id: 'a', name: '../same\\<img src=x>.png', size: 4, data: 'data:application/octet-stream;base64,AP8BgQ=='});
+    app.cases[0].attachments.push({id: 'b', name: '../same\\<img src=x>.png', size: 1, data: 'data:application/octet-stream;base64,VQ=='});
+    store.importApplication(admin, app);
+    store.setMembership(admin, {userId: member.id, projectId: 'demo-project', roles: ['专业监理']});
+    const before = store.visibleWorkspace(member, {inlineAttachments: false});
+    const zip = store.projectArchive(member, 'demo-project');
+    const files = unzipSync(zip);
+    const manifest = JSON.parse(Buffer.from(files['manifest.json']));
+    assert.equal(manifest.files.length, Object.keys(files).length - 1);
+    for (const item of manifest.files) {
+      assert.equal(item.bytes, files[item.path].length);
+      assert.equal(item.sha256, createHash('sha256').update(files[item.path]).digest('hex'));
+      assert.ok(!item.path.includes('..'));
+    }
+    const data = JSON.parse(Buffer.from(files['project.json']));
+    assert.equal(data.records.length, 1);
+    assert.equal(data.project.id, 'demo-project');
+    assert.equal(data.records[0].events.length, app.cases[0].events.length);
+    assert.deepEqual(Buffer.from(files[data.records[0].attachments[0].exportPath]), Buffer.from([0, 255, 1, 129]));
+    assert.deepEqual(Buffer.from(files[data.records[0].attachments[1].exportPath]), Buffer.from([85]));
+    const html = Buffer.from(files['index.html']).toString();
+    assert.ok(html.includes('&lt;script&gt;project&lt;/script&gt;'));
+    assert.ok(!html.includes('<img src=x>'));
+    assert.ok(Object.values(files).every(bytes => !Buffer.from(bytes).includes('Private project marker')));
+    assert.ok(!Object.hasOwn(data, 'users'));
+    assert.deepEqual(store.visibleWorkspace(member, {inlineAttachments: false}), before);
+    assert.throws(() => store.projectArchive(member, other.id), /不可访问/);
+    store.setMembership(admin, {userId: member.id, projectId: 'demo-project', roles: []});
+    assert.throws(() => store.projectArchive(member, 'demo-project'), /不可访问/);
+    store.setDisabled(admin, {userId: member.id, disabled: true});
+    assert.throws(() => store.projectArchive(member, 'demo-project'), /停用/);
+    assert.ok(store.projectArchive(admin, other.id).length);
+    const db = new DatabaseSync(join(directory, 'team.sqlite'));
+    db.prepare('UPDATE attachment_blobs SET data=?').run(Buffer.from([99])); db.close();
+    assert.throws(() => store.projectArchive(admin, 'demo-project'), /校验失败/);
+    assert.equal(store.visibleWorkspace(admin, {inlineAttachments: false}).workspace.cases.length, 2);
+  } finally { store.close(); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('project handoff rejects oversized attachments before reading and cross-project links', () => {
+  const app = applicationDemo();
+  app.cases[0].attachments = [{name: 'large.bin', size: projectExportLimit + 1}];
+  assert.throws(() => buildProjectArchive(app, 'demo-project', () => assert.fail('must reject before blob read')), /64 MiB/);
+  app.cases[0].attachments = [];
+  app.cases[0].relatedId = 'outside-project';
+  assert.throws(() => buildProjectArchive(app, 'demo-project', () => {}), /关联超出/);
+});
+
+
+test('project export releases its single-transfer slot after an interrupted HTTP download', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'flowlens-export-interrupt-'));
+  const {server, store} = createTeamServer({database: join(directory, 'team.sqlite')});
+  let stalled;
+  try {
+    const admin = await store.createUser(null, {username: 'admin', name: 'Admin', password});
+    const app = applicationDemo();
+    for (let index = 0; index < 3; index++) app.cases[0].attachments.push({id: 'large-' + index, name: 'large.bin', size: 8 * 1024 * 1024, data: 'data:application/octet-stream;base64,' + Buffer.alloc(8 * 1024 * 1024, index).toString('base64')});
+    store.importApplication(admin, app);
+    const session = await store.login('admin', password);
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    const options = {hostname: '127.0.0.1', port: server.address().port, path: '/api/team/project-export?projectId=demo-project', headers: {Host: '127.0.0.1:4186', Cookie: 'flowlens_session=' + session.token}};
+    const request = () => new Promise((resolve, reject) => { http.get(options, resolve).on('error', reject); });
+    // Hold the first response body regardless of OS socket-buffer size.
+    server.prependOnceListener('request', (_request, response) => {
+      response.end = function () { this.flushHeaders(); return this; };
+    });
+    stalled = await request();
+    assert.equal(stalled.statusCode, 200);
+    stalled.pause();
+    const busy = await request();
+    assert.equal(busy.statusCode, 503); busy.resume();
+    const closed = new Promise(resolve => stalled.once('close', resolve));
+    stalled.destroy(); await closed;
+    // Wait for the server-side close event, then consume a fresh complete transfer.
+    let retry;
+    for (let attempt = 0; attempt < 20; attempt++) {
+      retry = await request();
+      if (retry.statusCode !== 503) break;
+      retry.resume();
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    assert.equal(retry.statusCode, 200);
+    const chunks = [];
+    for await (const chunk of retry) chunks.push(chunk);
+    assert.ok(unzipSync(Buffer.concat(chunks))['manifest.json']);
+  } finally {
+    stalled?.destroy(); server.closeAllConnections();
     await new Promise(resolve => server.close(resolve));
     await rm(directory, {recursive: true, force: true});
   }

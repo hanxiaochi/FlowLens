@@ -43,6 +43,22 @@ async function task(action) {
 function download(name, value, type = 'application/json') {
   const url = URL.createObjectURL(new Blob([value], {type})); const link = node('a'); link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
+async function downloadFromServer(path, name, type = 'application/octet-stream') {
+  const controller = new AbortController(); let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; controller.abort(); }, 120000);
+  say('正在下载 ' + name + '，可以取消后重试。');
+  const cancel = node('button', '取消下载'); cancel.type = 'button'; cancel.onclick = () => controller.abort(); notice.append(cancel);
+  try {
+    const response = await fetch(path, {credentials: 'same-origin', signal: controller.signal});
+    if (!response.ok) { const result = await response.json(); throw Object.assign(Error(result.error || '下载失败'), {status: response.status}); }
+    download(name, await response.blob(), type);
+    say('文件已交给浏览器下载，请查看下载列表。');
+  } catch (error) {
+    if (controller.signal.aborted && !timedOut) { say('已取消下载，可以重新尝试。'); return; }
+    if (timedOut) throw Error('下载超时，请检查网络后重试。');
+    throw error;
+  } finally { clearTimeout(timer); }
+}
 function current() { return workspace?.cases.find(record => record.id === selectedId); }
 function roleFor(record) { return record.status === 'draft' ? record.submitter : record.template.workflow[record.step]?.role; }
 function roles() { return memberships.find(item => item.projectId === projectId)?.roles ?? []; }
@@ -94,6 +110,8 @@ function home() {
   hero.append(label('当前项目', projects), node('p', '我的项目角色 · ' + (roles().join('、') || '只读管理查看'), 'muted'));
   const project = workspace.projects.find(item => item.id === projectId);
   const app = workspace.applications.find(item => item.id === project.appId);
+  hero.append(button('下载项目资料包', () => downloadFromServer('/api/team/project-export?projectId=' + encodeURIComponent(projectId), 'FlowLens-项目资料.zip', 'application/zip')));
+  hero.append(node('p', '包含已保存表单、办理历史、附件与文件校验清单，单次最多 64 MiB。解压后打开 index.html。', 'muted'));
   content.append(hero);
   const templates = node('div', undefined, 'cards');
   for (const template of workspace.templates.filter(item => app.templateIds.includes(item.id))) {
@@ -213,20 +231,7 @@ function recordView() {
   side.append(actions);
   for (const attachment of record.attachments) side.append(button('下载附件 · ' + attachment.name, async () => {
     if (attachment.data) { const link = node('a'); link.href = attachment.data; link.download = attachment.name; link.click(); return; }
-    const controller = new AbortController(); let timedOut = false;
-    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, 120000);
-    say('正在下载 ' + attachment.name + '，可以取消后重试。');
-    const cancel = node('button', '取消附件下载'); cancel.type = 'button'; cancel.onclick = () => controller.abort(); notice.append(cancel);
-    try {
-      const response = await fetch('/api/team/attachment?recordId=' + encodeURIComponent(record.id) + '&attachmentId=' + encodeURIComponent(attachment.id), {credentials: 'same-origin', signal: controller.signal});
-      if (!response.ok) { const result = await response.json(); throw Object.assign(Error(result.error || '附件下载失败'), {status: response.status}); }
-      download(attachment.name, await response.blob(), 'application/octet-stream');
-      say('附件已交给浏览器下载，请查看下载列表。');
-    } catch (error) {
-      if (controller.signal.aborted && !timedOut) { say('已取消附件下载，可以重新尝试。'); return; }
-      if (timedOut) throw Error('附件下载超时，请检查网络后重试。');
-      throw error;
-    } finally { clearTimeout(timer); }
+    await downloadFromServer('/api/team/attachment?recordId=' + encodeURIComponent(record.id) + '&attachmentId=' + encodeURIComponent(attachment.id), attachment.name);
   }));
   const app = workspace.applications.find(item => item.id === record.appId);
   for (const relation of app.relations.filter(item => item.from === record.template.id)) {

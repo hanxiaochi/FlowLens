@@ -13,6 +13,7 @@ export function createTeamServer({database = resolve(root, '.local/team.sqlite')
   if (canonical.protocol === 'http:' && !['localhost', '127.0.0.1', '[::1]'].includes(canonical.hostname)) throw Error('外部协作站点必须配置 HTTPS 源地址');
   const store = openTeamStore(database);
   const attempts = new Map();
+  let exportingProject = false;
   const cookie = (token, age) => `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${canonical.protocol === 'https:' ? '; Secure' : ''}`;
   function send(res, status, value, extra = {}) {
     if (res.destroyed || res.writableEnded) return;
@@ -78,6 +79,22 @@ export function createTeamServer({database = resolve(root, '.local/team.sqlite')
       if (req.method === 'GET') {
         if (path === '/api/team/me') return send(res, 200, {user});
         if (path === '/api/team/workspace') return send(res, 200, store.visibleWorkspace(user, {inlineAttachments: req.headers['x-flowlens-client'] !== '2'}));
+        if (path === '/api/team/project-export') {
+          if (exportingProject) fail(503, '正在发送另一份项目资料包，请稍后重试');
+          exportingProject = true;
+          const releaseExport = () => {
+            exportingProject = false;
+            res.off('close', releaseExport);
+            res.off('finish', releaseExport);
+          };
+          res.once('close', releaseExport);
+          res.once('finish', releaseExport);
+          try {
+            const archive = store.projectArchive(user, new URL(req.url, origin).searchParams.get('projectId'));
+            res.writeHead(200, {'Content-Type': 'application/zip', 'Content-Length': archive.length, 'Content-Disposition': 'attachment; filename=FlowLens-project.zip'});
+            return res.end(archive);
+          } catch (error) { releaseExport(); throw error; }
+        }
         if (path === '/api/team/attachment') {
           const query = new URL(req.url, origin).searchParams;
           const file = store.attachment(user, query.get('recordId'), query.get('attachmentId'));

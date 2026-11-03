@@ -1,3 +1,4 @@
+import {buildProjectArchive} from './team-project-export.mjs';
 import {DatabaseSync, backup} from 'node:sqlite';
 import {randomBytes, randomUUID, scrypt as derive, timingSafeEqual, createHash} from 'node:crypto';
 import {promisify} from 'node:util';
@@ -242,6 +243,22 @@ export function openTeamStore(filename) {
     if (!row || row.size !== file.size || digest(row.data) !== file.blobId) fail(500, '附件内容校验失败');
     return {name: file.name, data: Buffer.from(row.data), size: row.size};
   }
+  function projectArchive(user, projectId) {
+    db.exec('BEGIN');
+    try {
+      const currentUser = active(user);
+      if (!currentUser.admin && !roles(user, projectId).length) fail(404, '项目不存在或不可访问');
+      const current = workspace();
+      if (!current.projects.some(item => item.id === projectId)) fail(404, '项目不存在或不可访问');
+      const result = buildProjectArchive(current, projectId, (record, file) => {
+        const row = db.prepare('SELECT data,size FROM attachment_blobs WHERE id=?').get(file.blobId);
+        if (!row || row.size !== file.size || digest(row.data) !== file.blobId) fail(500, '附件内容校验失败');
+        return Buffer.from(row.data);
+      });
+      db.exec('COMMIT');
+      return result;
+    } catch (error) { db.exec('ROLLBACK'); throw error; }
+  }
   function importApplication(user, input) {
     admin(user);
     const incoming = upgradeWorkspace(input);
@@ -383,7 +400,7 @@ export function openTeamStore(filename) {
     });
   }
   return {
-    createUser, login, session, visibleWorkspace, importApplication, updateDefinitions, setMembership, command, changePassword, resetPassword, operations, deliveryReport, updateDelivery, attachment,
+    createUser, login, session, visibleWorkspace, importApplication, updateDefinitions, setMembership, command, changePassword, resetPassword, operations, deliveryReport, updateDelivery, attachment, projectArchive,
     logout: token => db.prepare('DELETE FROM sessions WHERE token=?').run(digest(token)),
     users: user => { admin(user); return db.prepare('SELECT * FROM users ORDER BY username').all().map(publicUser); },
     memberships: user => { admin(user); return db.prepare('SELECT user_id AS userId,project_id AS projectId,roles FROM members').all().map(row => ({...row, roles: JSON.parse(row.roles)})); },

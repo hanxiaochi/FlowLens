@@ -5,7 +5,7 @@
 - @electric-sql/pglite 0.5.13 — Apache-2.0，https://github.com/electric-sql/pglite
   仅用于开发测试，具体第三方组件许可见其发行包。
 - fflate — MIT，https://github.com/101arrowz/fflate
-  用于在本地浏览器解包 DOCX；安装版本记录于 package-lock.json。
+  用于在本地浏览器解包 DOCX，以及团队服务的项目 ZIP 导出。团队包内附 0.8.3 的 ESM 源码与 MIT 许可，位于 team-vendor；安装版本记录于 package-lock.json。
 - @xmldom/xmldom — MIT，https://github.com/xmldom/xmldom
   仅用于 Node 测试读取 Word XML；浏览器运行使用原生 DOMParser。
 

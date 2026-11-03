@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'team*'
+      - 'team-vendor/**'
       - 'forms*.mjs'
       - 'apps*.mjs'
       - 'scripts/*team*'

@@ -1,7 +1,8 @@
 FROM node:24-bookworm-slim
 WORKDIR /app
-COPY --chown=node:node team-server.mjs team-store.mjs team-attachments.mjs team-ui.js team-delivery.mjs team.html team.css forms-store.mjs forms-model.mjs forms-schema.mjs forms-rules.mjs forms-print.mjs forms.css forms-detail-ui.js apps-model.mjs ./
+COPY --chown=node:node team-server.mjs team-store.mjs team-attachments.mjs team-project-export.mjs team-ui.js team-delivery.mjs team.html team.css forms-store.mjs forms-model.mjs forms-schema.mjs forms-rules.mjs forms-print.mjs forms.css forms-detail-ui.js apps-model.mjs ./
 COPY --chown=node:node scripts/team-admin.mjs ./scripts/team-admin.mjs
+COPY --chown=node:node team-vendor ./team-vendor
 RUN mkdir /data && chown node:node /data
 USER node
 ENV HOST=0.0.0.0 PORT=4186 FLOWLENS_DATABASE=/data/team.sqlite

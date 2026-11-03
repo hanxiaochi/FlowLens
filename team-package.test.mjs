@@ -56,6 +56,7 @@ test('standalone distribution starts without dependencies and its CLI restores d
       attachment: {name: '验收附件.bin', data: 'data:application/octet-stream;base64,' + attachmentBytes.toString('base64')}
     });
     const before = store.visibleWorkspace(session.user);
+    assert.ok(store.projectArchive(session.user, 'demo-project').length > attachmentBytes.length);
     const backup = join(directory, 'backup.sqlite');
     const backedUp = cli(['backup', backup]);
     assert.equal(backedUp.status, 0, backedUp.stderr);
