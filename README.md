@@ -1,6 +1,6 @@
 # FlowLens
 
-**简体中文** · [English](README.en.md) · [v1.11.0 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.11.0)
+**简体中文** · [English](README.en.md) · [v1.12.0 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.12.0)
 
 **[直接打开在线 Demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -17,6 +17,16 @@
 [反馈卡住的步骤](https://github.com/hanxiaochi/FlowLens/issues/new?template=trial-feedback.yml) · [分享介绍与试用计划](docs/launch-kit.md)
 
 [需求研究与下一阶段缺口](docs/fde-product-audit-2026-11-02.md) · [业务访谈与交付验收工作单](docs/fde-discovery-worksheet.md)
+
+## 1.12 写到一半的内容，也能找回
+
+业务卡片现在直接显示单据编号和字段摘要。填写文字、明细行与办理意见时，会保存本机草稿；刷新或重新登录后，从页头核对找回。两个页面各存一份，提交成功后只清理对应草稿。原修订变化时展示差异，供人工核对。
+
+111 项回归、跨平台 CI，以及刷新恢复、多页面、权限变化和组合故障的浏览器验收已通过。云端已升级。[本版说明与保存范围](docs/release-1.12.0.md)
+
+![草稿差异核对](docs/images/draft-comparison-1.12.png)
+
+草稿保存在当前浏览器。清除网站数据会删除本机草稿，跨设备同步仍待实现。
 
 ## 1.11 刷新后继续确认上一次操作
 
@@ -87,7 +97,7 @@ Windows、Ubuntu 各通过 93 项回归，容器和云端五账号复验通过�
 
 服务端会检查角色、阶段和修订号。重复请求复用原结果，过期页面不能覆盖新内容。新增了账号停用、密码修改、审计记录、表式版本发布，以及 SQLite 备份恢复工具。
 
-下载发布页中的 `FlowLens-1.11.0-team.zip`，安装 Node.js 24 LTS，按部署指南初始化管理员后运行 `npm start`。协作包附带所需运行文件，可以离线启动。[部署与恢复指南](docs/team-deployment.md) · [本版验收](docs/release-1.11.0.md) · [持续交付计划](docs/delivery-plan.md)
+下载发布页中的 `FlowLens-1.12.0-team.zip`，安装 Node.js 24 LTS，按部署指南初始化管理员后运行 `npm start`。协作包附带所需运行文件，可以离线启动。[部署与恢复指南](docs/team-deployment.md) · [本版验收](docs/release-1.12.0.md) · [持续交付计划](docs/delivery-plan.md)
 
 公开 Demo 提供浏览器本地体验。团队服务需自托管，适合先用脱敏资料做小团队试运行。云端技术验收已有记录，真实客户流程、持续容量和维护交接仍需继续验证。
 
@@ -214,9 +224,3 @@ npm test
 3D 部分使用 [Three.js](https://threejs.org/)；SQL 验证测试使用 [PGlite](https://pglite.dev/)。依赖及许可说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 发现问题或有想法，欢迎开 [Issue](https://github.com/hanxiaochi/FlowLens/issues)。最好附上复现步骤和脱敏后的项目文件，别把密钥、真实客户数据一起贴上来。
-
-## 开发进展
-
-主分支正在开发 1.12，正式发行和云端仍为 1.11.0。业务卡片显示前三个非空字段的摘要和单据编号。新增本机填写草稿会保留文字、明细行和办理意见，刷新后可从页头核对找回。恢复前展示与服务器的差异，单据修订变化时需要人工核对；每个编辑页面独立保存。
-
-111 项本地回归通过。浏览器已验证草稿找回、保存后的对应版本清理、旧修订拦截、存储失败时下载草稿和窄屏清单。多标签页、权限变化及故障组合的完整验收继续进行。草稿保存在当前浏览器，清除网站数据会删除它；实际业务仍需点击保存或提交。

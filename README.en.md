@@ -1,6 +1,6 @@
 # FlowLens
 
-[简体中文](README.md) · **English** · [v1.11.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.11.0)
+[简体中文](README.md) · **English** · [v1.12.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.12.0)
 
 **[Try the live demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -21,6 +21,16 @@ No installation or API key needed. Start with a fictional supervision applicatio
 ![Application and project workspace](docs/images/application-workspace-1.3.jpg)
 
 [1.3 release notes and acceptance](docs/release-1.3.0.md)
+
+## 1.12 keeps work in progress
+
+Record cards now show IDs and field previews. Text, detail rows and action notes are saved as local drafts, available from the header after reload or sign-in. Each editing page keeps its own copy. A successful submission cleans up only its linked draft. When the server revision changes, the comparison view helps you reconcile the differences manually.
+
+All 111 tests and cross-platform CI pass. Browser acceptance covers reload recovery, competing editors, permission changes and combined failure paths. The cloud app has been upgraded. [Release notes and storage scope (Chinese)](docs/release-1.12.0.md)
+
+![Draft comparison](docs/images/draft-comparison-1.12.png)
+
+Drafts stay in this browser. Clearing site data deletes them; cross-device draft sync is still pending.
 
 ## 1.11 resumes business actions after a reload
 
@@ -91,7 +101,7 @@ Import an application package into the self-hosted team service, create accounts
 
 The server checks project roles, workflow stages, and record revisions. Repeated requests reuse their result. This release also adds account deactivation, password changes, audit history, versioned template publication, and SQLite backup and restore tools.
 
-Download `FlowLens-1.11.0-team.zip`, install Node.js 24 LTS, initialize the administrator, then run `npm start`. The team runtime bundles its required files and needs no npm install. See the [deployment guide (Chinese)](docs/team-deployment.md) and [release acceptance](docs/release-1.11.0.md).
+Download `FlowLens-1.12.0-team.zip`, install Node.js 24 LTS, initialize the administrator, then run `npm start`. The team runtime bundles its required files and needs no npm install. See the [deployment guide (Chinese)](docs/team-deployment.md) and [release acceptance](docs/release-1.12.0.md).
 
 The public demo runs locally in your browser. The shared service is self-hosted and intended for a small-team pilot. Cloud technical acceptance is recorded. Customer workflows, sustained capacity, and maintenance handover still need validation.
 
@@ -221,9 +231,3 @@ Version 1.0 includes 46 automated tests covering model validation, permissions, 
 The 3D scene uses [Three.js](https://threejs.org/). SQL validation tests use [PGlite](https://pglite.dev/). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for dependency and license information. The project itself has not yet specified a license.
 
 Found a problem or have an idea? Open an [issue](https://github.com/hanxiaochi/FlowLens/issues). Reproduction steps and a sanitized project file help. Please leave out API keys and real customer data.
-
-## Development status
-
-Version 1.12 is in development on main. The published release and cloud app remain on 1.11.0. Record cards show a short preview of three populated fields and the record ID. Local drafts retain text, detail rows and action notes in this browser. The header provides access after reload, and recovery shows differences against the server record. Changed revisions require manual reconciliation. Each editing page keeps a separate draft.
-
-All 111 local tests pass. Browser checks cover draft recovery, cleanup of the submitted draft version, stale-revision protection, draft download after storage failure, and the narrow-screen record list. Multi-tab, permission-change and combined failure acceptance is still in progress. Clearing site data deletes local drafts. Use Save or Submit to store business changes on the server.
