@@ -281,9 +281,14 @@ async function deliveryView(scope = 'instance', checkId) {
 async function operationsView() {
   const status = await api('operations');
   selectedId = ''; content.replaceChildren(); accountView();
-  const size = bytes => bytes === null ? '暂时无法读取' : (bytes / 1024 / 1024).toLocaleString(undefined, {maximumFractionDigits: 2}) + ' MiB';
+  const size = bytes => {
+    if (bytes === null) return '暂时无法读取';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toLocaleString(undefined, {maximumFractionDigits: 2}) + ' KiB';
+    return (bytes / 1024 / 1024).toLocaleString(undefined, {maximumFractionDigits: 2}) + ' MiB';
+  };
   const date = value => new Date(value).toLocaleString();
-  content.append(node('span', 'OPERATIONS', 'badge'), node('h1', '看清数据，接得住日常维护。'), node('p', '数据读取于 ' + date(status.checkedAt), 'muted'));
+  content.append(node('span', 'OPERATIONS', 'badge'), node('h1', '运行状态与备份'), node('p', '数据读取于 ' + date(status.checkedAt), 'muted'));
   const grid = node('div', undefined, 'admin-grid');
   const storage = node('section', undefined, 'panel stack');
   const usage = node('meter'); usage.max = status.workspaceLimitBytes; usage.value = status.workspaceBytes; usage.setAttribute('aria-label', '工作区容量使用量');
