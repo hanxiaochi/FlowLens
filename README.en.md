@@ -32,6 +32,14 @@ A Windows LAN pilot has passed five-account HTTPS workflow, restore, and browser
 
 An owner-hosted Tencent Cloud pilot has since passed public-IP HTTPS, five-role workflow, concurrent-write conflict, and database restoration checks. Daily backups are enabled. Real-business approval and longer-term operation remain under validation. [Cloud acceptance and screenshot](docs/cloud-pilot-2026-11-03.md)
 
+## 1.10 candidate · Find a record, then open it
+
+Projects now show 50 records per page, with search across identifiers and saved field values. Pending counts cover the whole project. Full forms, repeating rows and history load when a record opens. A completed record stays available after it leaves the pending filter.
+
+The candidate passes 93 local tests and browser checks for workflow completion and downloaded print files. Isolated capacity and release checks are in progress. The deployed release is currently 1.9. [Plan and open acceptance items (Chinese)](docs/delivery-plan.md)
+
+![Record search and project list](docs/images/project-search-1.10.png)
+
 ## 1.9 restores an archive into a working project
 
 After checking an archive, name the new project, assign members, review the plan and confirm. FlowLens remaps internal identifiers and record links while preserving saved values and clearly marking external history. A confirmed request can be retried after a lost response, including after a page reload. Cloud checks cover unchanged source data, attachment downloads, role enforcement and continued work. Restoration currently creates an independent project. Merging into an existing project remains planned. [Scope and acceptance notes (Chinese)](docs/release-1.9.0.md)
