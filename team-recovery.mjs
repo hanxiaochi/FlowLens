@@ -39,7 +39,7 @@ export function createRecoveryStore(factory = globalThis.indexedDB, name = 'flow
   return {
     async stage(userId, instanceId, request, description = '', draft = null) {
       if (!userId || !instanceId || request.expectedUserId !== userId || request.expectedInstanceId !== instanceId || typeof request.operationId !== 'string') throw Error('恢复请求缺少当前账号或服务环境。');
-      const target = request.type === 'create'
+      const target = request.type === 'publish-definitions' ? ['definitions', request.applicationId] : request.type === 'create'
         ? ['create', request.projectId, request.templateId, request.sourceId ?? '', request.relationId ?? '']
         : ['record', request.recordId];
       if (target.some(value => typeof value !== 'string')) throw Error('恢复请求缺少业务编号。');

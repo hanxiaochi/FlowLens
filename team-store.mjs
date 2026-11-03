@@ -1,3 +1,4 @@
+import {definitionDetails} from './team-definition-diff.mjs';
 import {summarizeWorkspace} from './team-read-model.mjs';
 import {prepareProjectRestore} from './team-project-restore.mjs';
 import {checkProjectArchive, inspectProjectArchive} from './team-project-check.mjs';
@@ -398,17 +399,19 @@ export function openTeamStore(filename) {
         const previous = current[collection].find(item => item.id === next.id);
         if (JSON.stringify(previous) === JSON.stringify(next)) continue;
         const sections = Object.keys({...previous, ...next}).filter(key => JSON.stringify(previous?.[key]) !== JSON.stringify(next[key]));
-        changes.push({collection, id: next.id, title: next.title ?? next.name, kind: previous ? 'changed' : 'added', beforeVersion: previous?.version, afterVersion: next.version, sections});
+        changes.push({collection, id: next.id, title: next.title ?? next.name, kind: previous ? 'changed' : 'added', beforeVersion: previous?.version, afterVersion: next.version, sections, details: definitionDetails(previous, next, current.templates, [...incoming.templates, ...current.templates.filter(template => !incoming.templates.some(item => item.id === template.id))])});
       }
     }
     const result = applyDefinitions(current, incoming);
     upgradeWorkspace(current, {allowAttachmentReferences: true, copy: false});
     if (Buffer.byteLength(JSON.stringify(current)) > 32 * 1024 * 1024) fail(413, '当前实例工作区已超过 32 MB 容量，请联系管理员归档并规划独立实例');
     const context = serviceContext(user);
+    const changedTemplates = new Set(changes.filter(change => change.collection === 'templates').map(change => change.id));
+    const affectedApplications = current.applications.filter(app => app.id === incoming.applications[0].id || app.templateIds.some(id => changedTemplates.has(id))).map(app => ({id: app.id, name: app.name}));
     return {
       ...context, userId: user.id, applicationId: incoming.applications[0].id,
       planFingerprint: digest(JSON.stringify({baseline, incoming, ...context, userId: user.id})),
-      changed: baseline !== definitionFingerprint(current), preservedRecords: result.preservedRecords, changes
+      changed: baseline !== definitionFingerprint(current), preservedRecords: result.preservedRecords, affectedApplications, changes
     };
   }
   function previewDefinitions(user, input) {

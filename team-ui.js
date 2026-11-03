@@ -42,7 +42,7 @@ function acceptSession(result) {
   user = result.user; serviceContext = result.context;
 }
 async function api(path, data) {
-  const timeoutMs = ['import', 'definitions'].includes(path) || data?.type === 'attachment' ? 120000 : 30000;
+  const timeoutMs = ['import', 'definitions', 'definitions-preview', 'definitions-publish'].includes(path) || data?.type === 'attachment' ? 120000 : 30000;
   return teamJsonRequest('/api/team/' + path, {method: data === undefined ? 'GET' : 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', 'X-FlowLens-Request': '1', 'X-FlowLens-Client': '3'}, body: data === undefined ? undefined : JSON.stringify(data)}, timeoutMs);
 }
 async function task(action) {
@@ -215,6 +215,7 @@ function updatePendingControls() {
 }
 async function sendPending() {
   if (!pending) throw Error('当前没有待确认的业务操作。');
+  if (pending.type === 'publish-definitions') return sendDefinitionPending();
   updatePendingControls();
   let result;
   try {
@@ -249,6 +250,70 @@ async function enterWorkspace() {
     if (count) say('发现 ' + count + ' 份本机填写草稿，可从“本机填写草稿”核对恢复。');
   } catch (error) { say('本机填写草稿无法读取，请使用下载草稿保留填写内容。' + error.message, true); }
 }
+async function definitionPreviewView(incoming) {
+  if (!clean()) return;
+  acceptSession(await api('me'));
+  const plan = await api('definitions-preview', incoming);
+  if (plan.userId !== user.id || plan.instanceId !== serviceContext.instanceId) throw Error('账号或服务环境已变化，请重新预览。');
+  selectedId = ''; selectedRecord = null; accountView(); content.replaceChildren();
+  content.append(node('h1', '核对表式发布'), node('p', '该应用已有 ' + plan.preservedRecords + ' 份业务沿用原表式快照。新建业务使用发布后的定义。'));
+  content.append(node('p', '涉及应用 · ' + plan.affectedApplications.map(app => app.name).join('、')));
+  content.append(node('p', plan.changed ? '以下为更新包与服务器当前定义的差异。' : '当前定义与更新包一致，可以确认当前状态。'));
+  const collectionNames = {applications: '应用', templates: '表式', projects: '项目'};
+  let remaining = 200;
+  for (const change of plan.changes.slice(0, 50)) {
+    const card = node('section', undefined, 'panel');
+    card.append(node('h2', collectionNames[change.collection] + ' · ' + change.title), node('p', change.kind === 'added' ? '新增' : '更新'));
+    if (change.afterVersion !== undefined) card.append(node('p', '版本 ' + (change.beforeVersion ?? '无') + ' → ' + change.afterVersion));
+    for (const detail of change.details.slice(0, remaining)) {
+      const row = node('div', undefined, 'definition-change');
+      const before = node('div'), after = node('div');
+      before.append(node('p', '当前定义', 'muted'), node('pre', detail.before.slice(0, 2000)));
+      after.append(node('p', '更新后', 'muted'), node('pre', detail.after.slice(0, 2000)));
+      row.append(node('h3', detail.path), before, after); card.append(row);
+    }
+    remaining = Math.max(0, remaining - change.details.length);
+    content.append(card);
+  }
+  content.append(node('p', '页面最多显示 50 项定义、200 处属性差异，每个值最多 2000 字符。完整预览和更新包可以下载保存。', 'muted'));
+  const actions = node('div', undefined, 'toolbar');
+  const publish = button(plan.changed ? '确认发布这些变更' : '确认当前状态', async () => {
+    if (pending) throw Error('请先处理待确认操作。');
+    if (user.id !== plan.userId || serviceContext.instanceId !== plan.instanceId) throw Error('账号或服务环境已变化，请重新预览。');
+    const request = {type: 'publish-definitions', applicationId: plan.applicationId, workspace: incoming, planFingerprint: plan.planFingerprint, operationId: crypto.randomUUID(), expectedUserId: plan.userId, expectedInstanceId: plan.instanceId};
+    const entry = await recovery.stage(plan.userId, plan.instanceId, request, '发布表式 · ' + incoming.applications[0].name);
+    pending = entry.request; pendingDraft = null; publish.disabled = true;
+    await sendPending();
+  }, 'primary');
+  actions.append(publish, button('下载完整预览', () => download('FlowLens-表式发布预览.json', JSON.stringify(plan, null, 2))), button('下载更新包', () => download('FlowLens-待发布应用.json', JSON.stringify(incoming, null, 2))), button('返回管理后台', async () => { if (clean()) await adminView(); }));
+  content.append(actions); say('预览已完成，请核对变更后发布。');
+}
+function definitionResultView(result) {
+  selectedId = ''; selectedRecord = null; accountView();
+  content.replaceChildren(node('h1', '表式发布结果'), node('p', result.updated ? '服务器已发布这份表式更新。' : '服务器已确认当前定义与更新包一致。'), node('p', '发布时保留该应用 ' + result.preservedRecords + ' 份已有业务。'), node('p', '操作编号 ' + result.operationId));
+  content.append(node('p', '新增办理角色可在管理后台分配项目权限。', 'muted'));
+  if (pending) content.append(button('重试原请求', sendPending));
+  else content.append(button('返回管理后台', adminView));
+}
+async function sendDefinitionPending() {
+  let result;
+  try {
+    const {workspace, operationId, planFingerprint, expectedUserId, expectedInstanceId} = pending;
+    result = await api('definitions-publish', {workspace, options: {operationId, planFingerprint, expectedUserId, expectedInstanceId}});
+  } catch (error) {
+    try { await recoveryView(); }
+    catch {
+      selectedId = ''; selectedRecord = null; accountView();
+      content.replaceChildren(node('h1', '发布结果待确认'), node('p', '原更新包和操作编号已保存在本机。网络恢复或重新登录后，可继续确认。'), button('重试原请求', sendPending), button('下载原发布请求', () => download('FlowLens-待确认发布.json', JSON.stringify(pending, null, 2))));
+    }
+    if (!error.status || error.status >= 500) throw Error('尚未收到发布结果确认，原更新包和操作编号已保存在本机，请继续确认原请求。');
+    throw error;
+  }
+  try { await recovery.remove(pending.expectedUserId, pending.operationId); }
+  catch { definitionResultView(result); throw Error('表式结果已确认，但本机记录清理失败。请重试原请求完成清理。'); }
+  pending = null; pendingDraft = null; definitionResultView(result);
+  say(result.updated ? '表式更新已发布。' : '当前定义已确认。');
+}
 async function recoveryView() {
   acceptSession(await api('me'));
   selectedId = ''; selectedRecord = null;
@@ -261,7 +326,7 @@ async function recoveryView() {
     await refresh(); home(); say('原请求保留在本机恢复列表，可从“恢复待确认操作”返回。');
   }));
   if (!entries.length) content.append(node('p', '当前没有待确认操作。'));
-  const actionNames = {create: '新建单据', save: '保存填写', submit: '提交办理', advance: '办理并继续', return: '退回修改', attachment: '添加附件'};
+  const actionNames = {create: '新建单据', save: '保存填写', submit: '提交办理', advance: '办理并继续', return: '退回修改', attachment: '添加附件', 'publish-definitions': '发布表式更新'};
   for (const entry of entries) {
     const card = node('article', undefined, 'panel');
     card.append(node('h2', entry.description), node('p', new Date(entry.createdAt).toLocaleString() + ' · ' + (actionNames[entry.request.type] ?? entry.request.type)), node('p', '操作编号 ' + entry.operationId));
@@ -272,7 +337,7 @@ async function recoveryView() {
     const resume = button('继续确认原请求', async () => {
       if (pending && pending.operationId !== entry.operationId) throw Error('请先处理当前待确认操作。');
       pending = entry.request; pendingDraft = entry.draft ?? null; await sendPending();
-    }, 'primary'); resume.disabled = !matches;
+    }, 'primary'); resume.disabled = !matches || (entry.request.type === 'publish-definitions' && !user.admin);
     const reviewed = input('已核对服务器状态', 'checkbox');
     const remove = button('移除这条本机记录', async () => {
       await recovery.remove(entry.userId, entry.operationId);
@@ -717,11 +782,10 @@ async function adminView() {
   const file = input('导入应用包', 'file'); file.accept = '.json';
   file.onchange = () => task(async () => { const selected = file.files[0]; if (!selected) return; if (selected.size > 24 * 1024 * 1024) throw Error('应用包最多 24 MB'); await api('import', JSON.parse(await selected.text())); await adminView(); say('应用已导入，请分配项目角色。'); }); imports.append(file);
   const updateFile = input('选择表式更新包', 'file'); updateFile.accept = '.json';
-  imports.append(node('h3', '发布已有应用的新表式'), node('p', '使用设计工作台导出的应用包。变更模板需提高版本，新规则用于新建业务，已有业务保留原快照。包中的业务记录不会替换服务器记录。', 'muted'), updateFile, button('确认发布表式更新', async () => {
+  imports.append(node('h3', '发布已有应用的新表式'), node('p', '选择设计工作台导出的应用包，先核对差异，再确认发布。新规则用于新建业务，已有业务沿用创建时的表式快照。', 'muted'), updateFile, button('预览表式更新', async () => {
     const selected = updateFile.files[0]; if (!selected) throw Error('请选择应用更新包');
     if (selected.size > 24 * 1024 * 1024) throw Error('应用包最多 24 MB');
-    const result = await api('definitions', JSON.parse(await selected.text()));
-    await adminView(); say('表式已发布，保留 ' + result.preservedRecords + ' 份已有业务。请核对新增角色的授权。');
+    await definitionPreviewView(JSON.parse(await selected.text()));
   }));
   const users = node('section', undefined, 'panel stack'); users.append(node('h2', '创建成员账号'));
   const username = input('新账号'), name = input('显示名'), password = input('初始密码', 'password'); password.minLength = 12;

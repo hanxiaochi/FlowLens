@@ -5,6 +5,23 @@ import {createRecoveryStore} from './team-recovery.mjs';
 
 const request = (overrides = {}) => ({type: 'save', recordId: 'record-a', operationId: crypto.randomUUID(), expectedUserId: 'user-a', expectedInstanceId: 'instance-a', values: {issue: 'Original'}, ...overrides});
 
+test('definition publications persist their original package and block competing publication tabs', async () => {
+  const factory = new IDBFactory();
+  let store = createRecoveryStore(factory);
+  try {
+    const publication = request({type: 'publish-definitions', applicationId: 'app-a', workspace: {templates: [{version: 2}]}, planFingerprint: 'original-plan'});
+    const saved = await store.stage('user-a', 'instance-a', publication);
+    publication.workspace.templates[0].version = 3;
+    await assert.rejects(store.stage('user-a', 'instance-a', {...publication, operationId: crypto.randomUUID()}), /已有相同业务/);
+    await store.stage('user-a', 'instance-a', request());
+    await store.close(); store = createRecoveryStore(factory);
+    const restored = (await store.list('user-a')).find(entry => entry.operationId === saved.operationId);
+    assert.equal(restored.request.workspace.templates[0].version, 2);
+    assert.equal(restored.request.planFingerprint, 'original-plan');
+    assert.deepEqual(restored.scope, ['user-a', 'instance-a', 'definitions', 'app-a']);
+  } finally { await store.close(); }
+});
+
 test('recovery keeps original requests across reopening and isolates accounts', async () => {
   const factory = new IDBFactory();
   let store = createRecoveryStore(factory);
