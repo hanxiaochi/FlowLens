@@ -236,3 +236,9 @@ npm test
 3D 部分使用 [Three.js](https://threejs.org/)；SQL 验证测试使用 [PGlite](https://pglite.dev/)。依赖及许可说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 发现问题或有想法，欢迎开 [Issue](https://github.com/hanxiaochi/FlowLens/issues)。最好附上复现步骤和脱敏后的项目文件，别把密钥、真实客户数据一起贴上来。
+
+## 开发进展
+
+1.14 正在补齐表式发布的差异核对与恢复。服务端已提供只读预览和带基线检查的发布接口，核对账号、服务实例及更新包；相同操作编号重试会返回原结果，日常业务填写可以继续进行。
+
+新接口已通过权限、并发基线、重放、无变更发布和 HTTP 入口测试。界面及跨刷新恢复仍在接入，现有发布界面继续使用原接口。正式发行和云端为 1.13.0。

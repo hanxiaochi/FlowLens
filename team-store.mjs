@@ -363,35 +363,91 @@ export function openTeamStore(filename) {
       return {saved: true};
     });
   }
+  function applyDefinitions(current, incoming) {
+    if (incoming.applications.length !== 1) fail(400, '每次发布一个应用的表式更新');
+    const app = incoming.applications[0];
+    const index = current.applications.findIndex(item => item.id === app.id);
+    if (index < 0) fail(404, '请先导入这个应用');
+    if (current.applications[index].templateIds.some(id => !app.templateIds.includes(id))) fail(400, '表式更新需保留应用已有模板');
+    for (const template of incoming.templates) {
+      const position = current.templates.findIndex(item => item.id === template.id);
+      if (position < 0) current.templates.push(template);
+      else {
+        const old = current.templates[position];
+        if (JSON.stringify(old) === JSON.stringify(template)) continue;
+        if (template.version <= old.version) fail(409, '变更的模板需提高版本号，请在设计工作台确认后重新导出');
+        current.templates[position] = template;
+      }
+    }
+    for (const project of incoming.projects) {
+      const old = current.projects.find(item => item.id === project.id);
+      if (old && JSON.stringify(old) !== JSON.stringify(project)) fail(409, '已有项目资料发生变化，请核对项目编号');
+      if (!old) current.projects.push(project);
+    }
+    current.applications[index] = app;
+    return {updated: true, preservedRecords: current.cases.filter(item => item.appId === app.id).length};
+  }
+  function definitionFingerprint(current) {
+    return digest(JSON.stringify({applications: current.applications, templates: current.templates, projects: current.projects}));
+  }
+  function definitionPlan(user, current, incoming) {
+    const baseline = definitionFingerprint(current);
+    const changes = [];
+    for (const collection of ['applications', 'templates', 'projects']) {
+      for (const next of incoming[collection]) {
+        const previous = current[collection].find(item => item.id === next.id);
+        if (JSON.stringify(previous) === JSON.stringify(next)) continue;
+        const sections = Object.keys({...previous, ...next}).filter(key => JSON.stringify(previous?.[key]) !== JSON.stringify(next[key]));
+        changes.push({collection, id: next.id, title: next.title ?? next.name, kind: previous ? 'changed' : 'added', beforeVersion: previous?.version, afterVersion: next.version, sections});
+      }
+    }
+    const result = applyDefinitions(current, incoming);
+    upgradeWorkspace(current, {allowAttachmentReferences: true, copy: false});
+    if (Buffer.byteLength(JSON.stringify(current)) > 32 * 1024 * 1024) fail(413, '当前实例工作区已超过 32 MB 容量，请联系管理员归档并规划独立实例');
+    const context = serviceContext(user);
+    return {
+      ...context, userId: user.id, applicationId: incoming.applications[0].id,
+      planFingerprint: digest(JSON.stringify({baseline, incoming, ...context, userId: user.id})),
+      changed: baseline !== definitionFingerprint(current), preservedRecords: result.preservedRecords, changes
+    };
+  }
+  function previewDefinitions(user, input) {
+    admin(user);
+    const incoming = upgradeWorkspace(input);
+    return transaction(() => { admin(user); return definitionPlan(user, workspace(), incoming); });
+  }
+  function publishDefinitions(user, input, options) {
+    admin(user);
+    if (!options || typeof options.operationId !== 'string' || !/^[\w-]{8,100}$/.test(options.operationId) || !/^[a-f0-9]{64}$/.test(options.planFingerprint ?? '')) fail(400, '请先预览表式更新，并保留原发布操作编号');
+    const fingerprint = digest(JSON.stringify({type: 'definitions.publish', input, options}));
+    return transaction(() => {
+      admin(user);
+      if (options.expectedUserId !== user.id) fail(409, '当前登录账号已变化，请重新预览表式更新');
+      if (options.expectedInstanceId !== serviceContext(user).instanceId) fail(409, '服务数据环境已变化，请核对当前表式后重新预览');
+      const prior = db.prepare('SELECT * FROM requests WHERE id=?').get(options.operationId);
+      if (prior) {
+        if (prior.user_id !== user.id || prior.fingerprint !== fingerprint) fail(409, '操作编号已用于不同请求');
+        return JSON.parse(prior.result);
+      }
+      const current = workspace();
+      const plan = definitionPlan(user, current, upgradeWorkspace(input));
+      if (plan.planFingerprint !== options.planFingerprint) fail(409, '表式发布基线或更新包已变化，请重新预览');
+      if (plan.changed) { writeWorkspace(current); audit(user, 'application.definitions', plan.applicationId); }
+      const result = {updated: plan.changed, preservedRecords: plan.preservedRecords, applicationId: plan.applicationId, operationId: options.operationId};
+      db.prepare('INSERT INTO requests VALUES(?,?,?,?)').run(options.operationId, user.id, fingerprint, JSON.stringify(result));
+      return result;
+    });
+  }
   function updateDefinitions(user, input) {
     admin(user);
     const incoming = upgradeWorkspace(input);
-    if (incoming.applications.length !== 1) fail(400, '每次发布一个应用的表式更新');
     return transaction(() => {
+      admin(user);
       const current = workspace();
-      const app = incoming.applications[0];
-      const index = current.applications.findIndex(item => item.id === app.id);
-      if (index < 0) fail(404, '请先导入这个应用');
-      if (current.applications[index].templateIds.some(id => !app.templateIds.includes(id))) fail(400, '表式更新需保留应用已有模板');
-      for (const template of incoming.templates) {
-        const position = current.templates.findIndex(item => item.id === template.id);
-        if (position < 0) current.templates.push(template);
-        else {
-          const old = current.templates[position];
-          if (JSON.stringify(old) === JSON.stringify(template)) continue;
-          if (template.version <= old.version) fail(409, '变更的模板需提高版本号，请在设计工作台确认后重新导出');
-          current.templates[position] = template;
-        }
-      }
-      for (const project of incoming.projects) {
-        const old = current.projects.find(item => item.id === project.id);
-        if (old && JSON.stringify(old) !== JSON.stringify(project)) fail(409, '已有项目资料发生变化，请核对项目编号');
-        if (!old) current.projects.push(project);
-      }
-      current.applications[index] = app;
+      const result = applyDefinitions(current, incoming);
       writeWorkspace(current);
-      audit(user, 'application.definitions', app.id);
-      return {updated: true, preservedRecords: current.cases.filter(item => item.appId === app.id).length};
+      audit(user, 'application.definitions', incoming.applications[0].id);
+      return result;
     });
   }
   function command(user, input, {inlineAttachments = true} = {}) {
@@ -472,7 +528,7 @@ export function openTeamStore(filename) {
     });
   }
   return {
-    createUser, login, session, serviceContext, visibleWorkspace, getRecord, importApplication, updateDefinitions, setMembership, command, changePassword, resetPassword, operations, deliveryReport, updateDelivery, attachment, projectArchive, previewProjectRestore, restoreProject,
+    createUser, login, session, serviceContext, visibleWorkspace, getRecord, importApplication, updateDefinitions, previewDefinitions, publishDefinitions, setMembership, command, changePassword, resetPassword, operations, deliveryReport, updateDelivery, attachment, projectArchive, previewProjectRestore, restoreProject,
     checkProjectArchive: (user, bytes) => { admin(user); return checkProjectArchive(bytes, workspace()); },
     requireAdmin: user => admin(user),
     logout: token => db.prepare('DELETE FROM sessions WHERE token=?').run(digest(token)),

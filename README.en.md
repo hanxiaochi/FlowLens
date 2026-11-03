@@ -243,3 +243,9 @@ Version 1.0 includes 46 automated tests covering model validation, permissions, 
 The 3D scene uses [Three.js](https://threejs.org/). SQL validation tests use [PGlite](https://pglite.dev/). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for dependency and license information. The project itself has not yet specified a license.
 
 Found a problem or have an idea? Open an [issue](https://github.com/hanxiaochi/FlowLens/issues). Reproduction steps and a sanitized project file help. Please leave out API keys and real customer data.
+
+## Development status
+
+Version 1.14 is adding definition-publication previews and recovery. The server now provides a read-only preview and guarded publication endpoints that bind the account, service instance, configuration baseline and update package. Repeating an operation ID returns the original result; ordinary record edits can continue during review.
+
+Tests cover permissions, competing baselines, replay, unchanged publication and HTTP entry points. UI and durable recovery integration are still in progress. The current UI continues to use the existing publication endpoint. The published release and cloud app remain on 1.13.0.
