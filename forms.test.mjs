@@ -4,7 +4,7 @@ import {DOMParser} from '@xmldom/xmldom';
 import {zipSync,strToU8,unzipSync} from 'fflate';
 import {parseWordXML,extractDocumentXML,formCells,defaultWorkflow} from './forms-docx.mjs';
 import {createCase,applyOperation,attachFile} from './forms-model.mjs';
-import {emptyWorkspace,validateWorkspace} from './forms-store.mjs';
+import {emptyWorkspace,validateWorkspace,upgradeWorkspace} from './forms-store.mjs';
 import {printableForm} from './forms-print.mjs';
 const xml=`<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>
 <w:p><w:r><w:t>浙公路（GL）040</w:t></w:r></w:p><w:p><w:r><w:t>监理指令单</w:t></w:r></w:p>
@@ -59,4 +59,33 @@ test('attachments are recorded, work packages roundtrip, malformed workflow and 
 test('standalone print export preserves merges, saved values and escapes user markup',()=>{
  const r=createCase(parse()[0]);r.values[r.template.fields[0].id]='<script>alert(1)</script> & 已填';
  const html=printableForm(r);assert.match(html,/rowspan="2"/);assert.match(html,/colspan="2"/);assert.match(html,/&lt;script&gt;alert\(1\)&lt;\/script&gt; &amp; 已填/);assert.doesNotMatch(html,/<script|<textarea|<input/i);assert.match(html,/办理记录/);
+});
+
+test('owned workspace validation preserves checks while default callers retain isolated copies', () => {
+ const original = emptyWorkspace();
+ original.templates = parse();
+ original.cases = [createCase(original.templates[0])];
+ const copied = upgradeWorkspace(original);
+ assert.deepEqual(copied, original);
+ copied.cases[0].template.title = 'Changed copy';
+ assert.notEqual(copied.cases[0].template.title, original.cases[0].template.title);
+ assert.equal(validateWorkspace(original, {copy: false}), original);
+ assert.equal(upgradeWorkspace(original, {copy: false}), original);
+ for (const invalidate of [
+  value => { value.cases[0].relatedId = 'missing'; },
+  value => { value.cases[0].revision = -1; },
+  value => { value.cases[0].values.unknown = 'invalid'; },
+  value => { value.cases[0].attachments.push({name: 'invalid', data: 'invalid'}); }
+ ]) {
+  const invalid = structuredClone(original);
+  invalidate(invalid);
+  const before = structuredClone(invalid);
+  assert.throws(() => upgradeWorkspace(invalid, {copy: false}));
+  assert.deepEqual(invalid, before);
+ }
+ const legacy = {format: 'flowlens-forms', version: 1, templates: [], cases: []};
+ const upgraded = upgradeWorkspace(legacy);
+ assert.equal(legacy.version, 1);
+ assert.equal(legacy.applications, undefined);
+ assert.deepEqual(upgradeWorkspace(legacy, {copy: false}), upgraded);
 });

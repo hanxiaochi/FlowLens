@@ -61,7 +61,8 @@ export function openTeamStore(filename) {
   }
   function writeWorkspace(value) {
     for (const record of value.cases) storeRecordAttachments(db, record);
-    const next = upgradeWorkspace(value, {allowAttachmentReferences: true});
+    // Each writer owns a freshly parsed workspace inside its transaction.
+    const next = upgradeWorkspace(value, {allowAttachmentReferences: true, copy: false});
     const serialized = JSON.stringify(next);
     if (Buffer.byteLength(serialized) > 32 * 1024 * 1024) fail(413, '当前实例工作区已超过 32 MB 容量，请联系管理员归档并规划独立实例');
     db.prepare('UPDATE workspace SET data=?,revision=revision+1 WHERE id=1').run(serialized);
