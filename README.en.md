@@ -221,3 +221,7 @@ Version 1.0 includes 46 automated tests covering model validation, permissions, 
 The 3D scene uses [Three.js](https://threejs.org/). SQL validation tests use [PGlite](https://pglite.dev/). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for dependency and license information. The project itself has not yet specified a license.
 
 Found a problem or have an idea? Open an [issue](https://github.com/hanxiaochi/FlowLens/issues). Reproduction steps and a sanitized project file help. Please leave out API keys and real customer data.
+
+## Development status
+
+Version 1.12 is in development on main. Record cards show a short preview of the first three populated fields from each record’s saved template, together with its ID. All 105 local tests pass; search and opening the matching record have been checked in the browser. The published release and cloud app remain on 1.11.0. Autosave for unsubmitted edits is still being designed. Use Save or Download draft for now.

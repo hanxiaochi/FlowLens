@@ -5,6 +5,30 @@ function templateSummary(template) {
     workflow: template.workflow.map(({id, label, role, kind}) => ({id, label, role, kind}))};
 }
 
+function fieldSummary(record) {
+  const summary = [];
+  for (const field of record.template.fields) {
+    const value = record.values[field.id];
+    if (value === undefined || value === null || String(value).trim() === '') continue;
+    let text = String(value);
+    if (field.type === 'table') {
+      try {
+        const rows = JSON.parse(text);
+        text = Array.isArray(rows) ? `${rows.length} 行明细` : '请打开单据查看明细';
+      } catch { text = '请打开单据查看明细'; }
+    }
+    if (field.type === 'boolean') {
+      if (text === 'true') text = '是';
+      if (text === 'false') text = '否';
+    }
+    text = text.replace(/\s+/gu, ' ').trim();
+    const characters = Array.from(text);
+    summary.push({label: Array.from(field.label).slice(0, 60).join(''), text: characters.slice(0, 120).join('') + (characters.length > 120 ? '…' : '')});
+    if (summary.length === 3) break;
+  }
+  return summary;
+}
+
 export function summarizeWorkspace(value, memberships, {projectId = '', page = '1', filter = 'all', search = '', recordId = ''} = {}) {
   const requestedPage = Number(page);
   if (!Number.isSafeInteger(requestedPage) || requestedPage < 1 || !['all', 'pending'].includes(filter) || typeof search !== 'string' || search.length > 200) throw Error('清单分页或筛选参数无效');
@@ -32,6 +56,7 @@ export function summarizeWorkspace(value, memberships, {projectId = '', page = '
       cases: matches.slice((currentPage - 1) * pageSize, currentPage * pageSize).map(record => ({
         id: record.id, title: record.title, projectId: record.projectId, appId: record.appId,
         revision: record.revision, status: record.status, step: record.step, submitter: record.submitter,
+        summary: fieldSummary(record),
         template: templateSummary(record.template), link: record.link ? {label: record.link.label} : undefined
       }))
     },

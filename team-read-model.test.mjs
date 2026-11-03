@@ -107,3 +107,32 @@ test('HTTP protocol 3 lists summaries and reads complete records while protocol 
 
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
 });
+
+test('card summaries use saved template labels and bounded readable values', async () => {
+  const {summarizeWorkspace} = await import('./team-read-model.mjs');
+  const fixture = applicationDemo();
+  const record = fixture.cases[0];
+  fixture.cases = [record];
+  record.template.fields = [
+    {id: 'empty', label: '空白'},
+    {id: 'zero', label: '数量', type: 'number'},
+    {id: 'flag', label: '已完成', type: 'boolean'},
+    {id: 'text', label: '原表式的问题说明'},
+    {id: 'extra', label: '第四项'}
+  ];
+  record.values = {empty: '  ', zero: 0, flag: false, text: '😀'.repeat(121), extra: '不在摘要内'};
+  const read = () => summarizeWorkspace(fixture, []).workspace.cases[0].summary;
+  assert.deepEqual(read(), [
+    {label: '数量', text: '0'}, {label: '已完成', text: '否'},
+    {label: '原表式的问题说明', text: '😀'.repeat(120) + '…'}
+  ]);
+  record.template.fields = [{id: 'items', label: '明细', type: 'table'}, {id: 'text', label: '说明'}];
+  record.values = {items: '[{"secret":"large cell content"},{}]', text: ' 第一行\n 第二行 '};
+  assert.deepEqual(read(), [{label: '明细', text: '2 行明细'}, {label: '说明', text: '第一行 第二行'}]);
+  for (const invalid of ['broken legacy data', '{}']) {
+    record.values.items = invalid;
+    assert.equal(read()[0].text, '请打开单据查看明细');
+  }
+  record.values = {};
+  assert.deepEqual(read(), []);
+});

@@ -161,7 +161,10 @@ function home() {
   const list = node('div', undefined, 'cards');
   for (const record of records) {
     const card = node('article', undefined, 'card');
-    card.append(node('span', record.status === 'complete' ? '已归档' : '待 ' + roleFor(record), 'badge'), node('h3', record.title), node('p', record.link?.label || '项目发起'), button('打开单据', () => openRecord(record.id)));
+    card.append(node('span', record.status === 'complete' ? '已归档' : '待 ' + roleFor(record), 'badge'), node('h3', record.title));
+    const summary = node('dl', undefined, 'record-summary');
+    for (const field of record.summary ?? []) summary.append(node('dt', field.label), node('dd', field.text));
+    card.append(summary, node('p', '单据编号 ' + record.id, 'record-identifier'), node('p', record.link?.label || '项目发起'), button('打开单据', () => openRecord(record.id)));
     list.append(card);
   }
   content.append(list);

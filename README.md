@@ -214,3 +214,7 @@ npm test
 3D 部分使用 [Three.js](https://threejs.org/)；SQL 验证测试使用 [PGlite](https://pglite.dev/)。依赖及许可说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 发现问题或有想法，欢迎开 [Issue](https://github.com/hanxiaochi/FlowLens/issues)。最好附上复现步骤和脱敏后的项目文件，别把密钥、真实客户数据一起贴上来。
+
+## 开发进展
+
+主分支正在开发 1.12。业务卡片已支持前三个非空字段的简短摘要，使用单据自己的表式快照，并显示单据编号。105 项本地回归通过，浏览器已核对搜索及打开原单据。正式发行和云端仍为 1.11.0。未提交填写的自动保存仍在设计，当前请使用保存填写或下载草稿。
