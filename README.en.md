@@ -30,6 +30,8 @@ Post-release tests on main verify full rollback and retry after a late transacti
 
 A Windows LAN pilot has passed five-account HTTPS workflow, restore, and browser UI checks on the server itself. Access from another computer and real-business approval remain pending. [Pilot status (Chinese)](docs/delivery-plan.md)
 
+An owner-hosted Tencent Cloud pilot has since passed public-IP HTTPS, five-role workflow, concurrent-write conflict, and database restoration checks. Daily backups are enabled. Real-business approval and longer-term operation remain under validation. [Cloud acceptance and screenshot](docs/cloud-pilot-2026-11-03.md)
+
 Import an application package into the self-hosted team service, create accounts, and assign project roles. A supervisor can issue an instruction, a contractor can reply using a separate account, and a records officer can archive it. The server stores forms, attachments, and the account behind each operation.
 
 ![Shared team workspace](docs/images/team-workspace-1.4.jpg)
@@ -38,7 +40,7 @@ The server checks project roles, workflow stages, and record revisions. Repeated
 
 Download `FlowLens-1.4.1-team.zip`, install Node.js 24 LTS, initialize the administrator, then run `npm start`. The team runtime uses Node built-ins and needs no npm dependencies. See the [deployment guide (Chinese)](docs/team-deployment.md) and [release acceptance](docs/release-1.4.1.md).
 
-The public demo runs locally in your browser. The shared service is self-hosted and intended for a small-team pilot. Customer workflows, external hosting, TLS, and operating capacity need acceptance in the target environment.
+The public demo runs locally in your browser. The shared service is self-hosted and intended for a small-team pilot. Cloud technical acceptance is recorded. Customer workflows, sustained capacity, and maintenance handover still need validation.
 
 ## Watch the walkthrough
 
