@@ -1,6 +1,6 @@
 import {validateApplications} from './apps-model.mjs';
 import {validateDecisionRules} from './forms-rules.mjs';
-import {validateWorkflow} from './forms-model.mjs';
+import {validateWorkflow,validateSummaryFields} from './forms-model.mjs';
 import {validateField,validateFieldValue} from './forms-schema.mjs';
 export const emptyWorkspace=()=>({format:'flowlens-forms',version:3,templates:[],cases:[],applications:[],projects:[]});
 export function validateWorkspace(value,{allowAttachmentReferences=false,copy=true}={}){
@@ -18,6 +18,7 @@ export function validateWorkspace(value,{allowAttachmentReferences=false,copy=tr
   if(!Array.isArray(t.fields)||t.fields.length>10000)throw Error('字段数量无效');const fieldIds=new Set();
   const blockIds=new Set();const walk=bs=>{for(const b of bs){blockIds.add(b.id);if(b.type==='table')for(const row of b.rows)for(const c of row){blockIds.add(c.id);walk(c.blocks);}}};walk(t.blocks);
   for(const f of t.fields){string(f.id,200);string(f.label,500);validateField(f);if(fieldIds.has(f.id)||!blockIds.has(f.id)||!['draft',...t.workflow.map(x=>x.id)].includes(f.owner))throw Error('填写区关联无效');fieldIds.add(f.id);}
+  validateSummaryFields(t);
  }
  for(const t of value.templates){template(t);if(ids.has(t.id))throw Error('模板编号重复');ids.add(t.id);}
  const cases=new Set();for(const r of value.cases){if(!Number.isSafeInteger(r.revision)||r.revision<0)throw Error('记录修订无效');string(r.id,200);if(cases.has(r.id))throw Error('业务编号重复');cases.add(r.id);template(r.template);string(r.title,500);string(r.project,500);string(r.submitter,100);

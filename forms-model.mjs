@@ -8,6 +8,7 @@ export function validateWorkflow(steps){
 }
 export function createCase(template,{title='',project='',role='填报人',relatedId=null}={}){
  validateWorkflow(template.workflow);
+ validateSummaryFields(template);
  validateDecisionRules(template);
  if(typeof title!=='string'||title.length>500||typeof project!=='string'||project.length>500||typeof role!=='string'||!role.trim()||role.length>100)throw Error('业务名称、项目或填报角色无效或过长');
  return {id:uid(),title:title.trim()||template.title,project,relatedId,template:clone(template),values:{},attachments:[],submitter:role,status:'draft',step:-1,revision:0,events:[],createdAt:new Date().toISOString()};
@@ -51,4 +52,38 @@ export function attachFile(record,attachment,role){
  if(!attachment.name||attachment.size>10*1024*1024)throw Error('单个附件不能超过 10 MB');
  const r=clone(record);r.attachments.push({...attachment,id:uid(),role,at:new Date().toISOString()});
  r.revision++;r.events.push({id:uid(),type:'attachment',role,at:new Date().toISOString(),note:attachment.name,from:'附件',to:'附件已保存',revision:r.revision,diff:[],values:clone(r.values),attachments:r.attachments.map(a=>({id:a.id,name:a.name,size:a.size})),status:r.status,step:r.step});return r;
+}
+
+export function validateSummaryFields(template) {
+  const selected = template.summaryFields;
+  if (selected === undefined) return;
+  if (!Array.isArray(selected) || selected.length > 3 || new Set(selected).size !== selected.length || Array.from(selected).some(id => typeof id !== 'string' || !template.fields.some(field => field.id === id))) {
+    throw Error('摘要最多选择三个不同且存在的填写区');
+  }
+}
+
+export function summarizeRecord(record) {
+  const summary = [];
+  const selected = record.template.summaryFields;
+  const fields = selected?.length ? selected.map(id => record.template.fields.find(field => field.id === id)) : record.template.fields;
+  for (const field of fields) {
+    const value = record.values[field.id];
+    if (value === undefined || value === null || String(value).trim() === '') continue;
+    let text = String(value);
+    if (field.type === 'table') {
+      try {
+        const rows = JSON.parse(text);
+        text = Array.isArray(rows) ? `${rows.length} 行明细` : '请打开单据查看明细';
+      } catch { text = '请打开单据查看明细'; }
+    }
+    if (field.type === 'boolean') {
+      if (text === 'true') text = '是';
+      if (text === 'false') text = '否';
+    }
+    text = text.replace(/\s+/gu, ' ').trim();
+    const characters = Array.from(text);
+    summary.push({label: Array.from(field.label).slice(0, 60).join(''), text: characters.slice(0, 120).join('') + (characters.length > 120 ? '…' : '')});
+    if (summary.length === 3) break;
+  }
+  return summary;
 }

@@ -228,3 +228,9 @@ npm test
 3D 部分使用 [Three.js](https://threejs.org/)；SQL 验证测试使用 [PGlite](https://pglite.dev/)。依赖及许可说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 发现问题或有想法，欢迎开 [Issue](https://github.com/hanxiaochi/FlowLens/issues)。最好附上复现步骤和脱敏后的项目文件，别把密钥、真实客户数据一起贴上来。
+
+## 开发进展
+
+主分支正在开发 1.13，正式发行和云端仍为 1.12.1。表式设计中已加入“配置清单摘要”，可按顺序选择最多三个字段；本地业务台账、项目卡片和协作清单共用摘要逻辑。已有单据继续使用自己的表式快照。
+
+116 项本地回归通过。浏览器已走通配置、新建、填写、导出应用及协作端读取，核对了重复字段拒绝和移除填写区后的配置清理。完整发行与云端验收继续进行。

@@ -4,7 +4,7 @@ import {renderDetailField,detailColumnsEditor} from './forms-detail-ui.js';
 import {proposeRule,acceptRule} from './forms-rules.mjs';
 import {unzipSync} from '/forms-vendor/fflate.js';
 import {extractDocumentXML,parseWordXML,formCells} from './forms-docx.mjs';
-import {uid,createCase,canEdit,applyOperation,attachFile,validateWorkflow} from './forms-model.mjs';
+import {uid,createCase,canEdit,applyOperation,attachFile,validateWorkflow,validateSummaryFields,summarizeRecord} from './forms-model.mjs';
 import {emptyWorkspace,loadWorkspace,saveWorkspace,validateWorkspace,commitWorkspace,upgradeWorkspace} from './forms-store.mjs';
 import {FIELD_TYPES,validateField} from './forms-schema.mjs';
 import {renderDelivery} from './forms-delivery-ui.js';
@@ -60,7 +60,7 @@ export async function mountForms(root,{onContext=()=>{},onNavigate=()=>{}}={}){
   library.replaceChildren();const tabs=el('div',undefined,'forms-library-tabs');for(const [key,name] of [['templates','模板库'],['cases','业务台账']])tabs.append(button(name,()=>{if(busy||!clean())return;kind=key;selected=null;draw();},kind===key?'selected':''));
   const search=el('input');search.placeholder='搜索表号、名称、项目';search.value=query;search.setAttribute('aria-label','搜索业务表单');search.oninput=()=>{query=search.value;renderList();};
   const list=el('div',undefined,'forms-list');library.append(tabs,search,list);
-  function renderList(){list.replaceChildren();const scoped=workspace[kind].filter(item=>appId?(kind==='templates'?workspace.applications.find(a=>a.id===appId)?.templateIds.includes(item.id):item.appId===appId&&item.projectId===projectId):(kind==='templates'||!item.appId));const items=scoped.filter(t=>`${t.code??t.template.code} ${t.title} ${t.project??''} ${t.source??''}`.toLowerCase().includes(query.toLowerCase()));for(const item of items){const b=button('',()=>{if(busy||!clean())return;openItem(kind,item.id);},'forms-list-item'+(item.id===selected?' selected':''));b.append(el('small',kind==='templates'?(item.code||'自定义文档'):(item.status==='complete'?'已归档':item.status==='draft'?'填报中':item.template.workflow[item.step].label)),el('strong',item.title),el('span',kind==='templates'?item.source:(item.project||'未填写项目')));list.append(b);}if(!items.length)list.append(el('p',query?'没有匹配记录':'从一份真实的 Word 开始。','forms-empty'));}renderList();
+  function renderList(){list.replaceChildren();const scoped=workspace[kind].filter(item=>appId?(kind==='templates'?workspace.applications.find(a=>a.id===appId)?.templateIds.includes(item.id):item.appId===appId&&item.projectId===projectId):(kind==='templates'||!item.appId));const items=scoped.filter(t=>`${t.code??t.template.code} ${t.title} ${t.project??''} ${t.source??''}`.toLowerCase().includes(query.toLowerCase()));for(const item of items){const b=button('',()=>{if(busy||!clean())return;openItem(kind,item.id);},'forms-list-item'+(item.id===selected?' selected':''));b.append(el('small',kind==='templates'?(item.code||'自定义文档'):(item.status==='complete'?'已归档':item.status==='draft'?'填报中':item.template.workflow[item.step].label)),el('strong',item.title),el('span',kind==='templates'?item.source:(item.project||'未填写项目')));if(kind==='cases'){for(const field of summarizeRecord(item))b.append(el('span',field.label+' · '+field.text,'forms-list-summary'));b.append(el('small','单据编号 '+item.id,'forms-record-id'));}list.append(b);}if(!items.length)list.append(el('p',query?'没有匹配记录':'从一份真实的 Word 开始。','forms-empty'));}renderList();
  }
  function renderBlocks(blocks,parent,t,record){
   for(const b of blocks){
@@ -98,8 +98,35 @@ export async function mountForms(root,{onContext=()=>{},onNavigate=()=>{}}={}){
   const owner=select([['draft','填报人'],...t.workflow.map(s=>[s.id,`${s.label} · ${s.role}`])],old?.owner??'draft');const required=el('input');required.type='checkbox';required.checked=!!old?.required;
   d.append(el('p','保留原文，在选中的位置增加填写区。历史业务使用创建时的模板，不会被本次修改覆盖。'),label('字段名称',name),label('数据类型',type),label('单位（可选）',unit),label('单选选项（逗号分隔）',options),label('最小值（数字字段）',min),label('最大值（数字字段）',max),label('原文位置 / 规则依据',evidence),label('已由业务人员确认',confirmed),label('由哪个阶段填写',owner),label('办理前必须填写',required));
   const detailBox=el('section');const columns=detailColumnsEditor(detailBox,old?.columns??[]);detailBox.hidden=type.value!=='table';type.onchange=()=>detailBox.hidden=type.value!=='table';d.append(detailBox);
-  d.append(button('保存填写区',wrap(async()=>{if(!name.value.trim())throw Error('请填写字段名称');const f={id,label:name.value.trim(),owner:owner.value,required:required.checked,type:type.value,unit:unit.value.trim(),evidence:evidence.value,confirmation:confirmed.checked?'confirmed':'pending'};if(f.type==='table')f.columns=columns();if(f.type==='select')f.options=options.value.split(/[,，]/).map(x=>x.trim()).filter(Boolean);if(f.type==='number'){if(min.value!=='')f.min=Number(min.value);if(max.value!=='')f.max=Number(max.value);}validateField(f);await commit(w=>{const target=w.templates.find(x=>x.id===t.id);target.fields=target.fields.filter(x=>x.id!==id);target.fields.push(f);target.version++;});d.close();draw();say('填写区已更新，已有业务不受影响。');}),'primary'));
-  if(old)d.append(button('移除此填写区',wrap(async()=>{await commit(w=>{const target=w.templates.find(x=>x.id===t.id);target.fields=target.fields.filter(x=>x.id!==id);target.version++;});d.close();draw();})));
+  d.append(button('保存填写区',wrap(async()=>{if(!name.value.trim())throw Error('请填写字段名称');const f={id,label:name.value.trim(),owner:owner.value,required:required.checked,type:type.value,unit:unit.value.trim(),evidence:evidence.value,confirmation:confirmed.checked?'confirmed':'pending'};if(f.type==='table')f.columns=columns();if(f.type==='select')f.options=options.value.split(/[,，]/).map(x=>x.trim()).filter(Boolean);if(f.type==='number'){if(min.value!=='')f.min=Number(min.value);if(max.value!=='')f.max=Number(max.value);}validateField(f);await commit(w=>{const target=w.templates.find(x=>x.id===t.id);const index=target.fields.findIndex(x=>x.id===id);if(index<0)target.fields.push(f);else target.fields[index]=f;target.version++;});d.close();draw();say('填写区已更新，已有业务不受影响。');}),'primary'));
+  if(old)d.append(button('移除此填写区',wrap(async()=>{await commit(w=>{const target=w.templates.find(x=>x.id===t.id);target.fields=target.fields.filter(x=>x.id!==id);if(target.summaryFields)target.summaryFields=target.summaryFields.filter(fieldId=>fieldId!==id);target.version++;});d.close();draw();})));
+ }
+ function configureSummary() {
+  const t = template(), dialog = modal('配置清单摘要');
+  dialog.append(el('p', '按显示顺序选择最多三个填写区。不选择时自动显示前三个非空字段；选中的字段为空时暂不显示。配置用于新发起的单据，已有单据保留原表式快照。'));
+  const choices = [['', '不选择'], ...t.fields.map(field => [field.id, field.label])];
+  const controls = Array.from({length: 3}, (_, index) => {
+   const control = select(choices, t.summaryFields?.[index] ?? '');
+   control.setAttribute('aria-label', '摘要字段 ' + (index + 1));
+   dialog.append(label('摘要字段 ' + (index + 1), control));
+   return control;
+  });
+  dialog.append(el('p', '移除填写区时，对应摘要选择也会移除。没有选中字段时恢复自动摘要。'));
+  const message = el('p'); message.setAttribute('role', 'status'); dialog.append(message);
+  dialog.append(button('保存摘要配置', wrap(async () => {
+   const selectedFields = controls.map(control => control.value).filter(Boolean);
+   try {
+    validateSummaryFields({...t, summaryFields: selectedFields});
+    if (JSON.stringify(t.summaryFields ?? []) !== JSON.stringify(selectedFields)) {
+     await commit(next => {
+      const target = next.templates.find(item => item.id === t.id);
+      target.summaryFields = selectedFields;
+      target.version++;
+     });
+    }
+   } catch (error) { message.textContent = error.message; return; }
+   dialog.close(); draw(); say('清单摘要已确认，新发起的单据按此配置显示。');
+  }), 'primary'));
  }
  function configureFlow(){
   const t=template(),d=modal('这份表交给谁办理');const submitter=el('input');submitter.value=t.submitterRole??'填报人';d.append(label('发起角色',submitter));const draft=structuredClone(t.workflow);const list=el('div');d.append(el('p','这是可修改的流程草案，不是从签字栏自动判定的业务规则。请对照原表说明确认；同一角色可出现在多个节点。'),list);
@@ -125,7 +152,7 @@ export async function mountForms(root,{onContext=()=>{},onNavigate=()=>{}}={}){
   inspector.replaceChildren();const item=selectedItem(),t=template();if(!item){inspector.append(el('h3','一份表，贯穿全过程'),el('p','01 导入与核对\n02 确认填写区\n03 配置办理人\n04 填写与流转\n05 追溯与归档'),el('p','本地推演，角色切换不是登录认证。正式签署需要打印后手签或接入电子签章。','forms-boundary'));return;}
   inspector.append(el('span','THE SAME DOCUMENT','eyebrow'),el('h3',kind==='templates'?'先确认，再运行':'办理这份业务'));
   if(kind==='templates'){
-   inspector.append(el('p','点击原表任意格子，设置名称、负责阶段和必填要求。空白格只是候选区，不能代替业务确认。'),button('配置办理流程',configureFlow),button('用自然语言调整规则',configureNaturalRule),button('用此表发起业务 →',newCase,'primary'));
+   inspector.append(el('p','点击原表任意格子，设置名称、负责阶段和必填要求。空白格只是候选区，不能代替业务确认。'),button('配置办理流程',configureFlow),button('配置清单摘要',configureSummary),button('用自然语言调整规则',configureNaturalRule),button('用此表发起业务 →',newCase,'primary'));
   }else{
    const roles=[...new Set([item.submitter,...t.workflow.map(s=>s.role)])];if(!roles.includes(role))role=roles[0];const choose=select(roles.map(r=>[r,r]),role);choose.setAttribute('aria-label','表单扮演角色');choose.onchange=()=>{if(busy){choose.value=role;return;}if(!clean()){say('请先保存草稿或提交，再切换角色，避免丢失填写内容。',true);choose.value=role;return;}role=choose.value;renderCenter();renderInspector();};inspector.append(label('扮演角色（本地推演）',choose));
    const note=el('textarea');note.placeholder='办理意见；退回时必须说明原因';note.setAttribute('aria-label','表单办理意见');inspector.append(note);

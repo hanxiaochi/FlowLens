@@ -20,6 +20,7 @@ async function setup({legacySubmitter = false} = {}) {
   const source = openTeamStore(join(directory, 'source.sqlite'));
   const sourceAdmin = await source.createUser(null, {username: 'source', name: 'Source admin', password});
   const app = applicationDemo();
+  app.templates[0].summaryFields = ['issue', 'instruction-no'];
   const first = app.cases[0];
   first.status = 'complete'; first.step = first.template.workflow.length;
   first.events[0].actor = {id: member.id, name: 'Source person with matching ID'};
@@ -73,9 +74,13 @@ test('restoration preserves linked records, marks external actors and continues 
     assert.deepEqual(store.attachment(member, restored[0].id, restored[0].attachments[0].id).data, Buffer.from([0, 255, 1, 129]));
     assert.equal(store.visibleWorkspace(member, {inlineAttachments: false}).workspace.projects.length, 1);
     const draft = restored[3];
+    assert.equal(restored[0].template.summaryFields, undefined);
+    assert.deepEqual(draft.template.summaryFields, ['issue', 'instruction-no']);
     const changed = store.command(member, {type: 'save', recordId: draft.id, expectedRevision: draft.revision, operationId: crypto.randomUUID(), values: {issue: '目标成员继续办理'}}, {inlineAttachments: false});
     assert.equal(changed.record.events.at(-1).actor.id, member.id);
     assert.equal(changed.record.events.at(-1).actor.external, undefined);
+    const summary = store.visibleWorkspace(member, {summary: {projectId: result.projectId}}).workspace.cases.find(record => record.id === draft.id).summary;
+    assert.deepEqual(summary, [{label: '问题及要求', text: '目标成员继续办理'}]);
     assert.throws(() => store.restoreProject(member, archive, confirmed), /管理员/);
     assert.throws(() => store.restoreProject(admin, archive, {...confirmed, projectName: 'Different'}), /不同请求/);
     assert.ok(result.mappings.cases[app.cases[0].id]);

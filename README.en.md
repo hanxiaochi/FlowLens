@@ -235,3 +235,9 @@ Version 1.0 includes 46 automated tests covering model validation, permissions, 
 The 3D scene uses [Three.js](https://threejs.org/). SQL validation tests use [PGlite](https://pglite.dev/). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for dependency and license information. The project itself has not yet specified a license.
 
 Found a problem or have an idea? Open an [issue](https://github.com/hanxiaochi/FlowLens/issues). Reproduction steps and a sanitized project file help. Please leave out API keys and real customer data.
+
+## Development status
+
+Version 1.13 is in development on main. The published release and cloud app remain on 1.12.1. Form designers can choose up to three summary fields in display order. Local records, project cards and the team list share the same summary logic. Existing records retain their saved template snapshots.
+
+All 116 local tests pass. Browser acceptance covers configuration, creating and filling a record, exporting the application and reading its summaries in the team app. Duplicate selections are rejected, and removing a field updates its summary configuration. Release and cloud acceptance are still in progress.

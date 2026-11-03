@@ -1,4 +1,5 @@
 import {applicationDelivery} from './apps-delivery.js';
+import {summarizeRecord} from './forms-model.mjs';
 import {createApplication, createProject, startProjectCase, validateRelation, applicationPackage} from './apps-model.mjs';
 
 const element = (tag, text, className) => {
@@ -121,7 +122,10 @@ export function renderApplications(host, {workspace, appId, projectId, role, onS
   for (const record of [...records].reverse()) {
     const card = element('article');
     const source = records.find(item => item.id === record.relatedId);
-    card.append(element('small', source ? `${source.title} → ${record.link?.label ?? '关联'}` : '项目发起'), element('h4', record.title), element('p', `${record.status === 'complete' ? '已完成' : record.status === 'draft' ? '填报中' : record.template.workflow[record.step].label} · 修订 ${record.revision}`), button('打开这份单据', () => onOpen('cases', record.id)));
+    card.append(element('small', source ? `${source.title} → ${record.link?.label ?? '关联'}` : '项目发起'), element('h4', record.title), element('p', `${record.status === 'complete' ? '已完成' : record.status === 'draft' ? '填报中' : record.template.workflow[record.step].label} · 修订 ${record.revision}`));
+    const summary = element('dl', undefined, 'forms-record-summary');
+    for (const field of summarizeRecord(record)) summary.append(element('dt', field.label), element('dd', field.text));
+    card.append(summary, element('p', '单据编号 ' + record.id, 'forms-record-id'), button('打开这份单据', () => onOpen('cases', record.id)));
     for (const relation of app.relations.filter(item => item.from === record.template.id)) {
       const downstream = button(relation.label, async () => {
         const result = startProjectCase(workspace, {appId, projectId, templateId: relation.to, sourceId: record.id, relationId: relation.id});
