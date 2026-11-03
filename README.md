@@ -1,6 +1,6 @@
 # FlowLens
 
-**简体中文** · [English](README.en.md) · [v1.7.0 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.7.0)
+**简体中文** · [English](README.en.md) · [v1.8.0 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.8.0)
 
 **[直接打开在线 Demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -28,6 +28,12 @@ Windows 内网试点已完成服务器本机的五账号 HTTPS 办理、恢复�
 
 随后已在所有者的腾讯云服务器完成公网 IP HTTPS、五角色办理、并发冲突及数据库恢复验收，并启用每日备份。真实业务试点与长期运行观察继续推进。[云端验收与截图](docs/cloud-pilot-2026-11-03.md)
 
+## 1.8 收到资料，先检查一遍
+
+管理员可以上传项目 ZIP，检查文件缺失、损坏、附件对应和单据关联，再查看当前实例的编号冲突、表式定义差异及待确认角色。报告能下载，换一个文件时会清除旧结果。Windows、Ubuntu 各通过 87 项测试，容器验收通过。本版提供检查与恢复预检，资料包恢复继续开发。[使用范围与验收](docs/release-1.8.0.md)
+
+![Project archive check](docs/images/project-check-1.8.png)
+
 ## 1.7 把一个项目的资料交出去
 
 项目工作台可以直接下载资料 ZIP，里面有表单打印页、办理历史、关联记录、原始附件和 SHA256 校验清单。解压后从 index.html 找到要看的单据与附件。服务器按当前项目权限导出，单次上限 64 MiB，下载中断后可以重试。Windows、Ubuntu 及容器验收通过，82 项测试覆盖主要失败路径。[本版说明与待验收项](docs/release-1.7.0.md)
@@ -52,7 +58,7 @@ Windows 内网试点已完成服务器本机的五账号 HTTPS 办理、恢复�
 
 服务端会检查角色、阶段和修订号。重复请求复用原结果，过期页面不能覆盖新内容。新增了账号停用、密码修改、审计记录、表式版本发布，以及 SQLite 备份恢复工具。
 
-下载发布页中的 `FlowLens-1.7.0-team.zip`，安装 Node.js 24 LTS，按部署指南初始化管理员后运行 `npm start`。协作包附带所需运行文件，可以离线启动。[部署与恢复指南](docs/team-deployment.md) · [本版验收](docs/release-1.5.0.md) · [持续交付计划](docs/delivery-plan.md)
+下载发布页中的 `FlowLens-1.8.0-team.zip`，安装 Node.js 24 LTS，按部署指南初始化管理员后运行 `npm start`。协作包附带所需运行文件，可以离线启动。[部署与恢复指南](docs/team-deployment.md) · [本版验收](docs/release-1.5.0.md) · [持续交付计划](docs/delivery-plan.md)
 
 公开 Demo 提供浏览器本地体验。团队服务需自托管，适合先用脱敏资料做小团队试运行。云端技术验收已有记录，真实客户流程、持续容量和维护交接仍需继续验证。
 
