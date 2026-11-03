@@ -399,6 +399,7 @@ export function openTeamStore(filename) {
     if (typeof input.operationId !== 'string' || !/^[\w-]{8,100}$/.test(input.operationId)) fail(400, '需要有效操作编号');
     const fingerprint = digest(JSON.stringify(input));
     return transaction(() => {
+      if (input.expectedUserId !== undefined && input.expectedUserId !== user.id) fail(409, '当前登录账号已变化，请重新登录后处理原请求');
       if (input.expectedInstanceId !== undefined && input.expectedInstanceId !== serviceContext(user).instanceId) fail(409, '服务数据环境已变化，请核对当前业务后处理原请求');
       const current = workspace();
       const record = input.type === 'create' ? null : current.cases.find(item => item.id === input.recordId);

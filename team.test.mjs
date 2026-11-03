@@ -33,7 +33,8 @@ test('service context persists across connections and guards commands before wri
     assert.deepEqual(store.serviceContext(user), context);
     store.importApplication(user, applicationDemo());
     store.setMembership(user, {userId: user.id, projectId: 'demo-project', roles: ['专业监理']});
-    const command = {type: 'create', projectId: 'demo-project', templateId: applicationDemo().templates[0].id, operationId: crypto.randomUUID(), expectedInstanceId: context.instanceId};
+    const command = {type: 'create', projectId: 'demo-project', templateId: applicationDemo().templates[0].id, operationId: crypto.randomUUID(), expectedInstanceId: context.instanceId, expectedUserId: user.id};
+    assert.throws(() => store.command(user, {...command, expectedUserId: otherUser.id}), error => error.status === 409);
     const result = store.command(user, command);
     assert.deepEqual(peer.command(user, command), result);
     const before = store.visibleWorkspace(user);

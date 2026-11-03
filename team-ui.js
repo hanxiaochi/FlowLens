@@ -174,7 +174,7 @@ async function openRecord(id) {
 }
 async function command(data) {
   if (pending) throw Error('上一项业务操作的结果尚未确认，请先点击“重试原请求”，或下载草稿并重新读取。');
-  pending = {...data, operationId: crypto.randomUUID(), expectedInstanceId: serviceContext.instanceId};
+  pending = {...data, operationId: crypto.randomUUID(), expectedInstanceId: serviceContext.instanceId, expectedUserId: user.id};
   await sendPending();
 }
 async function sendPending() {
