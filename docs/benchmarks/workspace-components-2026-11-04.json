@@ -1,0 +1,49 @@
+{
+  "fullResponseBytes": 2886817,
+  "summaryResponseBytes": 20459,
+  "combinedResponseBytes": 25378,
+  "runtime": "v24.22.2",
+  "records": 500,
+  "metadataBytes": 2886733,
+  "isolated": true,
+  "iterations": 20,
+  "scope": "read-only component timings; not request latency or write durability",
+  "results": [
+    {
+      "name": "SQLite full workspace select",
+      "iterations": 20,
+      "p50Ms": 14.183076999999997,
+      "p95Ms": 14.445695
+    },
+    {
+      "name": "JSON parse",
+      "iterations": 20,
+      "p50Ms": 28.945212000000083,
+      "p95Ms": 70.31844899999999
+    },
+    {
+      "name": "Full workspace validation and structured clone",
+      "iterations": 20,
+      "p50Ms": 99.20758599999999,
+      "p95Ms": 139.96227700000009
+    },
+    {
+      "name": "Structured clone alone",
+      "iterations": 20,
+      "p50Ms": 87.764408,
+      "p95Ms": 100.89524000000074
+    },
+    {
+      "name": "JSON stringify",
+      "iterations": 20,
+      "p50Ms": 17.035907000000407,
+      "p95Ms": 17.891467999999804
+    },
+    {
+      "name": "Project summary with selected record",
+      "iterations": 20,
+      "p50Ms": 0.36035700000047655,
+      "p95Ms": 0.6745299999993222
+    }
+  ]
+}
