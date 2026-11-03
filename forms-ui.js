@@ -37,7 +37,7 @@ export async function mountForms(root,{onContext=()=>{},onNavigate=()=>{}}={}){
  for(const control of Array.from(actions.querySelectorAll('button')))if(['体验整改闭环样例','导出业务工作包','恢复工作包','下载未保存草稿','备份并重新读取'].includes(control.textContent))extra.append(control);
  utilities.append(extra);actions.append(utilities);
  function say(message,error=false){notice.textContent=message;notice.classList.toggle('error',error);}
- async function commit(mutate){try{workspace=await commitWorkspace(workspace,mutate);}catch(e){throw Error('未推进已保存状态，当前输入仍保留。可下载未保存草稿。'+e.message);}}
+ async function commit(mutate){try{workspace=await commitWorkspace(workspace,mutate);}catch(e){throw Error('未推进已保存状态，当前输入仍保留。'+e.message);}}
  function selectedItem(){return workspace[kind].find(x=>x.id===selected);}
  function template(){const item=selectedItem();return kind==='cases'?item?.template:item;}
  function clean(){const item=selectedItem();if(kind!=='cases'||!item)return true;const dirty=Object.entries(values()).some(([k,v])=>v!==(item.values[k]??''));if(dirty)say('当前表单有未保存内容，请先保存填写或提交，再切换记录、导入或打印。',true);return !dirty;}
