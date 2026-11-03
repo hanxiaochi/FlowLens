@@ -1,7 +1,7 @@
 import http from 'node:http';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp, rm, readFile} from 'node:fs/promises';
+import {mkdtemp, rm, readFile, readdir} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -12,6 +12,168 @@ import {createProject} from './apps-model.mjs';
 import {DatabaseSync} from 'node:sqlite';
 
 const password = 'test-only-long-password';
+
+test('attachment HTTP downloads require current project access and new clients receive references', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'flowlens-attachment-http-'));
+  const {server, store} = createTeamServer({database: join(directory, 'team.sqlite')});
+  try {
+    const admin = await store.createUser(null, {username: 'admin', name: 'Admin', password});
+    const member = await store.createUser(admin, {username: 'member', name: 'Member', password});
+    store.importApplication(admin, applicationDemo());
+    store.setMembership(admin, {userId: member.id, projectId: 'demo-project', roles: ['专业监理']});
+    const source = store.visibleWorkspace(member).workspace.cases[0];
+    const bytes = Buffer.from([0, 255, 1, 129]);
+    const record = store.command(member, {type: 'attachment', recordId: source.id, expectedRevision: source.revision, operationId: crypto.randomUUID(), attachment: {name: '证明".bin', data: 'data:application/octet-stream;base64,' + bytes.toString('base64')}}, {inlineAttachments: false}).record;
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    function request(path, {data, cookie, modern = true} = {}) {
+      return new Promise((resolve, reject) => {
+        const req = http.request({hostname: '127.0.0.1', port: server.address().port, path, method: data ? 'POST' : 'GET', headers: {Host: '127.0.0.1:4186', 'Content-Type': 'application/json', 'X-FlowLens-Request': '1', ...(modern ? {'X-FlowLens-Client': '2'} : {}), ...(cookie ? {Cookie: cookie} : {})}}, response => {
+          const chunks = []; response.on('data', chunk => chunks.push(chunk)); response.on('end', () => resolve({status: response.statusCode, headers: response.headers, bytes: Buffer.concat(chunks)}));
+        });
+        req.on('error', reject); req.end(data ? JSON.stringify(data) : undefined);
+      });
+    }
+    const login = await request('/api/team/login', {data: {username: 'member', password}});
+    const cookie = login.headers['set-cookie'][0].split(';')[0];
+    const path = '/api/team/attachment?recordId=' + encodeURIComponent(record.id) + '&attachmentId=' + encodeURIComponent(record.attachments[0].id);
+    assert.equal((await request(path)).status, 401);
+    const download = await request(path, {cookie});
+    assert.equal(download.status, 200);
+    assert.equal(download.headers['content-type'], 'application/octet-stream');
+    assert.match(download.headers['content-disposition'], /filename\*=UTF-8''/);
+    assert.deepEqual(download.bytes, bytes);
+    const modern = JSON.parse((await request('/api/team/workspace', {cookie})).bytes);
+    assert.equal(modern.workspace.cases[0].attachments[0].data, undefined);
+    const legacy = JSON.parse((await request('/api/team/workspace', {cookie, modern: false})).bytes);
+    assert.ok(legacy.workspace.cases[0].attachments[0].data.startsWith('data:'));
+    store.setMembership(admin, {userId: member.id, projectId: 'demo-project', roles: []});
+    assert.equal((await request(path, {cookie})).status, 404);
+  } finally { await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('three eight-MiB attachments fit without expanding workspace and retry JSON', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'flowlens-attachment-capacity-'));
+  const filename = join(directory, 'team.sqlite');
+  const store = openTeamStore(filename);
+  try {
+    const admin = await store.createUser(null, {username: 'admin', name: 'Admin', password});
+    store.importApplication(admin, applicationDemo());
+    store.setMembership(admin, {userId: admin.id, projectId: 'demo-project', roles: ['专业监理']});
+    let record = store.visibleWorkspace(admin).workspace.cases[0];
+    for (let index = 0; index < 3; index++) {
+      const data = 'data:application/octet-stream;base64,' + Buffer.alloc(8 * 1024 * 1024, index + 1).toString('base64');
+      record = store.command(admin, {type: 'attachment', recordId: record.id, expectedRevision: record.revision, operationId: crypto.randomUUID(), attachment: {name: 'large-' + index, data}}, {inlineAttachments: false}).record;
+    }
+    assert.equal(record.attachments.length, 3);
+    assert.ok(record.attachments.every(file => file.data === undefined));
+    assert.ok(store.operations(admin).workspaceBytes < 256 * 1024);
+    assert.equal(store.operations(admin).attachmentBytes, 24 * 1024 * 1024);
+    assert.throws(() => store.visibleWorkspace(admin), /旧客户端/);
+    assert.equal(store.visibleWorkspace(admin, {inlineAttachments: false}).workspace.cases[0].attachments.length, 3);
+    for (let index = 0; index < 3; index++) assert.deepEqual(store.attachment(admin, record.id, record.attachments[index].id).data, Buffer.alloc(8 * 1024 * 1024, index + 1));
+    const inspection = new DatabaseSync(filename);
+    assert.ok(inspection.prepare('SELECT SUM(length(result)) AS n FROM requests').get().n < 256 * 1024);
+    inspection.close();
+    await store.backup(join(directory, 'full.sqlite'));
+  } finally { store.close(); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('a late migration failure leaves the original workspace and database version intact', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'flowlens-migration-failure-'));
+  const filename = join(directory, 'team.sqlite');
+  const store = openTeamStore(filename);
+  const admin = await store.createUser(null, {username: 'admin', name: 'Admin', password});
+  store.importApplication(admin, applicationDemo());
+  const workspace = store.visibleWorkspace(admin).workspace;
+  workspace.cases[0].attachments.push({name: 'legacy.txt', size: 1, data: 'data:text/plain;base64,QQ=='});
+  store.close();
+  const inspection = new DatabaseSync(filename);
+  try {
+    inspection.prepare('UPDATE workspace SET data=?').run(JSON.stringify(workspace));
+    inspection.prepare('INSERT INTO requests VALUES(?,?,?,?)').run('broken-history', admin.id, 'fingerprint', 'not-json');
+    inspection.exec('DROP TABLE attachment_blobs; PRAGMA user_version=1');
+    const original = inspection.prepare('SELECT data FROM workspace').get().data;
+    assert.throws(() => openTeamStore(filename));
+    assert.equal(inspection.prepare('PRAGMA user_version').get().user_version, 1);
+    assert.equal(inspection.prepare('SELECT data FROM workspace').get().data, original);
+    assert.equal(inspection.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name='attachment_blobs'").get().n, 0);
+    assert.equal((await readdir(directory)).filter(file => file.includes('.before-attachments-')).length, 1);
+  } finally { inspection.close(); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('inline attachments and historical retry results migrate with a pre-migration snapshot', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'flowlens-attachment-migration-'));
+  const filename = join(directory, 'team.sqlite');
+  let store = openTeamStore(filename);
+  try {
+    const admin = await store.createUser(null, {username: 'admin', name: 'Admin', password});
+    store.importApplication(admin, applicationDemo());
+    store.setMembership(admin, {userId: admin.id, projectId: 'demo-project', roles: ['专业监理']});
+    const record = store.visibleWorkspace(admin).workspace.cases[0];
+    const data = 'data:text/plain;base64,' + Buffer.from('迁移附件\nlegacy evidence').toString('base64');
+    const request = {type: 'attachment', recordId: record.id, expectedRevision: record.revision, operationId: crypto.randomUUID(), attachment: {name: '原附件.txt', data}};
+    const result = store.command(admin, request);
+    const before = store.visibleWorkspace(admin);
+    store.close(); store = null;
+    // Recreate the on-disk layout used by 1.5, including an inline cached response.
+    const legacy = new DatabaseSync(filename);
+    const saved = structuredClone(before.workspace); delete saved.storageRevision;
+    legacy.prepare('UPDATE workspace SET data=? WHERE id=1').run(JSON.stringify(saved));
+    legacy.prepare('UPDATE requests SET result=? WHERE id=?').run(JSON.stringify(result), request.operationId);
+    legacy.exec('DROP TABLE attachment_blobs; PRAGMA user_version=1'); legacy.close();
+    store = openTeamStore(filename);
+    assert.deepEqual(store.visibleWorkspace(admin), before);
+    assert.deepEqual(store.command(admin, request), result);
+    const metadata = store.visibleWorkspace(admin, {inlineAttachments: false}).workspace.cases[0].attachments[0];
+    assert.equal(metadata.data, undefined);
+    assert.equal(store.attachment(admin, record.id, metadata.id).data.toString(), '迁移附件\nlegacy evidence');
+    const inspect = new DatabaseSync(filename);
+    assert.equal(inspect.prepare('PRAGMA user_version').get().user_version, 2);
+    assert.equal(inspect.prepare('SELECT COUNT(*) AS n FROM attachment_blobs').get().n, 1);
+    assert.ok(!inspect.prepare('SELECT result FROM requests WHERE id=?').get(request.operationId).result.includes(';base64,'));
+    inspect.close();
+    const files = (await readdir(directory)).filter(file => file.includes('.before-attachments-'));
+    assert.equal(files.length, 1);
+    const snapshot = new DatabaseSync(join(directory, files[0]), {readOnly: true});
+    assert.equal(snapshot.prepare('PRAGMA user_version').get().user_version, 1);
+    assert.equal(JSON.parse(snapshot.prepare('SELECT data FROM workspace').get().data).cases[0].attachments[0].data, data);
+    snapshot.close();
+    assert.equal(store.operations(admin).lastAttachmentMigration.compacted, true);
+  } finally { store?.close(); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('blob storage is transactional, deduplicated and scoped to project membership', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'flowlens-attachment-blob-'));
+  const filename = join(directory, 'team.sqlite');
+  const store = openTeamStore(filename);
+  const inspection = new DatabaseSync(filename);
+  try {
+    const admin = await store.createUser(null, {username: 'admin', name: 'Admin', password});
+    const stranger = await store.createUser(admin, {username: 'stranger', name: 'Stranger', password});
+    store.importApplication(admin, applicationDemo());
+    store.setMembership(admin, {userId: admin.id, projectId: 'demo-project', roles: ['专业监理']});
+    let record = store.visibleWorkspace(admin).workspace.cases[0];
+    const data = 'data:application/octet-stream;base64,' + Buffer.from([0, 1, 255, 128]).toString('base64');
+    const request = {type: 'attachment', recordId: record.id, expectedRevision: record.revision, operationId: crypto.randomUUID(), attachment: {name: 'binary.bin', data}};
+    inspection.exec("CREATE TRIGGER reject_attachment BEFORE INSERT ON requests BEGIN SELECT RAISE(ABORT, 'attachment rollback'); END");
+    assert.throws(() => store.command(admin, request, {inlineAttachments: false}), /attachment rollback/);
+    assert.equal(inspection.prepare('SELECT COUNT(*) AS n FROM attachment_blobs').get().n, 0);
+    inspection.exec('DROP TRIGGER reject_attachment');
+    record = store.command(admin, request, {inlineAttachments: false}).record;
+    assert.deepEqual(store.command(admin, request, {inlineAttachments: false}).record, record);
+    assert.equal(record.attachments.length, 1);
+    const file = record.attachments[0];
+    assert.throws(() => store.attachment(stranger, record.id, file.id), error => error.status === 404);
+    assert.deepEqual(store.attachment(admin, record.id, file.id).data, Buffer.from([0, 1, 255, 128]));
+    record = store.command(admin, {...request, expectedRevision: record.revision, operationId: crypto.randomUUID()}, {inlineAttachments: false}).record;
+    assert.equal(record.attachments.length, 2);
+    assert.equal(inspection.prepare('SELECT COUNT(*) AS n FROM attachment_blobs').get().n, 1);
+    inspection.prepare('UPDATE attachment_blobs SET data=zeroblob(size)').run();
+    assert.throws(() => store.attachment(admin, record.id, file.id), error => error.status === 500);
+    await assert.rejects(store.backup(join(directory, 'corrupt.sqlite')), /校验失败/);
+    assert.equal(store.operations(admin).lastBackup, null);
+  } finally { inspection.close(); store.close(); await rm(directory, {recursive: true, force: true}); }
+});
 
 test('delivery confirmations preserve attribution, reject stale writes and require review after configuration changes', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'flowlens-delivery-'));

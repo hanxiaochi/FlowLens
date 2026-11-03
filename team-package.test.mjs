@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp, readFile, readdir, rm, writeFile} from 'node:fs/promises';
+import {mkdtemp, readFile, readdir, rm, writeFile, copyFile} from 'node:fs/promises';
+import {DatabaseSync} from 'node:sqlite';
 import {join, resolve} from 'node:path';
 import {tmpdir} from 'node:os';
 import {pathToFileURL, fileURLToPath} from 'node:url';
@@ -87,6 +88,12 @@ test('standalone distribution starts without dependencies and its CLI restores d
     await writeFile(invalid, 'invalid backup');
     assert.notEqual(cli(['restore', invalid], join(directory, 'rejected.sqlite')).status, 0);
     assert.ok(!(await readdir(directory)).includes('rejected.sqlite'));
+    const corruptBackup = join(directory, 'corrupt-attachment.sqlite');
+    await copyFile(backupWithHistory, corruptBackup);
+    const corrupt = new DatabaseSync(corruptBackup);
+    corrupt.exec('UPDATE attachment_blobs SET data=zeroblob(size)'); corrupt.close();
+    assert.notEqual(cli(['restore', corruptBackup], join(directory, 'corrupt-rejected.sqlite')).status, 0);
+    assert.ok(!(await readdir(directory)).includes('corrupt-rejected.sqlite'));
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));
     else store?.close();

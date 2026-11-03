@@ -77,7 +77,14 @@ export function createTeamServer({database = resolve(root, '.local/team.sqlite')
       const user = store.session(token);
       if (req.method === 'GET') {
         if (path === '/api/team/me') return send(res, 200, {user});
-        if (path === '/api/team/workspace') return send(res, 200, store.visibleWorkspace(user));
+        if (path === '/api/team/workspace') return send(res, 200, store.visibleWorkspace(user, {inlineAttachments: req.headers['x-flowlens-client'] !== '2'}));
+        if (path === '/api/team/attachment') {
+          const query = new URL(req.url, origin).searchParams;
+          const file = store.attachment(user, query.get('recordId'), query.get('attachmentId'));
+          const name = encodeURIComponent(file.name.toWellFormed()).replace(/[!'()*]/g, char => '%' + char.charCodeAt(0).toString(16));
+          res.writeHead(200, {'Content-Type': 'application/octet-stream', 'Content-Length': file.size, 'Content-Disposition': "attachment; filename=attachment; filename*=UTF-8''" + name});
+          return res.end(file.data);
+        }
         if (path === '/api/team/admin') return send(res, 200, {users: store.users(user), memberships: store.memberships(user), audit: store.audit(user)});
         if (path === '/api/team/operations') return send(res, 200, {...store.operations(user), uptimeSeconds: Math.floor(process.uptime()), memoryBytes: process.memoryUsage().rss});
         if (path === '/api/team/delivery') return send(res, 200, store.deliveryReport(user, new URL(req.url, origin).searchParams.get('scope') || 'instance', origin));
@@ -86,7 +93,7 @@ export function createTeamServer({database = resolve(root, '.local/team.sqlite')
       const input = await body(req, ['/api/team/import', '/api/team/definitions'].includes(path) ? 32 * 1024 * 1024 : path === '/api/team/command' ? 15 * 1024 * 1024 : 64 * 1024);
       if (path === '/api/team/logout') { store.logout(token); return send(res, 200, {ok: true}, {'Set-Cookie': cookie('', 0)}); }
       if (path === '/api/team/password') { await store.changePassword(user, input.oldPassword, input.newPassword); return send(res, 200, {ok: true}, {'Set-Cookie': cookie('', 0)}); }
-      if (path === '/api/team/command') return send(res, 200, store.command(user, input));
+      if (path === '/api/team/command') return send(res, 200, store.command(user, input, {inlineAttachments: req.headers['x-flowlens-client'] !== '2'}));
       if (path === '/api/team/delivery') return send(res, 200, store.updateDelivery(user, input, origin));
       if (path === '/api/team/import') return send(res, 200, store.importApplication(user, input));
       if (path === '/api/team/definitions') return send(res, 200, store.updateDefinitions(user, input));

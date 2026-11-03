@@ -3,6 +3,7 @@ import {existsSync, mkdirSync, chmodSync} from 'node:fs';
 import {DatabaseSync, backup} from 'node:sqlite';
 import {openTeamStore} from '../team-store.mjs';
 import {upgradeWorkspace} from '../forms-store.mjs';
+import {validateAttachmentSnapshot} from '../team-attachments.mjs';
 
 const [action, target] = process.argv.slice(2);
 const filename = resolve(process.env.FLOWLENS_DATABASE || '.local/team.sqlite');
@@ -12,8 +13,10 @@ if (action === 'restore') {
   const source = new DatabaseSync(resolve(target), {readOnly: true});
   try {
     if (source.prepare('PRAGMA integrity_check').get().integrity_check !== 'ok') throw Error('备份完整性检查失败');
-    if (source.prepare('PRAGMA user_version').get().user_version !== 1) throw Error('不支持的数据库版本');
-    upgradeWorkspace(JSON.parse(source.prepare('SELECT data FROM workspace WHERE id=1').get().data));
+    const version = source.prepare('PRAGMA user_version').get().user_version;
+    if (![1, 2].includes(version)) throw Error('不支持的数据库版本');
+    const workspace = upgradeWorkspace(JSON.parse(source.prepare('SELECT data FROM workspace WHERE id=1').get().data), {allowAttachmentReferences: version === 2});
+    if (version === 2) validateAttachmentSnapshot(source, workspace, {verifyHashes: true});
     source.prepare('SELECT id,username,password,admin,disabled FROM users').all();
     source.prepare('SELECT token,user_id,expires FROM sessions').all();
     source.prepare('SELECT user_id,project_id,roles FROM members').all();

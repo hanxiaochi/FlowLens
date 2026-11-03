@@ -28,7 +28,7 @@ const select = (name, options, value) => {
 };
 function say(text, error = false) { notice.textContent = text; notice.classList.toggle('error', error); }
 async function api(path, data) {
-  const response = await fetch('/api/team/' + path, {method: data === undefined ? 'GET' : 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', 'X-FlowLens-Request': '1'}, body: data === undefined ? undefined : JSON.stringify(data)});
+  const response = await fetch('/api/team/' + path, {method: data === undefined ? 'GET' : 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', 'X-FlowLens-Request': '1', 'X-FlowLens-Client': '2'}, body: data === undefined ? undefined : JSON.stringify(data)});
   const result = await response.json();
   if (!response.ok) throw Object.assign(Error(result.error || '请求失败'), {status: response.status});
   return result;
@@ -211,8 +211,11 @@ function recordView() {
   } else actions.append(node('p', record.status === 'complete' ? '这份业务已完成归档。' : '等待项目中的 ' + role + ' 办理。'));
   const retry = button('重试原请求', sendPending); retry.id = 'retry-request'; retry.hidden = !pending; actions.append(retry);
   side.append(actions);
-  for (const attachment of record.attachments) side.append(button('下载附件 · ' + attachment.name, () => {
-    const link = node('a'); link.href = attachment.data; link.download = attachment.name; link.click();
+  for (const attachment of record.attachments) side.append(button('下载附件 · ' + attachment.name, async () => {
+    if (attachment.data) { const link = node('a'); link.href = attachment.data; link.download = attachment.name; link.click(); return; }
+    const response = await fetch('/api/team/attachment?recordId=' + encodeURIComponent(record.id) + '&attachmentId=' + encodeURIComponent(attachment.id), {credentials: 'same-origin'});
+    if (!response.ok) { const result = await response.json(); throw Object.assign(Error(result.error || '附件下载失败'), {status: response.status}); }
+    download(attachment.name, await response.blob(), 'application/octet-stream');
   }));
   const app = workspace.applications.find(item => item.id === record.appId);
   for (const relation of app.relations.filter(item => item.from === record.template.id)) {
@@ -293,11 +296,12 @@ async function operationsView() {
   const storage = node('section', undefined, 'panel stack');
   const usage = node('meter'); usage.max = status.workspaceLimitBytes; usage.value = status.workspaceBytes; usage.setAttribute('aria-label', '工作区容量使用量');
   storage.append(node('h2', '工作区容量'), node('strong', size(status.workspaceBytes) + ' / ' + size(status.workspaceLimitBytes), 'status-value'), usage);
-  storage.append(node('p', '工作区包含表式、业务内容和编码后的附件。数据库主文件及写入日志还包含账号、审计和幂等请求记录。', 'muted'));
+  storage.append(node('p', '工作区包含表式、业务内容和附件引用。附件原文件独立保存在同一数据库中，数据库及写入日志还包含账号、审计和幂等请求记录。', 'muted'));
   if (status.workspaceBytes >= status.workspaceLimitBytes * 0.8) storage.append(node('p', '工作区接近实例上限，请联系维护人员评估容量。', 'status-warning'));
   storage.append(node('p', '数据库主文件 ' + size(status.databaseBytes) + ' · 写入日志 ' + size(status.databaseWalBytes)), node('p', '所在文件系统可用 ' + size(status.diskFreeBytes)));
   const business = node('section', undefined, 'panel stack');
   business.append(node('h2', '业务与账号'), node('strong', status.records + ' 份业务 · ' + status.projects + ' 个项目', 'status-value'), node('p', '其中 ' + status.completedRecords + ' 份已归档'), node('p', '附件原始大小合计 ' + size(status.attachmentBytes)), node('p', status.users.enabled + ' 个启用账号 / 共 ' + status.users.total + ' 个账号'));
+  if (status.storedAttachmentBytes !== undefined) business.append(node('p', '独立文件内容 ' + status.storedAttachmentCount + ' 份 · ' + size(status.storedAttachmentBytes)));
   const service = node('section', undefined, 'panel stack');
   service.append(node('h2', '当前进程'), node('strong', Math.floor(status.uptimeSeconds / 60) + ' 分钟', 'status-value'), node('p', '进程已运行时长'), node('p', '当前驻留内存 ' + size(status.memoryBytes)), node('p', '本页展示当前读取结果，定时任务、证书续期和主机告警由部署维护人员核对。', 'muted'));
   grid.append(storage, business, service); content.append(grid);
@@ -306,6 +310,11 @@ async function operationsView() {
     recovery.append(node('p', '最近通过完整性校验的备份 ' + date(status.lastBackup.completedAt)), node('p', '备份大小 ' + size(status.lastBackup.bytes) + ' · 备份工作区修订 ' + status.lastBackup.workspaceRevision + ' · 当前修订 ' + status.workspaceRevision), node('code', status.lastBackup.sha256, 'status-checksum'));
   } else recovery.append(node('p', '当前实例暂无已记录的备份成功结果。请维护人员执行备份命令，并核对生成文件。', 'status-warning'));
   if (status.lastRestore) recovery.append(node('p', '最近恢复完成于 ' + date(status.lastRestore.completedAt) + '。恢复后的旧登录会话已清除。'));
+  if (status.lastAttachmentMigration) {
+    const migration = status.lastAttachmentMigration;
+    recovery.append(node('p', '附件存储迁移完成于 ' + date(migration.completedAt)), node('p', '迁移前快照 ' + migration.backupFile));
+    if (!migration.compacted) recovery.append(node('p', '数据库空闲页尚待维护整理，迁移后的数据已保存。', 'status-warning'));
+  }
   recovery.append(node('p', '该记录覆盖备份生成及完整性检查。备份文件是否仍在、定时任务是否成功以及异地副本情况，需要维护人员另行核对。', 'muted'));
   content.append(recovery, button('刷新运行状态', operationsView), button('下载运行状态报告', () => download('FlowLens-运行状态.json', JSON.stringify(status, null, 2))));
   say('已读取管理员运行状态。');

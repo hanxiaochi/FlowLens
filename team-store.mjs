@@ -7,6 +7,7 @@ import {emptyWorkspace, upgradeWorkspace} from './forms-store.mjs';
 import {startProjectCase} from './apps-model.mjs';
 import {applyOperation, attachFile} from './forms-model.mjs';
 import {deliveryChecks} from './team-delivery.mjs';
+import {decodeAttachment, storeRecordAttachments, hydrateRecordAttachments, validateAttachmentSnapshot, migrateAttachments} from './team-attachments.mjs';
 
 const scrypt = promisify(derive);
 export const digest = value => createHash('sha256').update(value).digest('hex');
@@ -27,7 +28,7 @@ const publicUser = row => ({id: row.id, username: row.username, name: row.name, 
 export function openTeamStore(filename) {
   mkdirSync(dirname(filename), {recursive: true, mode: 0o700});
   const db = new DatabaseSync(filename);
-  if (db.prepare('PRAGMA user_version').get().user_version > 1) { db.close(); throw Error('数据库版本高于当前程序，请使用匹配版本'); }
+  if (db.prepare('PRAGMA user_version').get().user_version > 2) { db.close(); throw Error('数据库版本高于当前程序，请使用匹配版本'); }
   db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;
     CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL, password TEXT NOT NULL, admin INTEGER NOT NULL DEFAULT 0, disabled INTEGER NOT NULL DEFAULT 0);
     CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), expires INTEGER NOT NULL);
@@ -38,8 +39,10 @@ export function openTeamStore(filename) {
     CREATE TABLE IF NOT EXISTS maintenance (key TEXT PRIMARY KEY, data TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS delivery_checks (scope TEXT NOT NULL, check_id TEXT NOT NULL, revision INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY(scope,check_id));
     CREATE TABLE IF NOT EXISTS delivery_history (sequence INTEGER PRIMARY KEY AUTOINCREMENT, scope TEXT NOT NULL, check_id TEXT NOT NULL, data TEXT NOT NULL);
-    PRAGMA user_version=1;`);
+    `);
   db.prepare('INSERT OR IGNORE INTO workspace VALUES (1,0,?)').run(JSON.stringify(emptyWorkspace()));
+  try { migrateAttachments(db, filename); }
+  catch (error) { db.close(); throw error; }
   function transaction(fn) {
     db.exec('BEGIN IMMEDIATE');
     try { const result = fn(); db.exec('COMMIT'); return result; }
@@ -53,7 +56,8 @@ export function openTeamStore(filename) {
     return {...JSON.parse(row.data), storageRevision: row.revision};
   }
   function writeWorkspace(value) {
-    const next = upgradeWorkspace(value);
+    for (const record of value.cases) storeRecordAttachments(db, record);
+    const next = upgradeWorkspace(value, {allowAttachmentReferences: true});
     const serialized = JSON.stringify(next);
     if (Buffer.byteLength(serialized) > 32 * 1024 * 1024) fail(413, '当前实例工作区已超过 32 MB 容量，请联系管理员归档并规划独立实例');
     db.prepare('UPDATE workspace SET data=?,revision=revision+1 WHERE id=1').run(serialized);
@@ -64,6 +68,11 @@ export function openTeamStore(filename) {
     return row;
   }
   function admin(user) { if (!active(user).admin) fail(403, '需要管理员权限'); }
+  function inlineRecords(records) {
+    const bytes = records.reduce((total, record) => total + record.attachments.reduce((sum, file) => sum + file.size, 0), 0);
+    if (bytes >= 24 * 1024 * 1024) fail(409, '附件已超过旧客户端的内嵌容量，请保存草稿并刷新到新版客户端');
+    for (const record of records) hydrateRecordAttachments(db, record);
+  }
   function deliveryContext(scope, origin) {
     if (scope === 'instance') return {kind: 'instance', name: '当前部署实例', fingerprint: digest(origin)};
     if (typeof scope !== 'string' || !scope.startsWith('project:')) fail(400, '交付检查范围无效');
@@ -139,9 +148,12 @@ export function openTeamStore(filename) {
       records: current.cases.length,
       completedRecords: current.cases.filter(record => record.status === 'complete').length,
       attachmentBytes: current.cases.reduce((total, record) => total + record.attachments.reduce((sum, file) => sum + file.size, 0), 0),
+      storedAttachmentBytes: db.prepare('SELECT COALESCE(SUM(size),0) AS bytes FROM attachment_blobs').get().bytes,
+      storedAttachmentCount: db.prepare('SELECT COUNT(*) AS count FROM attachment_blobs').get().count,
       users: db.prepare('SELECT COUNT(*) AS total, COALESCE(SUM(disabled=0),0) AS enabled FROM users').get(),
       lastBackup: maintenance.lastBackup ?? null,
-      lastRestore: maintenance.lastRestore ?? null
+      lastRestore: maintenance.lastRestore ?? null,
+      lastAttachmentMigration: maintenance.lastAttachmentMigration ?? null
     };
   }
   async function verifiedBackup(destination) {
@@ -151,6 +163,7 @@ export function openTeamStore(filename) {
     let workspaceRevision;
     try {
       if (snapshot.prepare('PRAGMA integrity_check').get().integrity_check !== 'ok') throw Error('备份完整性检查失败');
+      validateAttachmentSnapshot(snapshot, JSON.parse(snapshot.prepare('SELECT data FROM workspace WHERE id=1').get().data), {verifyHashes: true});
       workspaceRevision = snapshot.prepare('SELECT revision FROM workspace WHERE id=1').get().revision;
     } finally { snapshot.close(); }
     const hash = createHash('sha256');
@@ -203,7 +216,7 @@ export function openTeamStore(filename) {
     if (!row) fail(401, '登录已过期，请重新登录');
     return publicUser(row);
   }
-  function visibleWorkspace(user) {
+  function visibleWorkspace(user, {inlineAttachments = true} = {}) {
     active(user);
     const value = workspace();
     const memberships = db.prepare('SELECT project_id,roles FROM members WHERE user_id=?').all(user.id).map(row => ({projectId: row.project_id, roles: JSON.parse(row.roles)}));
@@ -216,7 +229,18 @@ export function openTeamStore(filename) {
       value.templates = value.templates.filter(item => templateIds.has(item.id));
       value.cases = value.cases.filter(item => projectIds.has(item.projectId));
     }
+    if (inlineAttachments) inlineRecords(value.cases);
     return {workspace: value, memberships};
+  }
+  function attachment(user, recordId, attachmentId) {
+    active(user);
+    const record = workspace().cases.find(item => item.id === recordId);
+    if (!record || (!user.admin && !roles(user, record.projectId).length)) fail(404, '附件不存在或不可访问');
+    const file = record.attachments.find(item => item.id === attachmentId);
+    if (!file) fail(404, '附件不存在或不可访问');
+    const row = db.prepare('SELECT data,size FROM attachment_blobs WHERE id=?').get(file.blobId);
+    if (!row || row.size !== file.size || digest(row.data) !== file.blobId) fail(500, '附件内容校验失败');
+    return {name: file.name, data: Buffer.from(row.data), size: row.size};
   }
   function importApplication(user, input) {
     admin(user);
@@ -284,7 +308,7 @@ export function openTeamStore(filename) {
       return {updated: true, preservedRecords: current.cases.filter(item => item.appId === app.id).length};
     });
   }
-  function command(user, input) {
+  function command(user, input, {inlineAttachments = true} = {}) {
     active(user);
     if (typeof input.operationId !== 'string' || !/^[\w-]{8,100}$/.test(input.operationId)) fail(400, '需要有效操作编号');
     const fingerprint = digest(JSON.stringify(input));
@@ -299,7 +323,9 @@ export function openTeamStore(filename) {
       if (prior) {
         if (prior.user_id !== user.id || prior.fingerprint !== fingerprint) fail(409, '操作编号已用于不同请求');
         if (!roles(user, projectId).length) fail(403, '当前账号已无项目权限');
-        return JSON.parse(prior.result);
+        const result = JSON.parse(prior.result);
+        if (inlineAttachments) inlineRecords([result.record]);
+        return result;
       }
       if (record?.events.some(event => event.operationId === input.operationId)) fail(409, '此操作编号属于导入的历史记录，请使用新操作编号');
       const role = record ? (record.status === 'draft' ? record.submitter : record.template.workflow[record.step]?.role) : template.submitterRole || '填报人';
@@ -319,7 +345,7 @@ export function openTeamStore(filename) {
         if (input.type === 'attachment') {
           const attachment = input.attachment;
           if (!attachment || typeof attachment.data !== 'string' || !/^data:[\w.+/-]*;base64,[A-Za-z0-9+/=]*$/.test(attachment.data)) fail(400, '附件格式无效');
-          const size = Buffer.from(attachment.data.split(',')[1], 'base64').length;
+          const size = decodeAttachment(attachment.data).bytes.length;
           if (size > 10 * 1024 * 1024 || record.attachments.reduce((sum, item) => sum + item.size, 0) + size > 30 * 1024 * 1024) fail(413, '单个附件最多 10 MB，每份业务附件合计最多 30 MB');
           next = attachFile(record, {name: attachment.name, size, data: attachment.data}, role);
         } else next = applyOperation(record, {type: input.type, role, values: input.values ?? {}, note: input.note ?? '', expectedRevision: input.expectedRevision, operationId: input.operationId});
@@ -330,6 +356,7 @@ export function openTeamStore(filename) {
       audit(user, 'case.' + input.type, next.id);
       const result = {record: next};
       db.prepare('INSERT INTO requests VALUES(?,?,?,?)').run(input.operationId, user.id, fingerprint, JSON.stringify(result));
+      if (inlineAttachments) inlineRecords([result.record]);
       return result;
     });
   }
@@ -356,7 +383,7 @@ export function openTeamStore(filename) {
     });
   }
   return {
-    createUser, login, session, visibleWorkspace, importApplication, updateDefinitions, setMembership, command, changePassword, resetPassword, operations, deliveryReport, updateDelivery,
+    createUser, login, session, visibleWorkspace, importApplication, updateDefinitions, setMembership, command, changePassword, resetPassword, operations, deliveryReport, updateDelivery, attachment,
     logout: token => db.prepare('DELETE FROM sessions WHERE token=?').run(digest(token)),
     users: user => { admin(user); return db.prepare('SELECT * FROM users ORDER BY username').all().map(publicUser); },
     memberships: user => { admin(user); return db.prepare('SELECT user_id AS userId,project_id AS projectId,roles FROM members').all().map(row => ({...row, roles: JSON.parse(row.roles)})); },
