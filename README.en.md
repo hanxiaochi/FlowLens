@@ -22,7 +22,7 @@ No installation or API key needed. Start with a fictional supervision applicatio
 
 [1.3 release notes and acceptance](docs/release-1.3.0.md)
 
-The main branch is preparing ordinary business-request recovery for 1.11. Service-context checks, account binding and request deadlines have development checks in place. Durable browser recovery is still being implemented. The deployed release remains 1.10.2. [Development progress (Chinese)](docs/delivery-plan.md)
+The main branch is preparing ordinary business-request recovery for 1.11. Requests are staged in browser storage before sending and can be resumed after a reload. Development checks cover reloads, competing tabs and storage failure. End-to-end checks for attachments, re-login and changed service environments are still in progress. The deployed release remains 1.10.2. [Development progress (Chinese)](docs/delivery-plan.md)
 
 ## 1.4 adds a shared team workspace
 

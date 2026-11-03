@@ -4,12 +4,14 @@ import {renderDetailField} from './forms-detail-ui.js';
 import {printableForm} from './forms-print.mjs';
 import {deliveryStatusLabels} from './team-delivery.mjs';
 import {teamJsonRequest} from './team-http.mjs';
+import {createRecoveryStore} from './team-recovery.mjs';
 
 const content = document.querySelector('#content');
 const account = document.querySelector('#account');
 const notice = document.querySelector('#notice');
 let user, workspace, memberships = [], selectedId = '', projectId = '', busy = false, pending = null;
 let serviceContext = null;
+const recovery = createRecoveryStore();
 let deliveryDraft = null;
 let selectedRecord = null, listing = null, roleOptions = {};
 let listQuery = {page: 1, filter: 'all', search: ''};
@@ -77,7 +79,7 @@ function dirty() {
 }
 function clean() { if (dirty() || pending) { say('当前有填写内容或待确认请求，请保存、下载草稿后重新读取，或重试原请求。', true); return false; } return true; }
 function draft() { download('FlowLens-协作草稿.json', JSON.stringify(deliveryDraft ?? {recordId: selectedId, revision: current()?.revision, values: values(), note: content.querySelector('#operation-note')?.value ?? '', pending}, null, 2)); }
-window.addEventListener('beforeunload', event => { if (dirty() || pending) { event.preventDefault(); event.returnValue = ''; } });
+window.addEventListener('beforeunload', event => { if (!pending && dirty()) { event.preventDefault(); event.returnValue = ''; } });
 async function refresh(nextQuery = listQuery, requestedProject = projectId) {
   const recordId = selectedRecord?.projectId === requestedProject ? selectedId : '';
   const query = new URLSearchParams({...nextQuery, projectId: requestedProject, recordId});
@@ -96,6 +98,7 @@ function accountView() {
   const controls = node('div', undefined, 'toolbar');
   controls.append(button('我的项目', async () => { if (!clean()) return; selectedId = ''; await refresh(); home(); }), button('修改密码', () => { if (clean()) passwordView(); }), button('退出登录', async () => { if (!clean()) return; await api('logout', {}); user = null; workspace = null; selectedId = ''; loginView(); }));
   controls.append(button('下载草稿并重新登录', () => { draft(); user = null; selectedId = ''; pending = null; deliveryDraft = null; loginView(); }));
+  controls.append(button('恢复待确认操作', async () => { if (clean()) await recoveryView(); }));
   if (user.admin) controls.append(button('资料包检查', () => { if (clean()) projectCheckView(); }), button('管理后台', async () => { if (clean()) await adminView(); }), button('运行状态', async () => { if (clean()) await operationsView(); }));
   if (user.admin) controls.append(button('交付检查', async () => { if (clean()) await deliveryView(); }));
   if (user.admin && savedProjectRestore()) controls.append(button('继续待确认恢复', () => { if (clean()) restoreRetryView(); }));
@@ -111,7 +114,7 @@ function loginView() {
   const password = input('密码', 'password'); password.autocomplete = 'current-password'; password.required = true;
   const form = node('form'); const submit = node('button', '登录', 'primary'); submit.type = 'submit';
   form.append(label('账号', username), label('密码', password), submit);
-  form.onsubmit = event => { event.preventDefault(); task(async () => { acceptSession(await api('login', {username: username.value, password: password.value})); await refresh(); home(); say('已登录，选择项目开始办理。'); }); };
+  form.onsubmit = event => { event.preventDefault(); task(async () => { acceptSession(await api('login', {username: username.value, password: password.value})); say('已登录，选择项目开始办理。'); await enterWorkspace(); }); };
   panel.append(form); content.append(panel);
 }
 function home() {
@@ -174,27 +177,80 @@ async function openRecord(id) {
 }
 async function command(data) {
   if (pending) throw Error('上一项业务操作的结果尚未确认，请先点击“重试原请求”，或下载草稿并重新读取。');
-  pending = {...data, operationId: crypto.randomUUID(), expectedInstanceId: serviceContext.instanceId, expectedUserId: user.id};
+  const request = {...data, operationId: crypto.randomUUID(), expectedInstanceId: serviceContext.instanceId, expectedUserId: user.id};
+  if (data.type === 'create') {
+    const template = workspace.templates.find(template => template.id === data.templateId);
+    if (!template) throw Error('当前表式不可用，请重新读取项目。');
+    request.expectedTemplateVersion = template.version;
+  }
+  const entry = await recovery.stage(user.id, serviceContext.instanceId, request, current()?.title ?? workspace.projects.find(project => project.id === projectId)?.name ?? '业务操作');
+  pending = entry.request;
   await sendPending();
+}
+function updatePendingControls() {
+  const form = content.querySelector('.record-form'); if (form) form.inert = !!pending;
+  const note = content.querySelector('#operation-note'); if (note) note.disabled = !!pending;
+  const retry = content.querySelector('#retry-request'); if (retry) retry.hidden = !pending;
 }
 async function sendPending() {
   if (!pending) throw Error('当前没有待确认的业务操作。');
+  let result;
   try {
-    const result = await api('command', pending);
-    pending = null; selectedId = result.record.id; selectedRecord = result.record;
-    await refresh(); recordView(); say('已保存到服务器。');
+    result = await api('command', pending);
   } catch (error) {
-    if (!pending) {
-      recordView();
-      throw Error('业务已保存，但清单刷新失败。请稍后重新读取。' + error.message);
+    if (error.status === 400) {
+      try { await recovery.remove(pending.expectedUserId, pending.operationId); pending = null; }
+      catch { updatePendingControls(); throw Error('服务器已拒绝该请求，但本机记录清理失败，请从恢复入口处理。'); }
     }
-    if (error.status && error.status < 500) pending = null;
-    const form = content.querySelector('.record-form'); if (form) form.inert = !!pending;
-    const note = content.querySelector('#operation-note'); if (note) note.disabled = !!pending;
-    const retry = content.querySelector('#retry-request'); if (retry) retry.hidden = !pending;
-    if (pending) throw Error('尚未收到业务结果确认，请点击“重试原请求”。');
+    updatePendingControls();
+    if (pending && (!error.status || error.status >= 500)) throw Error('尚未收到业务结果确认。原请求已保存在本机，可重试或刷新后从恢复入口继续。');
     throw error;
   }
+  selectedId = result.record.id; selectedRecord = result.record; projectId = result.record.projectId;
+  try { await recovery.remove(pending.expectedUserId, pending.operationId); }
+  catch { recordView(); throw Error('业务已保存，但本机恢复记录清理失败。请重试原请求确认并清理。'); }
+  pending = null;
+  try { await refresh(); recordView(); say('已保存到服务器。'); }
+  catch (error) { recordView(); throw Error('业务已保存，但清单刷新失败。请稍后重新读取。' + error.message); }
+}
+async function enterWorkspace() {
+  await refresh(); home();
+  try { if ((await recovery.list(user.id)).length) await recoveryView(); }
+  catch (error) { say('本机恢复记录无法读取，提交前需解决存储问题。' + error.message, true); }
+}
+async function recoveryView() {
+  acceptSession(await api('me'));
+  selectedId = ''; selectedRecord = null;
+  await refresh();
+  const entries = await recovery.list(user.id);
+  accountView(); content.replaceChildren();
+  content.append(node('h1', '恢复待确认操作'), node('p', '这里保留了当前浏览器中这个账号尚未完成确认的原请求。先核对服务器上的业务，再决定继续确认或移除本机记录。'));
+  if (!entries.length) content.append(node('p', '当前没有待确认操作。'));
+  const actionNames = {create: '新建单据', save: '保存填写', submit: '提交办理', advance: '办理并继续', return: '退回修改', attachment: '添加附件'};
+  for (const entry of entries) {
+    const card = node('article', undefined, 'panel');
+    card.append(node('h2', entry.description), node('p', new Date(entry.createdAt).toLocaleString() + ' · ' + (actionNames[entry.request.type] ?? entry.request.type)), node('p', '操作编号 ' + entry.operationId));
+    const matches = entry.instanceId === serviceContext.instanceId && entry.userId === user.id;
+    if (!matches) card.append(node('p', '服务数据环境已变化，请下载原请求并核对当前业务后处理这条本机记录。', 'status-warning'));
+    const preview = node('details'); preview.append(node('summary', '查看提交内容摘要'));
+    preview.append(node('pre', JSON.stringify({...entry.request, attachment: entry.request.attachment ? {name: entry.request.attachment.name} : undefined}, null, 2).slice(0, 4000)), node('p', '摘要最多显示 4000 字符，完整原请求可下载。'));
+    const resume = button('继续确认原请求', async () => {
+      if (pending && pending.operationId !== entry.operationId) throw Error('请先处理当前待确认操作。');
+      pending = entry.request; await sendPending();
+    }, 'primary'); resume.disabled = !matches;
+    const reviewed = input('已核对服务器状态', 'checkbox');
+    const remove = button('移除这条本机记录', async () => {
+      await recovery.remove(entry.userId, entry.operationId);
+      if (pending?.operationId === entry.operationId) pending = null;
+      await recoveryView(); say('本机恢复记录已移除。');
+    }); remove.disabled = true; reviewed.onchange = () => { remove.disabled = !reviewed.checked; };
+    const actions = node('div', undefined, 'toolbar');
+    actions.append(resume, button('下载完整原请求', () => download('FlowLens-待确认操作-' + entry.operationId + '.json', JSON.stringify(entry, null, 2))));
+    const reviewLabel = label('我已核对服务器状态，确认可以移除本机记录', reviewed); reviewLabel.className = 'check';
+    card.append(preview, actions, reviewLabel, remove);
+    content.append(card);
+  }
+  say(entries.length ? '请选择需要继续确认的原请求。' : '本机待确认记录已处理完毕。');
 }
 function fieldControl(parent, field, record, role) {
   const editable = canEdit(record, field, role) && roles().includes(role);
@@ -287,6 +343,7 @@ function recordView() {
     item.append(node('strong', (event.actor?.external ? '外部历史 · ' + event.actor.name : event.actor?.name || '导入前记录') + ' · ' + event.role), node('p', event.from + ' → ' + event.to), node('p', event.note), node('small', event.at)); side.append(item);
   }
   layout.append(form, side); content.append(layout);
+  updatePendingControls();
 }
 function passwordView() {
   content.replaceChildren(); const panel = node('section', undefined, 'panel login'); panel.append(node('h2', '修改密码'));
@@ -561,5 +618,5 @@ async function adminView() {
   for (const event of data.audit) audit.append(node('p', event.at + ' · ' + (data.users.find(item => item.id === event.user_id)?.name || event.user_id) + ' · ' + event.action + ' · ' + event.target));
   content.append(button('下载最近审计记录', () => download('FlowLens-审计记录.json', JSON.stringify(data.audit, null, 2))), audit);
 }
-try { acceptSession(await api('me')); await refresh(); home(); say('服务器工作区已就绪。'); }
+try { acceptSession(await api('me')); say('服务器工作区已就绪。'); await enterWorkspace(); }
 catch (error) { loginView(); say(error.status === 401 ? '请登录团队账号。' : error.message, error.status !== 401); }

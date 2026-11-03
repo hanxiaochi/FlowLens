@@ -418,6 +418,7 @@ export function openTeamStore(filename) {
       if (record?.events.some(event => event.operationId === input.operationId)) fail(409, '此操作编号属于导入的历史记录，请使用新操作编号');
       const role = record ? (record.status === 'draft' ? record.submitter : record.template.workflow[record.step]?.role) : template.submitterRole || '填报人';
       authorize(user, projectId, role);
+      if (input.type === 'create' && input.expectedTemplateVersion !== undefined && input.expectedTemplateVersion !== template.version) fail(409, '表式版本已变化，请核对当前表式后处理原请求');
       let next;
       if (input.type === 'create') {
         const project = current.projects.find(item => item.id === projectId);

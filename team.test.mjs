@@ -33,10 +33,15 @@ test('service context persists across connections and guards commands before wri
     assert.deepEqual(store.serviceContext(user), context);
     store.importApplication(user, applicationDemo());
     store.setMembership(user, {userId: user.id, projectId: 'demo-project', roles: ['专业监理']});
-    const command = {type: 'create', projectId: 'demo-project', templateId: applicationDemo().templates[0].id, operationId: crypto.randomUUID(), expectedInstanceId: context.instanceId, expectedUserId: user.id};
+    const command = {type: 'create', projectId: 'demo-project', templateId: applicationDemo().templates[0].id, operationId: crypto.randomUUID(), expectedInstanceId: context.instanceId, expectedUserId: user.id, expectedTemplateVersion: applicationDemo().templates[0].version};
     assert.throws(() => store.command(user, {...command, expectedUserId: otherUser.id}), error => error.status === 409);
     const result = store.command(user, command);
     assert.deepEqual(peer.command(user, command), result);
+    const definitions = applicationDemo();
+    for (const template of definitions.templates) template.version++;
+    store.updateDefinitions(user, definitions);
+    assert.deepEqual(store.command(user, command), result);
+    assert.throws(() => store.command(user, {...command, operationId: crypto.randomUUID()}), error => error.status === 409);
     const before = store.visibleWorkspace(user);
     const auditBefore = store.audit(user);
     inspection = new DatabaseSync(filename);
@@ -47,7 +52,7 @@ test('service context persists across connections and guards commands before wri
     assert.deepEqual(store.audit(user), auditBefore);
     assert.notEqual(peer.serviceContext(user).instanceId, context.instanceId);
     store.setMembership(user, {userId: user.id, projectId: 'demo-project', roles: []});
-    assert.throws(() => store.command(user, {...command, expectedInstanceId: store.serviceContext(user).instanceId, operationId: crypto.randomUUID()}), error => error.status === 403);
+    assert.throws(() => store.command(user, {...command, expectedInstanceId: store.serviceContext(user).instanceId, expectedTemplateVersion: definitions.templates[0].version, operationId: crypto.randomUUID()}), error => error.status === 403);
   } finally {
     inspection?.close(); peer?.close(); other.close(); store.close();
     await rm(directory, {recursive: true, force: true});
