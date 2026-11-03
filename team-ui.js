@@ -86,7 +86,7 @@ function accountView() {
   controls.append(button('下载草稿并重新登录', () => { draft(); user = null; selectedId = ''; pending = null; deliveryDraft = null; loginView(); }));
   if (user.admin) controls.append(button('资料包检查', () => { if (clean()) projectCheckView(); }), button('管理后台', async () => { if (clean()) await adminView(); }), button('运行状态', async () => { if (clean()) await operationsView(); }));
   if (user.admin) controls.append(button('交付检查', async () => { if (clean()) await deliveryView(); }));
-  if (user.admin && localStorage.getItem('flowlens.restore.' + user.id)) controls.append(button('继续待确认恢复', () => { if (clean()) restoreRetryView(); }));
+  if (user.admin && savedProjectRestore()) controls.append(button('继续待确认恢复', () => { if (clean()) restoreRetryView(); }));
   account.append(controls);
 }
 function loginView() {
@@ -373,6 +373,13 @@ function projectCheckView() {
   panel.append(label('项目资料包', file), check); content.append(panel, results);
 }
 
+function savedProjectRestore() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('flowlens.restore.' + user.id));
+    return saved?.options?.operationId && saved?.plan?.projectName && Array.isArray(saved.plan.assignments) ? saved : null;
+  } catch { return null; }
+}
+
 async function restoreArchiveRequest(path, file, options) {
   const encoded = encodeURIComponent(JSON.stringify(options));
   if (encoded.length > 65536) throw Error('恢复参数过大，请减少本次成员安排');
@@ -393,7 +400,8 @@ function showRestorePlan(panel, plan) {
 async function submitProjectRestore(file, saved) {
   // Persist the confirmed request before sending so a lost response can be retried after reload.
   const key = 'flowlens.restore.' + user.id;
-  localStorage.setItem(key, JSON.stringify(saved));
+  try { localStorage.setItem(key, JSON.stringify(saved)); }
+  catch { throw Error('浏览器无法保存恢复重试信息，请检查站点存储设置后重试。'); }
   accountView();
   say('正在恢复。若连接中断，可从顶部继续重试同一次恢复。');
   let result;
@@ -409,7 +417,7 @@ async function submitProjectRestore(file, saved) {
 }
 function restoreRetryView() {
   const key = 'flowlens.restore.' + user.id;
-  const saved = JSON.parse(localStorage.getItem(key));
+  const saved = savedProjectRestore();
   if (!saved) { say('当前没有待重试恢复。'); return; }
   selectedId = ''; content.replaceChildren(); accountView();
   const panel = node('section', undefined, 'panel stack project-check');
@@ -426,7 +434,7 @@ function restoreRetryView() {
   content.append(panel);
 }
 async function projectRestoreView(file, report) {
-  if (localStorage.getItem('flowlens.restore.' + user.id)) { restoreRetryView(); return; }
+  if (savedProjectRestore()) { restoreRetryView(); return; }
   const data = await api('admin');
   selectedId = ''; content.replaceChildren(); accountView();
   const panel = node('section', undefined, 'panel stack project-check');
