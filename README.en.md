@@ -1,6 +1,6 @@
 # FlowLens
 
-[简体中文](README.md) · **English** · [v1.9.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.9.0)
+[简体中文](README.md) · **English** · [v1.10.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.10.0)
 
 **[Try the live demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -32,11 +32,11 @@ A Windows LAN pilot has passed five-account HTTPS workflow, restore, and browser
 
 An owner-hosted Tencent Cloud pilot has since passed public-IP HTTPS, five-role workflow, concurrent-write conflict, and database restoration checks. Daily backups are enabled. Real-business approval and longer-term operation remain under validation. [Cloud acceptance and screenshot](docs/cloud-pilot-2026-11-03.md)
 
-## 1.10 candidate · Find a record, then open it
+## 1.10 · Find a record, then open it
 
 Projects now show 50 records per page, with search across identifiers and saved field values. Pending counts cover the whole project. Full forms, repeating rows and history load when a record opens. A completed record stays available after it leaves the pending filter.
 
-The candidate passes 93 local tests and browser checks for workflow completion and downloaded print files. Isolated capacity and release checks are in progress. The deployed release is currently 1.9. [Plan and open acceptance items (Chinese)](docs/delivery-plan.md)
+Windows and Ubuntu each pass 93 tests, with container and five-account cloud checks also passing. In the isolated 500-record test, two-minute sustained writes increased from 241 to 283. Sustained request P95 was slightly higher. [Results and scope (Chinese)](docs/release-1.10.0.md)
 
 ![Record search and project list](docs/images/project-search-1.10.png)
 

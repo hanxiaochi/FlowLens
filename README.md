@@ -1,6 +1,6 @@
 # FlowLens
 
-**简体中文** · [English](README.en.md) · [v1.9.0 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.9.0)
+**简体中文** · [English](README.en.md) · [v1.10.0 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.10.0)
 
 **[直接打开在线 Demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -28,11 +28,11 @@ Windows 内网试点已完成服务器本机的五账号 HTTPS 办理、恢复�
 
 随后已在所有者的腾讯云服务器完成公网 IP HTTPS、五角色办理、并发冲突及数据库恢复验收，并启用每日备份。真实业务试点与长期运行观察继续推进。[云端验收与截图](docs/cloud-pilot-2026-11-03.md)
 
-## 1.10 候选版 · 先找到单据，再打开办理
+## 1.10 先找到单据，再打开办理
 
 业务按项目分页，每页 50 份，可以按编号或填写内容搜索。待办数量覆盖整个项目，打开单据后再读取完整表式、明细和历史。归档后即使单据离开当前待办筛选，也能继续查看刚保存的结果。
 
-本地 93 项回归和浏览器办理、打印下载检查通过，隔离容量复测及发布验收正在进行。线上正式版本目前为 1.9。[阶段计划与待确认事项](docs/delivery-plan.md)
+Windows、Ubuntu 各通过 93 项回归，容器和云端五账号复验通过。500 份虚构业务的两分钟持续保存从 241 次增加到 283 次，持续请求 P95 略高，完整结果保留在验收记录中。[本版结果与边界](docs/release-1.10.0.md)
 
 ![编号搜索与业务清单](docs/images/project-search-1.10.png)
 
