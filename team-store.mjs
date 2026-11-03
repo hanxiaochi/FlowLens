@@ -1,3 +1,4 @@
+import {summarizeWorkspace} from './team-read-model.mjs';
 import {prepareProjectRestore} from './team-project-restore.mjs';
 import {checkProjectArchive, inspectProjectArchive} from './team-project-check.mjs';
 import {buildProjectArchive} from './team-project-export.mjs';
@@ -219,7 +220,7 @@ export function openTeamStore(filename) {
     if (!row) fail(401, '登录已过期，请重新登录');
     return publicUser(row);
   }
-  function visibleWorkspace(user, {inlineAttachments = true} = {}) {
+  function visibleWorkspace(user, {inlineAttachments = true, summary} = {}) {
     active(user);
     const value = workspace();
     const memberships = db.prepare('SELECT project_id,roles FROM members WHERE user_id=?').all(user.id).map(row => ({projectId: row.project_id, roles: JSON.parse(row.roles)}));
@@ -232,8 +233,15 @@ export function openTeamStore(filename) {
       value.templates = value.templates.filter(item => templateIds.has(item.id));
       value.cases = value.cases.filter(item => projectIds.has(item.projectId));
     }
+    if (summary) return summarizeWorkspace(value, memberships, summary);
     if (inlineAttachments) inlineRecords(value.cases);
     return {workspace: value, memberships};
+  }
+  function getRecord(user, recordId) {
+    const actor = active(user);
+    const record = workspace().cases.find(item => item.id === recordId);
+    if (!record || (!actor.admin && !roles(user, record.projectId).length)) fail(404, '业务不存在或不可访问');
+    return {record};
   }
   function attachment(user, recordId, attachmentId) {
     active(user);
@@ -455,7 +463,7 @@ export function openTeamStore(filename) {
     });
   }
   return {
-    createUser, login, session, visibleWorkspace, importApplication, updateDefinitions, setMembership, command, changePassword, resetPassword, operations, deliveryReport, updateDelivery, attachment, projectArchive, previewProjectRestore, restoreProject,
+    createUser, login, session, visibleWorkspace, getRecord, importApplication, updateDefinitions, setMembership, command, changePassword, resetPassword, operations, deliveryReport, updateDelivery, attachment, projectArchive, previewProjectRestore, restoreProject,
     checkProjectArchive: (user, bytes) => { admin(user); return checkProjectArchive(bytes, workspace()); },
     requireAdmin: user => admin(user),
     logout: token => db.prepare('DELETE FROM sessions WHERE token=?').run(digest(token)),

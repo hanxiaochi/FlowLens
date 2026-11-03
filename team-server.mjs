@@ -80,7 +80,11 @@ export function createTeamServer({database = resolve(root, '.local/team.sqlite')
       const user = store.session(token);
       if (req.method === 'GET') {
         if (path === '/api/team/me') return send(res, 200, {user});
-        if (path === '/api/team/workspace') return send(res, 200, store.visibleWorkspace(user, {inlineAttachments: req.headers['x-flowlens-client'] !== '2'}));
+        if (path === '/api/team/workspace') {
+          const summary = req.headers['x-flowlens-client'] === '3' ? Object.fromEntries(new URL(req.url, origin).searchParams) : undefined;
+          return send(res, 200, store.visibleWorkspace(user, {inlineAttachments: !['2', '3'].includes(req.headers['x-flowlens-client']), summary}));
+        }
+        if (path === '/api/team/record') return send(res, 200, store.getRecord(user, new URL(req.url, origin).searchParams.get('recordId')));
         if (path === '/api/team/project-export') {
           if (exportingProject) fail(503, '正在发送另一份项目资料包，请稍后重试');
           exportingProject = true;
@@ -135,7 +139,7 @@ export function createTeamServer({database = resolve(root, '.local/team.sqlite')
       const input = await body(req, ['/api/team/import', '/api/team/definitions'].includes(path) ? 32 * 1024 * 1024 : path === '/api/team/command' ? 15 * 1024 * 1024 : 64 * 1024);
       if (path === '/api/team/logout') { store.logout(token); return send(res, 200, {ok: true}, {'Set-Cookie': cookie('', 0)}); }
       if (path === '/api/team/password') { await store.changePassword(user, input.oldPassword, input.newPassword); return send(res, 200, {ok: true}, {'Set-Cookie': cookie('', 0)}); }
-      if (path === '/api/team/command') return send(res, 200, store.command(user, input, {inlineAttachments: req.headers['x-flowlens-client'] !== '2'}));
+      if (path === '/api/team/command') return send(res, 200, store.command(user, input, {inlineAttachments: !['2', '3'].includes(req.headers['x-flowlens-client'])}));
       if (path === '/api/team/delivery') return send(res, 200, store.updateDelivery(user, input, origin));
       if (path === '/api/team/import') return send(res, 200, store.importApplication(user, input));
       if (path === '/api/team/definitions') return send(res, 200, store.updateDefinitions(user, input));

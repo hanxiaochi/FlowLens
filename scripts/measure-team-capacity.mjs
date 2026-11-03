@@ -30,15 +30,16 @@ if (mode === 'init') {
 
 const credentials = JSON.parse(await readFile(join(directory, 'credentials.json'), 'utf8'));
 let activePhase;
-async function request(path, {data, cookie, binary = false, measure = true} = {}) {
+async function request(path, {data, cookie, binary = false, measure = true, protocol = '2'} = {}) {
   const start = performance.now();
   const response = await fetch(origin + '/api/team/' + path, {
     method: data === undefined ? 'GET' : 'POST',
-    headers: {'Content-Type': 'application/json', 'X-FlowLens-Request': '1', 'X-FlowLens-Client': '2', ...(cookie ? {Cookie: cookie} : {})},
+    headers: {'Content-Type': 'application/json', 'X-FlowLens-Request': '1', 'X-FlowLens-Client': protocol, ...(cookie ? {Cookie: cookie} : {})},
     body: data === undefined ? undefined : JSON.stringify(data), signal: AbortSignal.timeout(30000)
   });
-  const body = binary ? new Uint8Array(await response.arrayBuffer()) : await response.json();
-  if (measure) activePhase?.push({path: path.split('?')[0], status: response.status, milliseconds: performance.now() - start});
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  const body = binary ? bytes : JSON.parse(new TextDecoder().decode(bytes));
+  if (measure) activePhase?.push({path: path.split('?')[0], status: response.status, bytes: bytes.length, milliseconds: performance.now() - start});
   return {status: response.status, body, cookie: response.headers.get('set-cookie')?.split(';')[0]};
 }
 async function ok(path, options) {
@@ -71,15 +72,19 @@ if (mode === 'verify' || mode === 'verify-restart') {
 const phases = [];
 const samples = [];
 const recordCount = Number(process.env.FLOWLENS_CAPACITY_RECORDS ?? 50);
+const protocol = process.env.FLOWLENS_CAPACITY_PROTOCOL ?? '2';
+assert.ok(['2', '3'].includes(protocol));
 assert.ok(Number.isInteger(recordCount) && recordCount >= 9 && recordCount <= 500);
 const report = {version: process.env.FLOWLENS_CAPACITY_VERSION ?? 'unspecified', scriptSha256: hash(await readFile(new URL(import.meta.url))), runtime: process.version, syntheticData: true, target: 'isolated loopback HTTP', serverLimits: {cpus: 1, memoryMiB: 512}, phases, samples};
 const commits = new Map();
+report.readProtocol = protocol;
+report.requestsPerWriteCycle = protocol === '3' ? 6 : 4;
 function summary(measurements) {
   const times = measurements.map(item => item.milliseconds).sort((a, b) => a - b);
   const percentile = fraction => Math.round(times[Math.max(0, Math.ceil(times.length * fraction) - 1)] * 10) / 10;
   const statuses = {};
   for (const item of measurements) statuses[item.status] = (statuses[item.status] ?? 0) + 1;
-  return {requests: times.length, statuses, p50Ms: percentile(0.5), p95Ms: percentile(0.95), maxMs: percentile(1)};
+  return {requests: times.length, responseBytes: measurements.reduce((sum, item) => sum + item.bytes, 0), statuses, p50Ms: percentile(0.5), p95Ms: percentile(0.95), maxMs: percentile(1)};
 }
 async function phase(name, work) {
   const measurements = []; activePhase = measurements;
@@ -135,15 +140,20 @@ try {
     }
   })().catch(error => { report.samplingError = error.message; });
   async function writeCycle(worker, label) {
-    const before = await ok('workspace', {cookie: worker.cookie});
-    const record = before.workspace.cases.find(item => item.id === worker.recordId);
+    const before = await ok('workspace', {cookie: worker.cookie, protocol});
+    const record = protocol === '3'
+      ? (await ok('record?recordId=' + encodeURIComponent(worker.recordId), {cookie: worker.cookie, protocol})).record
+      : before.workspace.cases.find(item => item.id === worker.recordId);
     const input = {type: 'save', recordId: record.id, expectedRevision: record.revision, operationId: randomUUID(), values: {issue: label}};
     const saved = await ok('command', {cookie: worker.cookie, data: input});
     assert.equal(saved.record.revision, record.revision + 1);
     commits.set(record.id, (commits.get(record.id) ?? 0) + 1);
     assert.deepEqual(await ok('command', {cookie: worker.cookie, data: input}), saved);
-    const after = await ok('workspace', {cookie: worker.cookie});
-    assert.equal(after.workspace.cases.find(item => item.id === record.id).revision, saved.record.revision);
+    const after = await ok('workspace', {cookie: worker.cookie, protocol});
+    const latest = protocol === '3'
+      ? (await ok('record?recordId=' + encodeURIComponent(record.id), {cookie: worker.cookie, protocol})).record
+      : after.workspace.cases.find(item => item.id === record.id);
+    assert.equal(latest.revision, saved.record.revision);
   }
   for (const count of [1, 4, 8]) await phase('independent-records-' + count, async () => {
     await Promise.all(workers.slice(0, count).map(async (worker, workerIndex) => {
@@ -165,7 +175,7 @@ try {
   await phase('export-with-concurrent-reads', async () => {
     const [archive] = await Promise.all([
       ok('project-export?projectId=' + encodeURIComponent(projectId), {cookie: admin, binary: true}),
-      ...workers.map(worker => ok('workspace', {cookie: worker.cookie}))
+      ...workers.map(worker => ok('workspace', {cookie: worker.cookie, protocol}))
     ]);
     const files = unzipSync(archive);
     const manifest = JSON.parse(Buffer.from(files['manifest.json']));

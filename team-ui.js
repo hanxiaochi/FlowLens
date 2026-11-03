@@ -9,6 +9,8 @@ const account = document.querySelector('#account');
 const notice = document.querySelector('#notice');
 let user, workspace, memberships = [], selectedId = '', projectId = '', busy = false, pending = null;
 let deliveryDraft = null;
+let selectedRecord = null, listing = null, roleOptions = {};
+let listQuery = {page: 1, filter: 'all', search: ''};
 const node = (tag, text, className) => {
   const element = document.createElement(tag);
   if (text !== undefined) element.textContent = text;
@@ -29,7 +31,7 @@ const select = (name, options, value) => {
 };
 function say(text, error = false) { notice.textContent = text; notice.classList.toggle('error', error); }
 async function api(path, data) {
-  const response = await fetch('/api/team/' + path, {method: data === undefined ? 'GET' : 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', 'X-FlowLens-Request': '1', 'X-FlowLens-Client': '2'}, body: data === undefined ? undefined : JSON.stringify(data)});
+  const response = await fetch('/api/team/' + path, {method: data === undefined ? 'GET' : 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', 'X-FlowLens-Request': '1', 'X-FlowLens-Client': '3'}, body: data === undefined ? undefined : JSON.stringify(data)});
   const result = await response.json();
   if (!response.ok) throw Object.assign(Error(result.error || '请求失败'), {status: response.status});
   return result;
@@ -60,7 +62,7 @@ async function downloadFromServer(path, name, type = 'application/octet-stream')
     throw error;
   } finally { clearTimeout(timer); }
 }
-function current() { return workspace?.cases.find(record => record.id === selectedId); }
+function current() { return selectedRecord?.id === selectedId ? selectedRecord : undefined; }
 function roleFor(record) { return record.status === 'draft' ? record.submitter : record.template.workflow[record.step]?.role; }
 function roles() { return memberships.find(item => item.projectId === projectId)?.roles ?? []; }
 function values() { return Object.fromEntries(Array.from(content.querySelectorAll('[data-field]')).map(field => [field.dataset.field, field.value])); }
@@ -72,10 +74,15 @@ function dirty() {
 function clean() { if (dirty() || pending) { say('当前有填写内容或待确认请求，请保存、下载草稿后重新读取，或重试原请求。', true); return false; } return true; }
 function draft() { download('FlowLens-协作草稿.json', JSON.stringify(deliveryDraft ?? {recordId: selectedId, revision: current()?.revision, values: values(), note: content.querySelector('#operation-note')?.value ?? '', pending}, null, 2)); }
 window.addEventListener('beforeunload', event => { if (dirty() || pending) { event.preventDefault(); event.returnValue = ''; } });
-async function refresh() {
-  const result = await api('workspace'); workspace = result.workspace; memberships = result.memberships;
-  if (!workspace.projects.some(project => project.id === projectId)) projectId = workspace.projects[0]?.id ?? '';
-  if (!workspace.cases.some(record => record.id === selectedId && record.projectId === projectId)) selectedId = '';
+async function refresh(nextQuery = listQuery, requestedProject = projectId) {
+  const query = new URLSearchParams({...nextQuery, projectId: requestedProject});
+  const result = await api('workspace?' + query);
+  if (result.projection !== 'summary' || !result.listing) throw Error('服务端读取协议已变化，请下载草稿并刷新页面。');
+  workspace = result.workspace; memberships = result.memberships; listing = result.listing; roleOptions = result.roleOptions;
+  projectId = listing.projectId;
+  listQuery = {page: listing.page, filter: listing.filter, search: listing.search};
+  if (selectedId && selectedRecord?.projectId !== projectId) { selectedId = ''; selectedRecord = null; }
+  if (selectedId) selectedRecord = (await api('record?recordId=' + encodeURIComponent(selectedId))).record;
 }
 function accountView() {
   account.replaceChildren();
@@ -90,6 +97,7 @@ function accountView() {
   account.append(controls);
 }
 function loginView() {
+  selectedRecord = null; listing = null; roleOptions = {}; projectId = ''; listQuery = {page: 1, filter: 'all', search: ''};
   account.replaceChildren(); content.replaceChildren();
   const panel = node('div', undefined, 'panel login');
   panel.append(node('span', 'SHARED WORKSPACE', 'badge'), node('h1', '一起把业务办完'), node('p', '使用管理员分配的账号登录。你的项目和办理权限由服务器确认。', 'muted'));
@@ -108,7 +116,10 @@ function home() {
     content.append(hero); return;
   }
   const projects = select('当前项目', workspace.projects.map(project => [project.id, project.name]), projectId);
-  projects.onchange = () => { projectId = projects.value; home(); };
+  projects.onchange = () => task(async () => {
+    try { await refresh({page: 1, filter: 'all', search: ''}, projects.value); home(); }
+    finally { projects.value = projectId; }
+  });
   hero.append(label('当前项目', projects), node('p', '我的项目角色 · ' + (roles().join('、') || '只读管理查看'), 'muted'));
   const project = workspace.projects.find(item => item.id === projectId);
   const app = workspace.applications.find(item => item.id === project.appId);
@@ -127,12 +138,16 @@ function home() {
   }
   content.append(templates);
   const records = workspace.cases.filter(record => record.projectId === projectId);
-  const waiting = records.filter(record => record.status !== 'complete' && roles().includes(roleFor(record)));
-  content.append(node('h2', '我的待办 · ' + waiting.length));
-  const inbox = node('div', undefined, 'toolbar');
-  for (const record of waiting) inbox.append(button(record.title + ' · ' + (record.status === 'draft' ? '填报' : record.template.workflow[record.step].label), () => openRecord(record.id)));
-  if (!waiting.length) inbox.append(node('p', '当前没有需要你办理的单据。', 'muted'));
-  content.append(inbox, node('h2', '项目业务记录 · ' + records.length));
+  const filters = node('div', undefined, 'toolbar');
+  for (const [value, text] of [['all', '全部业务 · ' + listing.total], ['pending', '我的待办 · ' + listing.pending]]) {
+    filters.append(button(text, async () => { await refresh({...listQuery, filter: value, page: 1}); home(); }, listQuery.filter === value ? 'primary' : undefined));
+  }
+  const search = input('按编号或填写内容搜索'); search.placeholder = '输入编号或填写内容'; search.maxLength = 200; search.value = listQuery.search;
+  const searchRecords = async () => { await refresh({...listQuery, search: search.value.trim(), page: 1}); home(); };
+  search.onkeydown = event => { if (event.key === 'Enter') { event.preventDefault(); task(searchRecords); } };
+  filters.append(search, button('搜索', searchRecords), button('清除筛选', async () => { await refresh({page: 1, filter: 'all', search: ''}); home(); }));
+  content.append(filters, node('h2', '符合当前筛选 · ' + listing.matched + ' 份'));
+  if (!records.length) content.append(node('p', '当前筛选下没有业务记录。', 'muted'));
   const list = node('div', undefined, 'cards');
   for (const record of records) {
     const card = node('article', undefined, 'card');
@@ -140,9 +155,17 @@ function home() {
     list.append(card);
   }
   content.append(list);
+  const pagination = node('div', undefined, 'toolbar');
+  const previous = button('上一页', async () => { await refresh({...listQuery, page: listing.page - 1}); home(); }); previous.disabled = listing.page <= 1;
+  const next = button('下一页', async () => { await refresh({...listQuery, page: listing.page + 1}); home(); }); next.disabled = listing.page >= listing.pages;
+  pagination.append(previous, node('span', '第 ' + listing.page + ' / ' + listing.pages + ' 页 · 每页 ' + listing.pageSize + ' 份'), next); content.append(pagination);
   const retry = button('重试原请求', sendPending); retry.id = 'retry-request'; retry.hidden = !pending; content.append(retry);
 }
-function openRecord(id) { if (!clean()) return; selectedId = id; recordView(); }
+async function openRecord(id) {
+  if (!clean()) return;
+  const result = await api('record?recordId=' + encodeURIComponent(id));
+  selectedRecord = result.record; selectedId = result.record.id; projectId = result.record.projectId; recordView();
+}
 async function command(data) {
   pending = {...data, operationId: crypto.randomUUID()};
   await sendPending();
@@ -150,7 +173,7 @@ async function command(data) {
 async function sendPending() {
   try {
     const result = await api('command', pending);
-    pending = null; selectedId = result.record.id;
+    pending = null; selectedId = result.record.id; selectedRecord = result.record;
     await refresh(); recordView(); say('已保存到服务器。');
   } catch (error) {
     if (error.status) pending = null;
@@ -207,7 +230,7 @@ function recordView() {
   const record = current(); if (!record) { home(); return; }
   const role = roleFor(record); const editable = roles().includes(role) && record.status !== 'complete';
   const toolbar = node('div', undefined, 'toolbar');
-  toolbar.append(button('返回项目', () => { if (clean()) home(); }), button('下载当前草稿', draft), button('下载草稿并重新读取', async () => { draft(); pending = null; await refresh(); recordView(); say('已重新读取服务器版本，请核对已下载草稿中的内容。'); }), button('下载打印版', () => { if (clean()) download('FlowLens-业务打印.html', printableForm(record, {shared: true}), 'text/html'); }));
+  toolbar.append(button('返回项目', async () => { if (clean()) { selectedId = ''; await refresh(); home(); } }), button('下载当前草稿', draft), button('下载草稿并重新读取', async () => { draft(); pending = null; await refresh(); recordView(); say('已重新读取服务器版本，请核对已下载草稿中的内容。'); }), button('下载打印版', () => { if (clean()) download('FlowLens-业务打印.html', printableForm(record, {shared: true}), 'text/html'); }));
   content.append(toolbar, node('h1', record.title), node('p', record.project + ' · 修订 ' + record.revision + ' · ' + (record.status === 'complete' ? '已归档' : '当前办理角色 ' + role), 'muted'));
   const layout = node('div', undefined, 'record-layout'); const form = node('article', undefined, 'panel record-form');
   renderBlocks(form, record.template.blocks, record, role);
@@ -411,7 +434,7 @@ async function submitProjectRestore(file, saved) {
     throw error;
   }
   localStorage.removeItem(key);
-  projectId = result.projectId; await refresh(); home();
+  await refresh({page: 1, filter: 'all', search: ''}, result.projectId); home();
   say('已恢复到 ' + result.projectName + '。请核对单据、附件与成员安排。');
   content.prepend(button('下载本次恢复报告', () => download('FlowLens-项目恢复.json', JSON.stringify(result, null, 2))));
 }
@@ -502,7 +525,7 @@ async function adminView() {
   const checkboxes = node('div', undefined, 'stack');
   function showRoles() {
     checkboxes.replaceChildren(); const selected = workspace.projects.find(item => item.id === project.value); if (!selected) return;
-    const available = projectRoles(workspace, selected.id);
+    const available = roleOptions[selected.id] ?? projectRoles(workspace, selected.id);
     const saved = data.memberships.find(item => item.userId === member.value && item.projectId === project.value)?.roles ?? [];
     for (const role of available) { const check = input(role, 'checkbox'); check.value = role; check.checked = saved.includes(role); const row = label(role, check); row.className = 'check'; checkboxes.append(row); }
   }
