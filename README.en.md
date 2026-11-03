@@ -32,6 +32,8 @@ A Windows LAN pilot has passed five-account HTTPS workflow, restore, and browser
 
 An owner-hosted Tencent Cloud pilot has since passed public-IP HTTPS, five-role workflow, concurrent-write conflict, and database restoration checks. Daily backups are enabled. Real-business approval and longer-term operation remain under validation. [Cloud acceptance and screenshot](docs/cloud-pilot-2026-11-03.md)
 
+Main is developing operations and delivery acceptance features. Admin capacity reporting, verified backup records, and restore markers have passed 72 cross-platform tests and local browser checks. Delivery check records are next, followed by a staged release and cloud upgrade. [Plan and pending decisions](docs/delivery-plan.md)
+
 Import an application package into the self-hosted team service, create accounts, and assign project roles. A supervisor can issue an instruction, a contractor can reply using a separate account, and a records officer can archive it. The server stores forms, attachments, and the account behind each operation.
 
 ![Shared team workspace](docs/images/team-workspace-1.4.jpg)
