@@ -78,7 +78,7 @@ assert.ok(Number.isInteger(recordCount) && recordCount >= 9 && recordCount <= 50
 const report = {version: process.env.FLOWLENS_CAPACITY_VERSION ?? 'unspecified', scriptSha256: hash(await readFile(new URL(import.meta.url))), runtime: process.version, syntheticData: true, target: 'isolated loopback HTTP', serverLimits: {cpus: 1, memoryMiB: 512}, phases, samples};
 const commits = new Map();
 report.readProtocol = protocol;
-report.requestsPerWriteCycle = protocol === '3' ? 6 : 4;
+report.requestsPerWriteCycle = 4;
 function summary(measurements) {
   const times = measurements.map(item => item.milliseconds).sort((a, b) => a - b);
   const percentile = fraction => Math.round(times[Math.max(0, Math.ceil(times.length * fraction) - 1)] * 10) / 10;
@@ -140,18 +140,19 @@ try {
     }
   })().catch(error => { report.samplingError = error.message; });
   async function writeCycle(worker, label) {
-    const before = await ok('workspace', {cookie: worker.cookie, protocol});
+    const readPath = protocol === '3' ? 'workspace?recordId=' + encodeURIComponent(worker.recordId) : 'workspace';
+    const before = await ok(readPath, {cookie: worker.cookie, protocol});
     const record = protocol === '3'
-      ? (await ok('record?recordId=' + encodeURIComponent(worker.recordId), {cookie: worker.cookie, protocol})).record
+      ? before.record
       : before.workspace.cases.find(item => item.id === worker.recordId);
     const input = {type: 'save', recordId: record.id, expectedRevision: record.revision, operationId: randomUUID(), values: {issue: label}};
     const saved = await ok('command', {cookie: worker.cookie, data: input});
     assert.equal(saved.record.revision, record.revision + 1);
     commits.set(record.id, (commits.get(record.id) ?? 0) + 1);
     assert.deepEqual(await ok('command', {cookie: worker.cookie, data: input}), saved);
-    const after = await ok('workspace', {cookie: worker.cookie, protocol});
+    const after = await ok(readPath, {cookie: worker.cookie, protocol});
     const latest = protocol === '3'
-      ? (await ok('record?recordId=' + encodeURIComponent(record.id), {cookie: worker.cookie, protocol})).record
+      ? after.record
       : after.workspace.cases.find(item => item.id === record.id);
     assert.equal(latest.revision, saved.record.revision);
   }

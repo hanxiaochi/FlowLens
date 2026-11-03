@@ -5,13 +5,15 @@ function templateSummary(template) {
     workflow: template.workflow.map(({id, label, role, kind}) => ({id, label, role, kind}))};
 }
 
-export function summarizeWorkspace(value, memberships, {projectId = '', page = '1', filter = 'all', search = ''} = {}) {
+export function summarizeWorkspace(value, memberships, {projectId = '', page = '1', filter = 'all', search = '', recordId = ''} = {}) {
   const requestedPage = Number(page);
   if (!Number.isSafeInteger(requestedPage) || requestedPage < 1 || !['all', 'pending'].includes(filter) || typeof search !== 'string' || search.length > 200) throw Error('清单分页或筛选参数无效');
   const selectedProject = value.projects.find(item => item.id === projectId) ?? value.projects[0];
   const selectedId = selectedProject?.id ?? '';
   const roles = memberships.find(item => item.projectId === selectedId)?.roles ?? [];
   const records = value.cases.filter(item => item.projectId === selectedId);
+  const record = recordId ? records.find(item => item.id === recordId) : undefined;
+  if (recordId && !record) throw Object.assign(Error('业务不存在或不可访问'), {status: 404});
   const pending = record => record.status !== 'complete' && roles.includes(record.status === 'draft' ? record.submitter : record.template.workflow[record.step]?.role);
   const needle = search.trim().toLowerCase();
   const matches = records.filter(record => (filter === 'all' || pending(record)) && (!needle || [record.id, record.title, ...Object.values(record.values)].some(value => String(value).toLowerCase().includes(needle))));
@@ -21,6 +23,7 @@ export function summarizeWorkspace(value, memberships, {projectId = '', page = '
   const roleOptions = Object.fromEntries(value.projects.map(project => [project.id, projectRoles(value, project.id)]));
   return {
     projection: 'summary',
+    record,
     workspace: {
       format: value.format, version: value.version, storageRevision: value.storageRevision,
       projects: value.projects,

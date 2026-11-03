@@ -75,14 +75,15 @@ function clean() { if (dirty() || pending) { say('当前有填写内容或待确
 function draft() { download('FlowLens-协作草稿.json', JSON.stringify(deliveryDraft ?? {recordId: selectedId, revision: current()?.revision, values: values(), note: content.querySelector('#operation-note')?.value ?? '', pending}, null, 2)); }
 window.addEventListener('beforeunload', event => { if (dirty() || pending) { event.preventDefault(); event.returnValue = ''; } });
 async function refresh(nextQuery = listQuery, requestedProject = projectId) {
-  const query = new URLSearchParams({...nextQuery, projectId: requestedProject});
+  const recordId = selectedRecord?.projectId === requestedProject ? selectedId : '';
+  const query = new URLSearchParams({...nextQuery, projectId: requestedProject, recordId});
   const result = await api('workspace?' + query);
   if (result.projection !== 'summary' || !result.listing) throw Error('服务端读取协议已变化，请下载草稿并刷新页面。');
   workspace = result.workspace; memberships = result.memberships; listing = result.listing; roleOptions = result.roleOptions;
   projectId = listing.projectId;
   listQuery = {page: listing.page, filter: listing.filter, search: listing.search};
   if (selectedId && selectedRecord?.projectId !== projectId) { selectedId = ''; selectedRecord = null; }
-  if (selectedId) selectedRecord = (await api('record?recordId=' + encodeURIComponent(selectedId))).record;
+  if (selectedId) selectedRecord = result.record;
 }
 function accountView() {
   account.replaceChildren();

@@ -44,6 +44,11 @@ test('summary pages omit heavy fields, retain whole-project counts and roles, an
     const search = store.visibleWorkspace(member, {summary: {search: 'last-needle'}});
     assert.equal(search.workspace.cases[0].id, 'page-record-60'); assert.equal(search.listing.matched, 1);
     assert.equal(store.getRecord(member, 'page-record-60').record.values.issue, 'LAST-NEEDLE');
+    const selected = store.visibleWorkspace(member, {summary: {page: '1', filter: 'pending', recordId: 'page-record-60'}});
+    assert.equal(selected.record.id, 'page-record-60');
+    assert.equal(selected.record.values.issue, 'LAST-NEEDLE');
+    assert.equal(selected.workspace.cases.some(item => item.id === selected.record.id), false);
+    assert.throws(() => store.visibleWorkspace(member, {summary: {recordId: 'private-record'}}), error => error.status === 404);
     assert.throws(() => store.getRecord(member, 'private-record'), /不可访问/);
     const legacy = store.visibleWorkspace(member, {inlineAttachments: false});
     assert.equal(legacy.workspace.cases.length, 61); assert.ok(legacy.workspace.cases[0].template.blocks);
@@ -79,6 +84,9 @@ test('HTTP protocol 3 lists summaries and reads complete records while protocol 
     assert.equal(summary.body.workspace.cases[0].values, undefined);
     for (const version of [undefined, '2']) assert.ok((await request('/api/team/workspace', version)).body.workspace.cases[0].values);
     const detail = await request('/api/team/record?recordId=' + id, '3'); assert.equal(detail.status, 200); assert.ok(detail.body.record.template.blocks);
+    const combined = await request('/api/team/workspace?search=no-match&recordId=' + id, '3');
+    assert.equal(combined.status, 200); assert.equal(combined.body.listing.matched, 0);
+    assert.deepEqual(combined.body.record, detail.body.record);
     assert.equal((await request('/api/team/record?recordId=' + id, '3', undefined, false)).status, 401);
     const changed = await request('/api/team/command', '3', {type: 'save', recordId: id, expectedRevision: detail.body.record.revision, operationId: crypto.randomUUID(), values: {issue: 'After summary read'}});
     assert.equal(changed.status, 200); assert.equal(changed.body.record.values.issue, 'After summary read');
