@@ -168,17 +168,25 @@ async function openRecord(id) {
   selectedRecord = result.record; selectedId = result.record.id; projectId = result.record.projectId; recordView();
 }
 async function command(data) {
+  if (pending) throw Error('上一项业务操作的结果尚未确认，请先点击“重试原请求”，或下载草稿并重新读取。');
   pending = {...data, operationId: crypto.randomUUID()};
   await sendPending();
 }
 async function sendPending() {
+  if (!pending) throw Error('当前没有待确认的业务操作。');
   try {
     const result = await api('command', pending);
     pending = null; selectedId = result.record.id; selectedRecord = result.record;
     await refresh(); recordView(); say('已保存到服务器。');
   } catch (error) {
+    if (!pending) {
+      recordView();
+      throw Error('业务已保存，但清单刷新失败。请稍后重新读取。' + error.message);
+    }
     if (error.status) pending = null;
+    const form = content.querySelector('.record-form'); if (form) form.inert = !!pending;
     const retry = content.querySelector('#retry-request'); if (retry) retry.hidden = !pending;
+    if (pending) throw Error('尚未收到业务结果确认，请点击“重试原请求”。');
     throw error;
   }
 }
