@@ -1,0 +1,472 @@
+{
+  "measuredVersion": "1.9.0",
+  "serverLimits": {
+    "cpus": 1,
+    "memoryMiB": 512
+  },
+  "driverLimits": {
+    "cpus": 0.5,
+    "memoryMiB": 512
+  },
+  "serverPeakRssKiB": 293576,
+  "serverOomKilled": false,
+  "driverOomKilled": false,
+  "driverExitCode": 0,
+  "measurements": {
+    "version": "1.9.0",
+    "scriptSha256": "ea02effd1a0b2b8921ec1ec7f37f67e0452ce8797f21a1d9a686c52f85029d01",
+    "runtime": "v24.22.2",
+    "syntheticData": true,
+    "target": "isolated loopback HTTP",
+    "serverLimits": {
+      "cpus": 1,
+      "memoryMiB": 512
+    },
+    "phases": [
+      {
+        "name": "independent-records-1",
+        "elapsedMs": 12198,
+        "requests": 80,
+        "statuses": {
+          "200": 80
+        },
+        "p50Ms": 177.8,
+        "p95Ms": 221.4,
+        "maxMs": 291.6,
+        "byRoute": {
+          "workspace": {
+            "requests": 40,
+            "statuses": {
+              "200": 40
+            },
+            "p50Ms": 196.7,
+            "p95Ms": 258.5,
+            "maxMs": 291.6
+          },
+          "command": {
+            "requests": 40,
+            "statuses": {
+              "200": 40
+            },
+            "p50Ms": 107.7,
+            "p95Ms": 214.9,
+            "maxMs": 223.4
+          }
+        }
+      },
+      {
+        "name": "independent-records-4",
+        "elapsedMs": 36587,
+        "requests": 320,
+        "statuses": {
+          "200": 320
+        },
+        "p50Ms": 425.6,
+        "p95Ms": 699.4,
+        "maxMs": 885.8,
+        "byRoute": {
+          "workspace": {
+            "requests": 160,
+            "statuses": {
+              "200": 160
+            },
+            "p50Ms": 503.7,
+            "p95Ms": 757.9,
+            "maxMs": 885.8
+          },
+          "command": {
+            "requests": 160,
+            "statuses": {
+              "200": 160
+            },
+            "p50Ms": 392.9,
+            "p95Ms": 569.9,
+            "maxMs": 606.2
+          }
+        }
+      },
+      {
+        "name": "independent-records-8",
+        "elapsedMs": 73899,
+        "requests": 640,
+        "statuses": {
+          "200": 640
+        },
+        "p50Ms": 805.8,
+        "p95Ms": 1561.5,
+        "maxMs": 3026.4,
+        "byRoute": {
+          "workspace": {
+            "requests": 320,
+            "statuses": {
+              "200": 320
+            },
+            "p50Ms": 869.5,
+            "p95Ms": 1615.5,
+            "maxMs": 3026.4
+          },
+          "command": {
+            "requests": 320,
+            "statuses": {
+              "200": 320
+            },
+            "p50Ms": 741.3,
+            "p95Ms": 1444.6,
+            "maxMs": 2407.6
+          }
+        }
+      },
+      {
+        "name": "same-revision-conflict-and-retry",
+        "elapsedMs": 1404,
+        "requests": 17,
+        "statuses": {
+          "200": 10,
+          "409": 7
+        },
+        "p50Ms": 389.5,
+        "p95Ms": 652.1,
+        "maxMs": 652.1,
+        "byRoute": {
+          "workspace": {
+            "requests": 1,
+            "statuses": {
+              "200": 1
+            },
+            "p50Ms": 123.4,
+            "p95Ms": 123.4,
+            "maxMs": 123.4
+          },
+          "command": {
+            "requests": 16,
+            "statuses": {
+              "200": 9,
+              "409": 7
+            },
+            "p50Ms": 389.5,
+            "p95Ms": 652.1,
+            "maxMs": 652.1
+          }
+        }
+      },
+      {
+        "name": "export-with-concurrent-reads",
+        "elapsedMs": 3511,
+        "requests": 9,
+        "statuses": {
+          "200": 9
+        },
+        "p50Ms": 1735.4,
+        "p95Ms": 2925.2,
+        "maxMs": 2925.2,
+        "byRoute": {
+          "workspace": {
+            "requests": 8,
+            "statuses": {
+              "200": 8
+            },
+            "p50Ms": 1619.3,
+            "p95Ms": 2502.5,
+            "maxMs": 2502.5
+          },
+          "project-export": {
+            "requests": 1,
+            "statuses": {
+              "200": 1
+            },
+            "p50Ms": 2925.2,
+            "p95Ms": 2925.2,
+            "maxMs": 2925.2
+          }
+        }
+      },
+      {
+        "name": "steady-four-clients-120s",
+        "elapsedMs": 121246,
+        "requests": 964,
+        "statuses": {
+          "200": 964
+        },
+        "p50Ms": 406.8,
+        "p95Ms": 688,
+        "maxMs": 1288.3,
+        "byRoute": {
+          "workspace": {
+            "requests": 482,
+            "statuses": {
+              "200": 482
+            },
+            "p50Ms": 474,
+            "p95Ms": 737.2,
+            "maxMs": 1288.3
+          },
+          "command": {
+            "requests": 482,
+            "statuses": {
+              "200": 482
+            },
+            "p50Ms": 371.1,
+            "p95Ms": 591.3,
+            "maxMs": 803
+          }
+        }
+      }
+    ],
+    "samples": [
+      {
+        "at": "2026-11-03T18:39:36.412Z",
+        "memoryBytes": 209850368,
+        "workspaceBytes": 2555913
+      },
+      {
+        "at": "2026-11-03T18:39:41.826Z",
+        "memoryBytes": 209989632,
+        "workspaceBytes": 2561669
+      },
+      {
+        "at": "2026-11-03T18:39:47.061Z",
+        "memoryBytes": 205545472,
+        "workspaceBytes": 2566802
+      },
+      {
+        "at": "2026-11-03T18:39:52.480Z",
+        "memoryBytes": 209993728,
+        "workspaceBytes": 2573697
+      },
+      {
+        "at": "2026-11-03T18:39:57.971Z",
+        "memoryBytes": 210915328,
+        "workspaceBytes": 2581740
+      },
+      {
+        "at": "2026-11-03T18:40:03.445Z",
+        "memoryBytes": 206417920,
+        "workspaceBytes": 2589148
+      },
+      {
+        "at": "2026-11-03T18:40:09.052Z",
+        "memoryBytes": 215461888,
+        "workspaceBytes": 2596577
+      },
+      {
+        "at": "2026-11-03T18:40:14.375Z",
+        "memoryBytes": 212389888,
+        "workspaceBytes": 2604111
+      },
+      {
+        "at": "2026-11-03T18:40:20.050Z",
+        "memoryBytes": 212381696,
+        "workspaceBytes": 2612117
+      },
+      {
+        "at": "2026-11-03T18:40:25.950Z",
+        "memoryBytes": 212488192,
+        "workspaceBytes": 2618921
+      },
+      {
+        "at": "2026-11-03T18:40:31.600Z",
+        "memoryBytes": 219332608,
+        "workspaceBytes": 2627139
+      },
+      {
+        "at": "2026-11-03T18:40:36.983Z",
+        "memoryBytes": 219475968,
+        "workspaceBytes": 2634207
+      },
+      {
+        "at": "2026-11-03T18:40:42.550Z",
+        "memoryBytes": 219512832,
+        "workspaceBytes": 2640635
+      },
+      {
+        "at": "2026-11-03T18:40:48.954Z",
+        "memoryBytes": 229732352,
+        "workspaceBytes": 2648809
+      },
+      {
+        "at": "2026-11-03T18:40:54.351Z",
+        "memoryBytes": 229810176,
+        "workspaceBytes": 2655791
+      },
+      {
+        "at": "2026-11-03T18:41:00.053Z",
+        "memoryBytes": 229974016,
+        "workspaceBytes": 2662867
+      },
+      {
+        "at": "2026-11-03T18:41:05.750Z",
+        "memoryBytes": 220803072,
+        "workspaceBytes": 2669879
+      },
+      {
+        "at": "2026-11-03T18:41:12.054Z",
+        "memoryBytes": 216035328,
+        "workspaceBytes": 2678187
+      },
+      {
+        "at": "2026-11-03T18:41:17.850Z",
+        "memoryBytes": 220770304,
+        "workspaceBytes": 2685683
+      },
+      {
+        "at": "2026-11-03T18:41:23.455Z",
+        "memoryBytes": 216145920,
+        "workspaceBytes": 2692877
+      },
+      {
+        "at": "2026-11-03T18:41:29.854Z",
+        "memoryBytes": 225648640,
+        "workspaceBytes": 2701100
+      },
+      {
+        "at": "2026-11-03T18:41:36.456Z",
+        "memoryBytes": 225841152,
+        "workspaceBytes": 2709408
+      },
+      {
+        "at": "2026-11-03T18:41:42.669Z",
+        "memoryBytes": 263229440,
+        "workspaceBytes": 2712905
+      },
+      {
+        "at": "2026-11-03T18:41:47.750Z",
+        "memoryBytes": 235130880,
+        "workspaceBytes": 2717799
+      },
+      {
+        "at": "2026-11-03T18:41:52.958Z",
+        "memoryBytes": 235159552,
+        "workspaceBytes": 2723959
+      },
+      {
+        "at": "2026-11-03T18:41:58.482Z",
+        "memoryBytes": 235278336,
+        "workspaceBytes": 2731300
+      },
+      {
+        "at": "2026-11-03T18:42:04.003Z",
+        "memoryBytes": 226525184,
+        "workspaceBytes": 2738647
+      },
+      {
+        "at": "2026-11-03T18:42:09.463Z",
+        "memoryBytes": 235954176,
+        "workspaceBytes": 2744752
+      },
+      {
+        "at": "2026-11-03T18:42:14.857Z",
+        "memoryBytes": 236232704,
+        "workspaceBytes": 2750942
+      },
+      {
+        "at": "2026-11-03T18:42:20.352Z",
+        "memoryBytes": 226680832,
+        "workspaceBytes": 2758319
+      },
+      {
+        "at": "2026-11-03T18:42:25.561Z",
+        "memoryBytes": 231759872,
+        "workspaceBytes": 2765060
+      },
+      {
+        "at": "2026-11-03T18:42:30.967Z",
+        "memoryBytes": 226619392,
+        "workspaceBytes": 2772437
+      },
+      {
+        "at": "2026-11-03T18:42:36.360Z",
+        "memoryBytes": 231825408,
+        "workspaceBytes": 2778542
+      },
+      {
+        "at": "2026-11-03T18:42:41.952Z",
+        "memoryBytes": 241700864,
+        "workspaceBytes": 2785368
+      },
+      {
+        "at": "2026-11-03T18:42:47.162Z",
+        "memoryBytes": 237776896,
+        "workspaceBytes": 2791473
+      },
+      {
+        "at": "2026-11-03T18:42:52.550Z",
+        "memoryBytes": 227979264,
+        "workspaceBytes": 2798214
+      },
+      {
+        "at": "2026-11-03T18:42:57.744Z",
+        "memoryBytes": 227897344,
+        "workspaceBytes": 2804958
+      },
+      {
+        "at": "2026-11-03T18:43:03.467Z",
+        "memoryBytes": 228036608,
+        "workspaceBytes": 2811701
+      },
+      {
+        "at": "2026-11-03T18:43:09.166Z",
+        "memoryBytes": 228061184,
+        "workspaceBytes": 2818445
+      },
+      {
+        "at": "2026-11-03T18:43:14.768Z",
+        "memoryBytes": 238018560,
+        "workspaceBytes": 2824637
+      },
+      {
+        "at": "2026-11-03T18:43:20.179Z",
+        "memoryBytes": 233017344,
+        "workspaceBytes": 2831381
+      },
+      {
+        "at": "2026-11-03T18:43:25.473Z",
+        "memoryBytes": 233971712,
+        "workspaceBytes": 2838125
+      },
+      {
+        "at": "2026-11-03T18:43:30.764Z",
+        "memoryBytes": 243728384,
+        "workspaceBytes": 2844317
+      },
+      {
+        "at": "2026-11-03T18:43:36.061Z",
+        "memoryBytes": 243703808,
+        "workspaceBytes": 2851061
+      },
+      {
+        "at": "2026-11-03T18:43:41.753Z",
+        "memoryBytes": 243814400,
+        "workspaceBytes": 2857176
+      }
+    ],
+    "initialRecords": 500,
+    "initialAttachmentBytes": 25165824,
+    "exportBytes": 32786308,
+    "steadyWrites": 241,
+    "committedWrites": 502,
+    "finalWorkspaceBytes": 2860914,
+    "finalStateVerified": true,
+    "passed": true,
+    "driverPeakRssKiB": 300912
+  },
+  "restartVerification": {
+    "passed": true,
+    "records": 500,
+    "oldSessionStatus": 200,
+    "workspaceMatched": true,
+    "allAttachmentHashesMatched": true
+  },
+  "restoreVerification": {
+    "passed": true,
+    "records": 500,
+    "oldSessionStatus": 401,
+    "workspaceMatched": true,
+    "allAttachmentHashesMatched": true
+  },
+  "publicServiceAfter": {
+    "publicHealthStatus": 200,
+    "running": true,
+    "restartCount": 0,
+    "health": "healthy"
+  }
+}

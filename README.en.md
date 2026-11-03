@@ -38,6 +38,8 @@ After checking an archive, name the new project, assign members, review the plan
 
 ![Restored project](docs/images/project-restore-1.9.png)
 
+An isolated capacity baseline now covers 50 and 500 fictional records with 24 MiB of attachments. State consistency, retries, restart and restore checks pass. Full-workspace refreshes show higher latency at 500 records, so the next step separates list data from record details. [Environment, measurements and scope (Chinese)](docs/capacity-baseline-2026-11-04.md)
+
 ## 1.8 checks a handoff before you accept it
 
 Admins can upload a project ZIP to verify its files, attachment references and record relationships, then review existing identifiers, template differences and roles that need confirmation. Reports can be downloaded. Windows and Ubuntu each pass 87 tests, and container acceptance passes. This release provides validation and restore preflight. Archive restoration remains in development. [Scope and acceptance notes (Chinese)](docs/release-1.8.0.md)
