@@ -1,11 +1,13 @@
 import {canEdit} from './forms-model.mjs';
 import {renderDetailField} from './forms-detail-ui.js';
 import {printableForm} from './forms-print.mjs';
+import {deliveryStatusLabels} from './team-delivery.mjs';
 
 const content = document.querySelector('#content');
 const account = document.querySelector('#account');
 const notice = document.querySelector('#notice');
 let user, workspace, memberships = [], selectedId = '', projectId = '', busy = false, pending = null;
+let deliveryDraft = null;
 const node = (tag, text, className) => {
   const element = document.createElement(tag);
   if (text !== undefined) element.textContent = text;
@@ -46,11 +48,12 @@ function roleFor(record) { return record.status === 'draft' ? record.submitter :
 function roles() { return memberships.find(item => item.projectId === projectId)?.roles ?? []; }
 function values() { return Object.fromEntries(Array.from(content.querySelectorAll('[data-field]')).map(field => [field.dataset.field, field.value])); }
 function dirty() {
+  if (deliveryDraft) return true;
   const record = current();
   return record && (Object.entries(values()).some(([key, value]) => value !== (record.values[key] ?? '')) || !!content.querySelector('#operation-note')?.value);
 }
 function clean() { if (dirty() || pending) { say('当前有填写内容或待确认请求，请保存、下载草稿后重新读取，或重试原请求。', true); return false; } return true; }
-function draft() { download('FlowLens-协作草稿.json', JSON.stringify({recordId: selectedId, revision: current()?.revision, values: values(), note: content.querySelector('#operation-note')?.value ?? '', pending}, null, 2)); }
+function draft() { download('FlowLens-协作草稿.json', JSON.stringify(deliveryDraft ?? {recordId: selectedId, revision: current()?.revision, values: values(), note: content.querySelector('#operation-note')?.value ?? '', pending}, null, 2)); }
 window.addEventListener('beforeunload', event => { if (dirty() || pending) { event.preventDefault(); event.returnValue = ''; } });
 async function refresh() {
   const result = await api('workspace'); workspace = result.workspace; memberships = result.memberships;
@@ -63,8 +66,9 @@ function accountView() {
   account.append(node('span', user.name + ' · ' + user.username));
   const controls = node('div', undefined, 'toolbar');
   controls.append(button('我的项目', async () => { if (!clean()) return; selectedId = ''; await refresh(); home(); }), button('修改密码', () => { if (clean()) passwordView(); }), button('退出登录', async () => { if (!clean()) return; await api('logout', {}); user = null; workspace = null; selectedId = ''; loginView(); }));
-  controls.append(button('下载草稿并重新登录', () => { draft(); user = null; selectedId = ''; pending = null; loginView(); }));
+  controls.append(button('下载草稿并重新登录', () => { draft(); user = null; selectedId = ''; pending = null; deliveryDraft = null; loginView(); }));
   if (user.admin) controls.append(button('管理后台', async () => { if (clean()) await adminView(); }), button('运行状态', async () => { if (clean()) await operationsView(); }));
+  if (user.admin) controls.append(button('交付检查', async () => { if (clean()) await deliveryView(); }));
   account.append(controls);
 }
 function loginView() {
@@ -229,6 +233,50 @@ function passwordView() {
   const oldPassword = input('原密码', 'password'), newPassword = input('新密码', 'password'); newPassword.minLength = 12;
   panel.append(label('原密码', oldPassword), label('新密码，至少 12 位', newPassword), button('保存密码并重新登录', async () => { await api('password', {oldPassword: oldPassword.value, newPassword: newPassword.value}); user = null; selectedId = ''; loginView(); say('密码已修改，所有会话已退出，请重新登录。'); }, 'primary'));
   content.append(panel);
+}
+async function deliveryView(scope = 'instance', checkId) {
+  const report = await api('delivery?scope=' + encodeURIComponent(scope));
+  await refresh(); selectedId = ''; content.replaceChildren(); accountView();
+  const scopes = select('检查范围', [['instance', '当前部署实例'], ...workspace.projects.map(project => ['project:' + project.id, project.name])], scope);
+  const selected = report.checks.find(item => item.id === checkId) ?? report.checks[0];
+  const checks = select('检查项目', report.checks.map(item => [item.id, item.title + ' · ' + deliveryStatusLabels[item.effectiveStatus]]), selected.id);
+  scopes.onchange = () => task(async () => { if (clean()) await deliveryView(scopes.value); else scopes.value = scope; });
+  checks.onchange = () => task(async () => { if (clean()) await deliveryView(scope, checks.value); else checks.value = selected.id; });
+  content.append(node('h1', '交付检查记录'), node('p', '管理员记录人工确认结果与依据。系统展示记录人、修订和历史，业务负责人仍需对实际结论负责。', 'muted'));
+  const selectors = node('div', undefined, 'toolbar'); selectors.append(label('检查范围', scopes), label('检查项目', checks)); content.append(selectors);
+  const panel = node('section', undefined, 'panel stack');
+  panel.append(node('h2', selected.title), node('p', selected.guidance), node('span', deliveryStatusLabels[selected.effectiveStatus], 'badge'));
+  if (selected.effectiveStatus === 'needs-review') panel.append(node('p', '部署恢复、地址或项目配置已变化，请重新核验后保存。原确认依据仍保留在下方。', 'status-warning'));
+  const status = select('确认状态', Object.entries(deliveryStatusLabels).filter(([id]) => id !== 'needs-review'), selected.effectiveStatus === 'needs-review' ? 'pending' : selected.status);
+  const reviewer = input('确认人'); reviewer.maxLength = 100; reviewer.value = selected.reviewer;
+  const evidence = node('textarea'); evidence.setAttribute('aria-label', '确认依据'); evidence.maxLength = 4000; evidence.value = selected.evidence;
+  const payload = () => ({scope, checkId: selected.id, expectedRevision: selected.revision, expectedContextFingerprint: report.contextFingerprint, expectedRestoreMarker: report.restoreMarker, status: status.value, reviewer: reviewer.value, evidence: evidence.value});
+  for (const field of [status, reviewer, evidence]) field.oninput = () => { deliveryDraft = payload(); };
+  panel.append(label('确认状态', status), label('确认人', reviewer), label('依据、结果或待解决事项', evidence));
+  let submission;
+  const save = button('保存检查记录', async () => {
+    submission ??= {...payload(), operationId: crypto.randomUUID()};
+    deliveryDraft = submission;
+    try {
+      await api('delivery', submission); submission = null; deliveryDraft = null;
+      await deliveryView(scope, selected.id); say('交付检查已保存，记录人和依据已进入历史。');
+    } catch (error) {
+      if (error.status) submission = null;
+      for (const field of [status, reviewer, evidence]) field.disabled = !!submission;
+      save.textContent = submission ? '重试原检查请求' : '保存检查记录';
+      throw error;
+    }
+  }, 'primary');
+  panel.append(save, button('下载交付草稿并重新读取', async () => { download('FlowLens-交付草稿.json', JSON.stringify(deliveryDraft ?? payload(), null, 2)); await deliveryView(scope, selected.id); deliveryDraft = null; }));
+  if (selected.actor) panel.append(node('p', '记录人 ' + selected.actor.name + ' · 修订 ' + selected.revision + ' · ' + new Date(selected.updatedAt).toLocaleString(), 'muted'));
+  content.append(panel, button('下载已保存的交付报告', () => download('FlowLens-交付检查.json', JSON.stringify(report, null, 2))));
+  const history = node('details', undefined, 'panel'); history.append(node('summary', '查看此范围最近 ' + report.history.length + ' 条记录'));
+  for (const entry of report.history) {
+    const event = node('section', undefined, 'event');
+    event.append(node('strong', (report.checks.find(item => item.id === entry.checkId)?.title ?? entry.checkId) + ' · ' + deliveryStatusLabels[entry.status]), node('p', '确认人 ' + entry.reviewer + ' · 记录人 ' + entry.actor.name), node('p', entry.evidence), node('p', new Date(entry.updatedAt).toLocaleString() + ' · 修订 ' + entry.revision));
+    history.append(event);
+  }
+  content.append(history); say('已读取交付检查记录。未填写项目保持待确认。');
 }
 async function operationsView() {
   const status = await api('operations');

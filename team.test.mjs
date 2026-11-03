@@ -13,6 +13,51 @@ import {DatabaseSync} from 'node:sqlite';
 
 const password = 'test-only-long-password';
 
+test('delivery confirmations preserve attribution, reject stale writes and require review after configuration changes', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'flowlens-delivery-'));
+  const filename = join(directory, 'team.sqlite');
+  const store = openTeamStore(filename);
+  const inspection = new DatabaseSync(filename);
+  try {
+    const admin = await store.createUser(null, {username: 'admin', name: 'Actual admin', password});
+    const member = await store.createUser(admin, {username: 'member', name: 'Member', password});
+    store.importApplication(admin, applicationDemo());
+    const scope = 'project:demo-project';
+    const report = store.deliveryReport(admin, scope);
+    assert.ok(report.checks.every(item => item.effectiveStatus === 'pending' && item.revision === 0));
+    assert.throws(() => store.deliveryReport(member, scope), error => error.status === 403);
+    assert.throws(() => store.deliveryReport(admin, 'project:missing'), error => error.status === 404);
+    const request = {scope, checkId: 'forms', expectedRevision: 0, expectedContextFingerprint: report.contextFingerprint, expectedRestoreMarker: report.restoreMarker, status: 'passed', reviewer: 'Fictional reviewer', evidence: 'Fictional table verified in test', operationId: crypto.randomUUID(), actor: {name: 'Forged'}};
+    assert.throws(() => store.updateDelivery(member, request), error => error.status === 403);
+    assert.throws(() => store.updateDelivery(admin, {...request, reviewer: ''}), /确认人和依据/);
+    assert.throws(() => store.updateDelivery(admin, {...request, checkId: 'unknown'}), /检查项/);
+    const result = store.updateDelivery(admin, request);
+    assert.equal(result.record.actor.name, 'Actual admin');
+    assert.deepEqual(store.updateDelivery(admin, request), result);
+    assert.equal(store.deliveryReport(admin, scope).history.length, 1);
+    assert.throws(() => store.updateDelivery(admin, {...request, operationId: crypto.randomUUID()}), error => error.status === 409);
+    assert.throws(() => store.updateDelivery(admin, {...request, evidence: 'Changed payload'}), error => error.status === 409);
+    store.setMembership(admin, {userId: member.id, projectId: 'demo-project', roles: ['专业监理']});
+    assert.equal(store.deliveryReport(admin, scope).checks[0].effectiveStatus, 'needs-review');
+    assert.throws(() => store.updateDelivery(admin, {...request, expectedRevision: 1, operationId: crypto.randomUUID()}), /配置已变化/);
+    const next = {...request, expectedRevision: 1, expectedContextFingerprint: store.deliveryReport(admin, scope).contextFingerprint, operationId: crypto.randomUUID()};
+    inspection.exec("CREATE TRIGGER fail_delivery BEFORE INSERT ON requests BEGIN SELECT RAISE(ABORT, 'delivery transaction failure'); END");
+    assert.throws(() => store.updateDelivery(admin, next), /delivery transaction failure/);
+    assert.equal(store.deliveryReport(admin, scope).history.length, 1);
+    assert.equal(store.deliveryReport(admin, scope).checks[0].revision, 1);
+    inspection.exec('DROP TRIGGER fail_delivery');
+    store.updateDelivery(admin, next);
+    assert.equal(store.deliveryReport(admin, scope).checks[0].effectiveStatus, 'passed');
+    const definitions = applicationDemo(); definitions.templates[0].version++; definitions.templates[0].title += ' v2';
+    store.updateDefinitions(admin, definitions);
+    assert.equal(store.deliveryReport(admin, scope).checks[0].effectiveStatus, 'needs-review');
+    const instance = {...request, scope: 'instance', checkId: 'https', expectedContextFingerprint: store.deliveryReport(admin, 'instance', 'https://first.example').contextFingerprint, operationId: crypto.randomUUID()};
+    store.updateDelivery(admin, instance, 'https://first.example');
+    assert.equal(store.deliveryReport(admin, 'instance', 'https://first.example').checks[0].effectiveStatus, 'passed');
+    assert.equal(store.deliveryReport(admin, 'instance', 'https://second.example').checks[0].effectiveStatus, 'needs-review');
+  } finally { inspection.close(); store.close(); await rm(directory, {recursive: true, force: true}); }
+});
+
 test('operations status is admin-only and backup evidence matches a verified snapshot', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'flowlens-operations-'));
   const filename = join(directory, 'team.sqlite');

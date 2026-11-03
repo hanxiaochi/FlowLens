@@ -5,7 +5,7 @@ import {resolve, extname} from 'node:path';
 import {openTeamStore, fail} from './team-store.mjs';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
-const staticFiles = new Set(['team.html', 'team-ui.js', 'team.css', 'forms.css', 'forms-detail-ui.js', 'forms-schema.mjs', 'forms-model.mjs', 'forms-rules.mjs', 'forms-print.mjs']);
+const staticFiles = new Set(['team.html', 'team-ui.js', 'team-delivery.mjs', 'team.css', 'forms.css', 'forms-detail-ui.js', 'forms-schema.mjs', 'forms-model.mjs', 'forms-rules.mjs', 'forms-print.mjs']);
 const cookieName = 'flowlens_session';
 export function createTeamServer({database = resolve(root, '.local/team.sqlite'), origin = 'http://127.0.0.1:4186'} = {}) {
   const canonical = new URL(origin);
@@ -80,12 +80,14 @@ export function createTeamServer({database = resolve(root, '.local/team.sqlite')
         if (path === '/api/team/workspace') return send(res, 200, store.visibleWorkspace(user));
         if (path === '/api/team/admin') return send(res, 200, {users: store.users(user), memberships: store.memberships(user), audit: store.audit(user)});
         if (path === '/api/team/operations') return send(res, 200, {...store.operations(user), uptimeSeconds: Math.floor(process.uptime()), memoryBytes: process.memoryUsage().rss});
+        if (path === '/api/team/delivery') return send(res, 200, store.deliveryReport(user, new URL(req.url, origin).searchParams.get('scope') || 'instance', origin));
         fail(404, '接口不存在');
       }
       const input = await body(req, ['/api/team/import', '/api/team/definitions'].includes(path) ? 32 * 1024 * 1024 : path === '/api/team/command' ? 15 * 1024 * 1024 : 64 * 1024);
       if (path === '/api/team/logout') { store.logout(token); return send(res, 200, {ok: true}, {'Set-Cookie': cookie('', 0)}); }
       if (path === '/api/team/password') { await store.changePassword(user, input.oldPassword, input.newPassword); return send(res, 200, {ok: true}, {'Set-Cookie': cookie('', 0)}); }
       if (path === '/api/team/command') return send(res, 200, store.command(user, input));
+      if (path === '/api/team/delivery') return send(res, 200, store.updateDelivery(user, input, origin));
       if (path === '/api/team/import') return send(res, 200, store.importApplication(user, input));
       if (path === '/api/team/definitions') return send(res, 200, store.updateDefinitions(user, input));
       if (path === '/api/team/users') return send(res, 201, await store.createUser(user, input));

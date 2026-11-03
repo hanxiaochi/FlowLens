@@ -1,6 +1,6 @@
 FROM node:24-bookworm-slim
 WORKDIR /app
-COPY --chown=node:node team-server.mjs team-store.mjs team-ui.js team.html team.css forms-store.mjs forms-model.mjs forms-schema.mjs forms-rules.mjs forms-print.mjs forms.css forms-detail-ui.js apps-model.mjs ./
+COPY --chown=node:node team-server.mjs team-store.mjs team-ui.js team-delivery.mjs team.html team.css forms-store.mjs forms-model.mjs forms-schema.mjs forms-rules.mjs forms-print.mjs forms.css forms-detail-ui.js apps-model.mjs ./
 COPY --chown=node:node scripts/team-admin.mjs ./scripts/team-admin.mjs
 RUN mkdir /data && chown node:node /data
 USER node

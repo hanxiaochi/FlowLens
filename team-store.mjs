@@ -6,6 +6,7 @@ import {dirname} from 'node:path';
 import {emptyWorkspace, upgradeWorkspace} from './forms-store.mjs';
 import {startProjectCase} from './apps-model.mjs';
 import {applyOperation, attachFile} from './forms-model.mjs';
+import {deliveryChecks} from './team-delivery.mjs';
 
 const scrypt = promisify(derive);
 export const digest = value => createHash('sha256').update(value).digest('hex');
@@ -35,6 +36,8 @@ export function openTeamStore(filename) {
     CREATE TABLE IF NOT EXISTS requests (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, fingerprint TEXT NOT NULL, result TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS audit (sequence INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, user_id TEXT NOT NULL, action TEXT NOT NULL, target TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS maintenance (key TEXT PRIMARY KEY, data TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS delivery_checks (scope TEXT NOT NULL, check_id TEXT NOT NULL, revision INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY(scope,check_id));
+    CREATE TABLE IF NOT EXISTS delivery_history (sequence INTEGER PRIMARY KEY AUTOINCREMENT, scope TEXT NOT NULL, check_id TEXT NOT NULL, data TEXT NOT NULL);
     PRAGMA user_version=1;`);
   db.prepare('INSERT OR IGNORE INTO workspace VALUES (1,0,?)').run(JSON.stringify(emptyWorkspace()));
   function transaction(fn) {
@@ -61,6 +64,63 @@ export function openTeamStore(filename) {
     return row;
   }
   function admin(user) { if (!active(user).admin) fail(403, '需要管理员权限'); }
+  function deliveryContext(scope, origin) {
+    if (scope === 'instance') return {kind: 'instance', name: '当前部署实例', fingerprint: digest(origin)};
+    if (typeof scope !== 'string' || !scope.startsWith('project:')) fail(400, '交付检查范围无效');
+    const current = workspace();
+    const project = current.projects.find(item => 'project:' + item.id === scope);
+    if (!project) fail(404, '项目不存在');
+    const app = current.applications.find(item => item.id === project.appId);
+    const templates = current.templates.filter(item => app.templateIds.includes(item.id)).sort((a, b) => a.id.localeCompare(b.id));
+    const members = db.prepare('SELECT members.user_id,roles,users.disabled FROM members JOIN users ON members.user_id=users.id WHERE project_id=? ORDER BY members.user_id').all(project.id);
+    return {kind: 'project', name: project.name, fingerprint: digest(JSON.stringify({project, app, templates, members}))};
+  }
+  function restoreMarker() { return db.prepare("SELECT data FROM maintenance WHERE key='lastRestore'").get()?.data ?? null; }
+  function deliveryReport(user, scope = 'instance', origin = '') {
+    admin(user);
+    const context = deliveryContext(scope, origin);
+    const saved = db.prepare('SELECT check_id,data FROM delivery_checks WHERE scope=?').all(scope);
+    const marker = restoreMarker();
+    return {
+      scope, scopeName: context.name, contextFingerprint: context.fingerprint, restoreMarker: marker, generatedAt: new Date().toISOString(),
+      checks: deliveryChecks[context.kind].map(definition => {
+        const data = saved.find(item => item.check_id === definition.id)?.data;
+        const record = data ? JSON.parse(data) : {revision: 0, status: 'pending', reviewer: '', evidence: '', actor: null, updatedAt: null};
+        const changed = record.revision > 0 && (record.contextFingerprint !== context.fingerprint || record.restoreMarker !== marker);
+        return {...definition, ...record, effectiveStatus: changed && record.status === 'passed' ? 'needs-review' : record.status};
+      }),
+      history: db.prepare('SELECT data FROM delivery_history WHERE scope=? ORDER BY sequence DESC LIMIT 200').all(scope).map(row => JSON.parse(row.data))
+    };
+  }
+  function updateDelivery(user, input, origin = '') {
+    const actor = active(user); admin(user);
+    if (!input || typeof input.operationId !== 'string' || !/^[\w-]{8,100}$/.test(input.operationId)) fail(400, '需要有效操作编号');
+    if (!Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0) fail(400, '需要有效修订号');
+    if (!['pending', 'passed', 'blocked'].includes(input.status)) fail(400, '检查状态无效');
+    if (typeof input.reviewer !== 'string' || input.reviewer.length > 100 || typeof input.evidence !== 'string' || input.evidence.length > 4000) fail(400, '确认人最多 100 字，依据最多 4000 字');
+    if (input.status !== 'pending' && (!input.reviewer.trim() || !input.evidence.trim())) fail(400, '请填写确认人和依据');
+    const fingerprint = digest('delivery:' + JSON.stringify(input));
+    return transaction(() => {
+      const context = deliveryContext(input.scope, origin);
+      if (!deliveryChecks[context.kind].some(item => item.id === input.checkId)) fail(400, '检查项无效');
+      const prior = db.prepare('SELECT * FROM requests WHERE id=?').get(input.operationId);
+      if (prior) {
+        if (prior.user_id !== user.id || prior.fingerprint !== fingerprint) fail(409, '操作编号已用于不同请求');
+        return JSON.parse(prior.result);
+      }
+      if (input.expectedContextFingerprint !== context.fingerprint || input.expectedRestoreMarker !== restoreMarker()) fail(409, '部署或项目配置已变化，请下载草稿并重新读取后核验');
+      const old = db.prepare('SELECT revision FROM delivery_checks WHERE scope=? AND check_id=?').get(input.scope, input.checkId);
+      if ((old?.revision ?? 0) !== input.expectedRevision) fail(409, '检查记录已被其他人更新，请下载草稿并重新读取');
+      const record = {checkId: input.checkId, revision: input.expectedRevision + 1, status: input.status, reviewer: input.reviewer.trim(), evidence: input.evidence.trim(), actor: {id: actor.id, name: actor.name}, updatedAt: new Date().toISOString(), contextFingerprint: context.fingerprint, restoreMarker: restoreMarker()};
+      const serialized = JSON.stringify(record);
+      db.prepare('INSERT INTO delivery_checks VALUES(?,?,?,?) ON CONFLICT(scope,check_id) DO UPDATE SET revision=excluded.revision,data=excluded.data').run(input.scope, input.checkId, record.revision, serialized);
+      db.prepare('INSERT INTO delivery_history(scope,check_id,data) VALUES(?,?,?)').run(input.scope, input.checkId, serialized);
+      audit(user, 'delivery.update', input.scope + '/' + input.checkId);
+      const result = {record};
+      db.prepare('INSERT INTO requests VALUES(?,?,?,?)').run(input.operationId, user.id, fingerprint, JSON.stringify(result));
+      return result;
+    });
+  }
   function operations(user) {
     admin(user);
     const current = workspace();
@@ -296,7 +356,7 @@ export function openTeamStore(filename) {
     });
   }
   return {
-    createUser, login, session, visibleWorkspace, importApplication, updateDefinitions, setMembership, command, changePassword, resetPassword, operations,
+    createUser, login, session, visibleWorkspace, importApplication, updateDefinitions, setMembership, command, changePassword, resetPassword, operations, deliveryReport, updateDelivery,
     logout: token => db.prepare('DELETE FROM sessions WHERE token=?').run(digest(token)),
     users: user => { admin(user); return db.prepare('SELECT * FROM users ORDER BY username').all().map(publicUser); },
     memberships: user => { admin(user); return db.prepare('SELECT user_id AS userId,project_id AS projectId,roles FROM members').all().map(row => ({...row, roles: JSON.parse(row.roles)})); },

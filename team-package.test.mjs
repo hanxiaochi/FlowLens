@@ -43,6 +43,8 @@ test('standalone distribution starts without dependencies and its CLI restores d
     });
     assert.equal(health, 200);
     const session = await store.login('admin', password);
+    const delivery = store.deliveryReport(session.user);
+    store.updateDelivery(session.user, {scope: 'instance', checkId: 'https', expectedRevision: 0, expectedContextFingerprint: delivery.contextFingerprint, expectedRestoreMarker: delivery.restoreMarker, operationId: crypto.randomUUID(), status: 'passed', reviewer: 'Package tester', evidence: 'Fictional package acceptance'});
     store.importApplication(session.user, applicationDemo());
     store.setMembership(session.user, {userId: session.user.id, projectId: 'demo-project', roles: ['专业监理']});
     const record = store.visibleWorkspace(session.user).workspace.cases[0];
@@ -68,6 +70,10 @@ test('standalone distribution starts without dependencies and its CLI restores d
     const newSession = await store.login('admin', password);
     assert.equal(store.operations(newSession.user).lastBackup, null);
     assert.ok(store.operations(newSession.user).lastRestore.completedAt);
+    const restoredDelivery = store.deliveryReport(newSession.user);
+    assert.equal(restoredDelivery.checks[0].effectiveStatus, 'needs-review');
+    assert.equal(restoredDelivery.checks[0].reviewer, 'Package tester');
+    assert.equal(restoredDelivery.history.length, 1);
     assert.deepEqual(store.visibleWorkspace(newSession.user), before);
     const restoredAttachment = store.visibleWorkspace(newSession.user).workspace.cases[0].attachments.at(-1);
     assert.equal(restoredAttachment.name, '验收附件.bin');
