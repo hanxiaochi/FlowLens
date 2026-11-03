@@ -1,3 +1,4 @@
+import {projectRoles} from './apps-model.mjs';
 import {canEdit} from './forms-model.mjs';
 import {renderDetailField} from './forms-detail-ui.js';
 import {printableForm} from './forms-print.mjs';
@@ -493,9 +494,7 @@ async function adminView() {
   const checkboxes = node('div', undefined, 'stack');
   function showRoles() {
     checkboxes.replaceChildren(); const selected = workspace.projects.find(item => item.id === project.value); if (!selected) return;
-    const app = workspace.applications.find(item => item.id === selected.appId);
-    const templates = [...workspace.templates.filter(item => app.templateIds.includes(item.id)), ...workspace.cases.filter(item => item.projectId === selected.id).map(item => item.template)];
-    const available = [...new Set(templates.flatMap(item => [item.submitterRole || '填报人', ...item.workflow.map(stage => stage.role)]))];
+    const available = projectRoles(workspace, selected.id);
     const saved = data.memberships.find(item => item.userId === member.value && item.projectId === project.value)?.roles ?? [];
     for (const role of available) { const check = input(role, 'checkbox'); check.value = role; check.checked = saved.includes(role); const row = label(role, check); row.className = 'check'; checkboxes.append(row); }
   }

@@ -1,3 +1,4 @@
+import {projectRoles} from './apps-model.mjs';
 import {isDeepStrictEqual} from 'node:util';
 import {createHash} from 'node:crypto';
 import {crc32, inflateRawSync} from 'node:zlib';
@@ -127,7 +128,7 @@ export function inspectProjectArchive(input, current) {
     checkedAt: new Date().toISOString(), archiveSha256: hash(bytes), integrityPassed: true,
     project: {id: project.project.id, name: project.project.name}, records: workspace.cases.length,
     attachments: attachmentCount, files: files.size, expandedBytes: entries.reduce((sum, entry) => sum + entry.original, 0),
-    targetRevision: current.storageRevision, conflicts, requiredRoles: [...new Set([...workspace.templates, ...workspace.cases.map(record => record.template)].flatMap(template => [template.submitterRole || '填报人', ...template.workflow.map(stage => stage.role)]))], historicalActors: [...historicalActors.values()],
+    targetRevision: current.storageRevision, conflicts, requiredRoles: projectRoles(workspace, project.project.id), historicalActors: [...historicalActors.values()],
     nextStep: conflicts.length ? '存在已有编号，请先核对差异与恢复目标。' : '编号未冲突，仍需确认表式、当前成员权限和历史账号对应。',
     notice: '文件检查通过。清单由资料包提供，业务真实性需交接双方确认。请先预览恢复方案，再确认目标项目和成员安排。'
   };

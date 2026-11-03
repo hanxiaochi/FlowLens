@@ -17,6 +17,15 @@ function application(workspace, appId) {
   return app;
 }
 
+export function projectRoles(workspace, projectId) {
+  const project = workspace.projects.find(item => item.id === projectId);
+  if (!project) throw Error('项目不存在');
+  const app = application(workspace, project.appId);
+  const records = workspace.cases.filter(item => item.projectId === projectId);
+  const templates = [...workspace.templates.filter(item => app.templateIds.includes(item.id)), ...records.map(item => item.template)];
+  return [...new Set([...templates.flatMap(item => [item.submitterRole || '填报人', ...item.workflow.map(stage => stage.role)]), ...records.map(item => item.submitter)])];
+}
+
 export function validateRelation(app, relation, templates) {
   const source = templates.find(item => item.id === relation.from);
   const target = templates.find(item => item.id === relation.to);

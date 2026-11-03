@@ -12,7 +12,7 @@ import {applicationDemo} from './apps-demo.mjs';
 import {createCase} from './forms-model.mjs';
 
 const password = 'restore-test-password';
-async function setup() {
+async function setup({legacySubmitter = false} = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'flowlens-restore-'));
   const store = openTeamStore(join(directory, 'target.sqlite'));
   const admin = await store.createUser(null, {username: 'admin', name: 'Target admin', password});
@@ -33,7 +33,7 @@ async function setup() {
     record.provenance = []; record.status = 'complete'; record.step = template.workflow.length;
     app.cases.push(record); previous = record;
   }
-  const draft = createCase(app.templates[0], {project: app.projects[0].name, role: app.templates[0].submitterRole});
+  const draft = createCase(app.templates[0], {project: app.projects[0].name, role: legacySubmitter ? '历史填报人' : app.templates[0].submitterRole});
   draft.appId = app.applications[0].id; draft.projectId = app.projects[0].id; app.cases.push(draft);
   source.importApplication(sourceAdmin, app);
   // Imported source history normally loses actors. Simulate a saved source event for provenance checks.
@@ -43,7 +43,7 @@ async function setup() {
   db.prepare('UPDATE workspace SET data=? WHERE id=1').run(JSON.stringify(value)); db.close();
   const archive = source.projectArchive(sourceAdmin, app.projects[0].id); source.close();
   const checked = store.checkProjectArchive(admin, archive);
-  const options = {operationId: crypto.randomUUID(), projectName: '恢复后的青禾项目', archiveSha256: checked.archiveSha256, expectedRevision: checked.targetRevision, memberships: [{userId: member.id, roles: ['专业监理']}]};
+  const options = {operationId: crypto.randomUUID(), projectName: '恢复后的青禾项目', archiveSha256: checked.archiveSha256, expectedRevision: checked.targetRevision, memberships: [{userId: member.id, roles: legacySubmitter ? ['专业监理', '历史填报人'] : ['专业监理']}]};
   return {directory, store, admin, member, archive, options, app};
 }
 
@@ -127,5 +127,19 @@ test('late restoration failure rolls back new blobs, membership, workspace, audi
     db.exec('DROP TRIGGER fail_restore');
     assert.equal(store.restoreProject(admin, archive, confirmed).restored, true);
     db.close();
+  } finally { store.close(); await rm(directory, {recursive: true, force: true}); }
+});
+
+
+test('restoration and membership editing retain historical submitters that differ from template defaults', async () => {
+  const {directory, store, admin, member, archive, options} = await setup({legacySubmitter: true});
+  try {
+    assert.ok(store.checkProjectArchive(admin, archive).requiredRoles.includes('历史填报人'));
+    const plan = store.previewProjectRestore(admin, archive, options);
+    const result = store.restoreProject(admin, archive, {...options, confirmed: true, planFingerprint: plan.planFingerprint});
+    store.setMembership(admin, {userId: member.id, projectId: result.projectId, roles: ['历史填报人']});
+    const draft = store.visibleWorkspace(member, {inlineAttachments: false}).workspace.cases.find(record => record.status === 'draft');
+    const saved = store.command(member, {type: 'save', recordId: draft.id, expectedRevision: draft.revision, operationId: crypto.randomUUID(), values: {issue: '旧角色继续办理'}}, {inlineAttachments: false});
+    assert.equal(saved.record.events.at(-1).role, '历史填报人');
   } finally { store.close(); await rm(directory, {recursive: true, force: true}); }
 });
