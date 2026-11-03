@@ -312,7 +312,7 @@ async function operationsView() {
   if (status.lastRestore) recovery.append(node('p', '最近恢复完成于 ' + date(status.lastRestore.completedAt) + '。恢复后的旧登录会话已清除。'));
   if (status.lastAttachmentMigration) {
     const migration = status.lastAttachmentMigration;
-    recovery.append(node('p', '附件存储迁移完成于 ' + date(migration.completedAt)), node('p', '迁移前快照 ' + migration.backupFile));
+    recovery.append(node('p', '附件存储迁移完成于 ' + date(migration.completedAt)), node('p', '迁移前快照 ' + migration.backupFile, 'status-checksum'));
     if (!migration.compacted) recovery.append(node('p', '数据库空闲页尚待维护整理，迁移后的数据已保存。', 'status-warning'));
   }
   recovery.append(node('p', '该记录覆盖备份生成及完整性检查。备份文件是否仍在、定时任务是否成功以及异地副本情况，需要维护人员另行核对。', 'muted'));
