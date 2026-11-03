@@ -1,6 +1,6 @@
 # FlowLens
 
-**简体中文** · [English](README.en.md) · [v1.12.1 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.12.1)
+**简体中文** · [English](README.en.md) · [v1.13.0 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.13.0)
 
 **[直接打开在线 Demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -17,6 +17,14 @@
 [反馈卡住的步骤](https://github.com/hanxiaochi/FlowLens/issues/new?template=trial-feedback.yml) · [分享介绍与试用计划](docs/launch-kit.md)
 
 [需求研究与下一阶段缺口](docs/fde-product-audit-2026-11-02.md) · [业务访谈与交付验收工作单](docs/fde-discovery-worksheet.md)
+
+## 1.13 清单里显示什么，由你决定
+
+在表式中点“配置清单摘要”，按顺序选择最多三个字段。编号、期限、检查要求可以直接出现在业务卡片上。本地台账、项目卡片与协作清单使用同一套配置，应用导出后也能带到团队服务。已有单据保留创建时的表式快照。
+
+116 项回归及跨平台 CI 通过，配置、导出导入、存储失败与窄屏已有浏览器验收，云端已升级。[本版说明](docs/release-1.13.0.md)
+
+![新旧单据摘要](docs/images/configured-summary-1.13.png)
 
 ## 1.12.1 修正首次新建
 
@@ -101,7 +109,7 @@ Windows、Ubuntu 各通过 93 项回归，容器和云端五账号复验通过�
 
 服务端会检查角色、阶段和修订号。重复请求复用原结果，过期页面不能覆盖新内容。新增了账号停用、密码修改、审计记录、表式版本发布，以及 SQLite 备份恢复工具。
 
-下载发布页中的 `FlowLens-1.12.1-team.zip`，安装 Node.js 24 LTS，按部署指南初始化管理员后运行 `npm start`。协作包附带所需运行文件，可以离线启动。[部署与恢复指南](docs/team-deployment.md) · [本版验收](docs/release-1.12.1.md) · [持续交付计划](docs/delivery-plan.md)
+下载发布页中的 `FlowLens-1.13.0-team.zip`，安装 Node.js 24 LTS，按部署指南初始化管理员后运行 `npm start`。协作包附带所需运行文件，可以离线启动。[部署与恢复指南](docs/team-deployment.md) · [本版验收](docs/release-1.13.0.md) · [持续交付计划](docs/delivery-plan.md)
 
 公开 Demo 提供浏览器本地体验。团队服务需自托管，适合先用脱敏资料做小团队试运行。云端技术验收已有记录，真实客户流程、持续容量和维护交接仍需继续验证。
 
@@ -228,9 +236,3 @@ npm test
 3D 部分使用 [Three.js](https://threejs.org/)；SQL 验证测试使用 [PGlite](https://pglite.dev/)。依赖及许可说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 发现问题或有想法，欢迎开 [Issue](https://github.com/hanxiaochi/FlowLens/issues)。最好附上复现步骤和脱敏后的项目文件，别把密钥、真实客户数据一起贴上来。
-
-## 开发进展
-
-主分支正在开发 1.13，正式发行和云端仍为 1.12.1。表式设计中已加入“配置清单摘要”，可按顺序选择最多三个字段；本地业务台账、项目卡片和协作清单共用摘要逻辑。已有单据继续使用自己的表式快照。
-
-116 项本地回归通过。浏览器已走通配置、新建、填写、导出应用及协作端读取，核对了重复字段拒绝和移除填写区后的配置清理。完整发行与云端验收继续进行。

@@ -1,6 +1,6 @@
 # FlowLens
 
-[简体中文](README.md) · **English** · [v1.12.1 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.12.1)
+[简体中文](README.md) · **English** · [v1.13.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.13.0)
 
 **[Try the live demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -21,6 +21,14 @@ No installation or API key needed. Start with a fictional supervision applicatio
 ![Application and project workspace](docs/images/application-workspace-1.3.jpg)
 
 [1.3 release notes and acceptance](docs/release-1.3.0.md)
+
+## 1.13 choose what each record card shows
+
+Open a form template’s summary settings and choose up to three fields in display order. Record numbers, deadlines and issue descriptions can appear directly on the card. Local records, project cards and the team list share the configuration, which travels with exported applications. Existing records retain the template snapshot they were created with.
+
+All 116 tests and cross-platform CI pass. Browser acceptance covers configuration, application handoff, failed saves and narrow screens. The cloud app has been upgraded. [Release notes (Chinese)](docs/release-1.13.0.md)
+
+![Configured and historical summaries](docs/images/configured-summary-1.13.png)
 
 ## 1.12.1 fixes fresh creation
 
@@ -105,7 +113,7 @@ Import an application package into the self-hosted team service, create accounts
 
 The server checks project roles, workflow stages, and record revisions. Repeated requests reuse their result. This release also adds account deactivation, password changes, audit history, versioned template publication, and SQLite backup and restore tools.
 
-Download `FlowLens-1.12.1-team.zip`, install Node.js 24 LTS, initialize the administrator, then run `npm start`. The team runtime bundles its required files and needs no npm install. See the [deployment guide (Chinese)](docs/team-deployment.md) and [release acceptance](docs/release-1.12.1.md).
+Download `FlowLens-1.13.0-team.zip`, install Node.js 24 LTS, initialize the administrator, then run `npm start`. The team runtime bundles its required files and needs no npm install. See the [deployment guide (Chinese)](docs/team-deployment.md) and [release acceptance](docs/release-1.13.0.md).
 
 The public demo runs locally in your browser. The shared service is self-hosted and intended for a small-team pilot. Cloud technical acceptance is recorded. Customer workflows, sustained capacity, and maintenance handover still need validation.
 
@@ -235,9 +243,3 @@ Version 1.0 includes 46 automated tests covering model validation, permissions, 
 The 3D scene uses [Three.js](https://threejs.org/). SQL validation tests use [PGlite](https://pglite.dev/). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for dependency and license information. The project itself has not yet specified a license.
 
 Found a problem or have an idea? Open an [issue](https://github.com/hanxiaochi/FlowLens/issues). Reproduction steps and a sanitized project file help. Please leave out API keys and real customer data.
-
-## Development status
-
-Version 1.13 is in development on main. The published release and cloud app remain on 1.12.1. Form designers can choose up to three summary fields in display order. Local records, project cards and the team list share the same summary logic. Existing records retain their saved template snapshots.
-
-All 116 local tests pass. Browser acceptance covers configuration, creating and filling a record, exporting the application and reading its summaries in the team app. Duplicate selections are rejected, and removing a field updates its summary configuration. Release and cloud acceptance are still in progress.
