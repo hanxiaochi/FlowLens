@@ -1,6 +1,6 @@
 # FlowLens
 
-[简体中文](README.md) · **English** · [v1.12.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.12.0)
+[简体中文](README.md) · **English** · [v1.12.1 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.12.1)
 
 **[Try the live demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -21,6 +21,10 @@ No installation or API key needed. Start with a fictional supervision applicatio
 ![Application and project workspace](docs/images/application-workspace-1.3.jpg)
 
 [1.3 release notes and acceptance](docs/release-1.3.0.md)
+
+## 1.12.1 fixes fresh creation
+
+Fixes the Create action before any record has been opened, and local draft saving for blank records at revision zero. All 113 local tests pass. [Patch notes (Chinese)](docs/release-1.12.1.md)
 
 ## 1.12 keeps work in progress
 
@@ -101,7 +105,7 @@ Import an application package into the self-hosted team service, create accounts
 
 The server checks project roles, workflow stages, and record revisions. Repeated requests reuse their result. This release also adds account deactivation, password changes, audit history, versioned template publication, and SQLite backup and restore tools.
 
-Download `FlowLens-1.12.0-team.zip`, install Node.js 24 LTS, initialize the administrator, then run `npm start`. The team runtime bundles its required files and needs no npm install. See the [deployment guide (Chinese)](docs/team-deployment.md) and [release acceptance](docs/release-1.12.0.md).
+Download `FlowLens-1.12.1-team.zip`, install Node.js 24 LTS, initialize the administrator, then run `npm start`. The team runtime bundles its required files and needs no npm install. See the [deployment guide (Chinese)](docs/team-deployment.md) and [release acceptance](docs/release-1.12.1.md).
 
 The public demo runs locally in your browser. The shared service is self-hosted and intended for a small-team pilot. Cloud technical acceptance is recorded. Customer workflows, sustained capacity, and maintenance handover still need validation.
 

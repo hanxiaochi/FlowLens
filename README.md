@@ -1,6 +1,6 @@
 # FlowLens
 
-**简体中文** · [English](README.en.md) · [v1.12.0 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.12.0)
+**简体中文** · [English](README.en.md) · [v1.12.1 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.12.1)
 
 **[直接打开在线 Demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -17,6 +17,10 @@
 [反馈卡住的步骤](https://github.com/hanxiaochi/FlowLens/issues/new?template=trial-feedback.yml) · [分享介绍与试用计划](docs/launch-kit.md)
 
 [需求研究与下一阶段缺口](docs/fde-product-audit-2026-11-02.md) · [业务访谈与交付验收工作单](docs/fde-discovery-worksheet.md)
+
+## 1.12.1 修正首次新建
+
+修正了首次进入页面的新建按钮错误，以及无预填字段单据在修订 0 时不能保存本机草稿的问题。113 项本地回归通过。[修订说明](docs/release-1.12.1.md)
 
 ## 1.12 写到一半的内容，也能找回
 
@@ -97,7 +101,7 @@ Windows、Ubuntu 各通过 93 项回归，容器和云端五账号复验通过�
 
 服务端会检查角色、阶段和修订号。重复请求复用原结果，过期页面不能覆盖新内容。新增了账号停用、密码修改、审计记录、表式版本发布，以及 SQLite 备份恢复工具。
 
-下载发布页中的 `FlowLens-1.12.0-team.zip`，安装 Node.js 24 LTS，按部署指南初始化管理员后运行 `npm start`。协作包附带所需运行文件，可以离线启动。[部署与恢复指南](docs/team-deployment.md) · [本版验收](docs/release-1.12.0.md) · [持续交付计划](docs/delivery-plan.md)
+下载发布页中的 `FlowLens-1.12.1-team.zip`，安装 Node.js 24 LTS，按部署指南初始化管理员后运行 `npm start`。协作包附带所需运行文件，可以离线启动。[部署与恢复指南](docs/team-deployment.md) · [本版验收](docs/release-1.12.1.md) · [持续交付计划](docs/delivery-plan.md)
 
 公开 Demo 提供浏览器本地体验。团队服务需自托管，适合先用脱敏资料做小团队试运行。云端技术验收已有记录，真实客户流程、持续容量和维护交接仍需继续验证。
 
