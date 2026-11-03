@@ -80,6 +80,12 @@ test('HTTP protocol 3 lists summaries and reads complete records while protocol 
       });
     }
     const summary = await request('/api/team/workspace', '3'); assert.equal(summary.status, 200);
+    const identity = await request('/api/team/me', '3');
+    assert.deepEqual(identity.body.context, store.serviceContext(member));
+    const login = await request('/api/team/login', '3', {username: 'member', password}, false);
+    assert.equal(login.status, 200); assert.deepEqual(login.body.context, identity.body.context);
+    const guarded = await request('/api/team/command', '3', {type: 'create', projectId: 'demo-project', templateId: summary.body.workspace.templates[0].id, operationId: crypto.randomUUID(), expectedInstanceId: 'old-instance'});
+    assert.equal(guarded.status, 409);
     const id = summary.body.workspace.cases[0].id;
     assert.equal(summary.body.workspace.cases[0].values, undefined);
     for (const version of [undefined, '2']) assert.ok((await request('/api/team/workspace', version)).body.workspace.cases[0].values);

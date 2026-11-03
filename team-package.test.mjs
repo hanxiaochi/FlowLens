@@ -44,6 +44,7 @@ test('standalone distribution starts without dependencies and its CLI restores d
     });
     assert.equal(health, 200);
     const session = await store.login('admin', password);
+    const originalContext = store.serviceContext(session.user);
     const delivery = store.deliveryReport(session.user);
     store.updateDelivery(session.user, {scope: 'instance', checkId: 'https', expectedRevision: 0, expectedContextFingerprint: delivery.contextFingerprint, expectedRestoreMarker: delivery.restoreMarker, operationId: crypto.randomUUID(), status: 'passed', reviewer: 'Package tester', evidence: 'Fictional package acceptance'});
     store.importApplication(session.user, applicationDemo());
@@ -79,6 +80,8 @@ test('standalone distribution starts without dependencies and its CLI restores d
     store = openTeamStore(restoredDatabase);
     assert.throws(() => store.session(session.token), /过期/);
     const newSession = await store.login('admin', password);
+    assert.notEqual(store.serviceContext(newSession.user).instanceId, originalContext.instanceId);
+    assert.throws(() => store.command(newSession.user, {type: 'create', projectId: 'demo-project', templateId: record.template.id, operationId: crypto.randomUUID(), expectedInstanceId: originalContext.instanceId}), error => error.status === 409);
     assert.equal(store.operations(newSession.user).lastBackup, null);
     assert.ok(store.operations(newSession.user).lastRestore.completedAt);
     const restoredDelivery = store.deliveryReport(newSession.user);

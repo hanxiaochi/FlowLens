@@ -15,6 +15,44 @@ import {DatabaseSync} from 'node:sqlite';
 
 const password = 'test-only-long-password';
 
+test('service context persists across connections and guards commands before writes or replay', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'flowlens-context-'));
+  const filename = join(directory, 'team.sqlite');
+  let store = openTeamStore(filename);
+  const other = openTeamStore(join(directory, 'other.sqlite'));
+  let peer, inspection;
+  try {
+    const user = await store.createUser(null, {username: 'admin', name: 'Admin', password});
+    const otherUser = await other.createUser(null, {username: 'admin', name: 'Other', password});
+    const context = store.serviceContext(user);
+    assert.match(context.instanceId, /^[0-9a-f-]{36}$/);
+    assert.notEqual(other.serviceContext(otherUser).instanceId, context.instanceId);
+    peer = openTeamStore(filename);
+    assert.deepEqual(peer.serviceContext(user), context);
+    store.close(); store = openTeamStore(filename);
+    assert.deepEqual(store.serviceContext(user), context);
+    store.importApplication(user, applicationDemo());
+    store.setMembership(user, {userId: user.id, projectId: 'demo-project', roles: ['专业监理']});
+    const command = {type: 'create', projectId: 'demo-project', templateId: applicationDemo().templates[0].id, operationId: crypto.randomUUID(), expectedInstanceId: context.instanceId};
+    const result = store.command(user, command);
+    assert.deepEqual(peer.command(user, command), result);
+    const before = store.visibleWorkspace(user);
+    const auditBefore = store.audit(user);
+    inspection = new DatabaseSync(filename);
+    inspection.prepare('UPDATE maintenance SET data=? WHERE key=?').run(JSON.stringify({id: crypto.randomUUID()}), 'instance');
+    assert.throws(() => store.command(user, command), error => error.status === 409);
+    assert.throws(() => store.command(user, {...command, operationId: crypto.randomUUID()}), error => error.status === 409);
+    assert.deepEqual(store.visibleWorkspace(user), before);
+    assert.deepEqual(store.audit(user), auditBefore);
+    assert.notEqual(peer.serviceContext(user).instanceId, context.instanceId);
+    store.setMembership(user, {userId: user.id, projectId: 'demo-project', roles: []});
+    assert.throws(() => store.command(user, {...command, expectedInstanceId: store.serviceContext(user).instanceId, operationId: crypto.randomUUID()}), error => error.status === 403);
+  } finally {
+    inspection?.close(); peer?.close(); other.close(); store.close();
+    await rm(directory, {recursive: true, force: true});
+  }
+});
+
 test('inline imports normalize legacy attachment metadata and reject external blob references', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'flowlens-attachment-import-'));
   const store = openTeamStore(join(directory, 'team.sqlite'));

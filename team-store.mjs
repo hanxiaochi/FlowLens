@@ -47,6 +47,7 @@ export function openTeamStore(filename) {
   db.prepare('INSERT OR IGNORE INTO workspace VALUES (1,0,?)').run(JSON.stringify(emptyWorkspace()));
   try { migrateAttachments(db, filename); }
   catch (error) { db.close(); throw error; }
+  db.prepare('INSERT OR IGNORE INTO maintenance(key,data) VALUES(?,?)').run('instance', JSON.stringify({id: randomUUID()}));
   function transaction(fn) {
     db.exec('BEGIN IMMEDIATE');
     try { const result = fn(); db.exec('COMMIT'); return result; }
@@ -90,6 +91,10 @@ export function openTeamStore(filename) {
     return {kind: 'project', name: project.name, fingerprint: digest(JSON.stringify({project, app, templates, members}))};
   }
   function restoreMarker() { return db.prepare("SELECT data FROM maintenance WHERE key='lastRestore'").get()?.data ?? null; }
+  function serviceContext(user) {
+    active(user);
+    return {instanceId: JSON.parse(db.prepare("SELECT data FROM maintenance WHERE key='instance'").get().data).id};
+  }
   function deliveryReport(user, scope = 'instance', origin = '') {
     admin(user);
     const context = deliveryContext(scope, origin);
@@ -394,6 +399,7 @@ export function openTeamStore(filename) {
     if (typeof input.operationId !== 'string' || !/^[\w-]{8,100}$/.test(input.operationId)) fail(400, '需要有效操作编号');
     const fingerprint = digest(JSON.stringify(input));
     return transaction(() => {
+      if (input.expectedInstanceId !== undefined && input.expectedInstanceId !== serviceContext(user).instanceId) fail(409, '服务数据环境已变化，请核对当前业务后处理原请求');
       const current = workspace();
       const record = input.type === 'create' ? null : current.cases.find(item => item.id === input.recordId);
       const projectId = record?.projectId ?? input.projectId;
@@ -464,7 +470,7 @@ export function openTeamStore(filename) {
     });
   }
   return {
-    createUser, login, session, visibleWorkspace, getRecord, importApplication, updateDefinitions, setMembership, command, changePassword, resetPassword, operations, deliveryReport, updateDelivery, attachment, projectArchive, previewProjectRestore, restoreProject,
+    createUser, login, session, serviceContext, visibleWorkspace, getRecord, importApplication, updateDefinitions, setMembership, command, changePassword, resetPassword, operations, deliveryReport, updateDelivery, attachment, projectArchive, previewProjectRestore, restoreProject,
     checkProjectArchive: (user, bytes) => { admin(user); return checkProjectArchive(bytes, workspace()); },
     requireAdmin: user => admin(user),
     logout: token => db.prepare('DELETE FROM sessions WHERE token=?').run(digest(token)),

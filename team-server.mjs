@@ -6,7 +6,7 @@ import {resolve, extname} from 'node:path';
 import {openTeamStore, fail} from './team-store.mjs';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
-const staticFiles = new Set(['apps-model.mjs', 'team.html', 'team-ui.js', 'team-delivery.mjs', 'team.css', 'forms.css', 'forms-detail-ui.js', 'forms-schema.mjs', 'forms-model.mjs', 'forms-rules.mjs', 'forms-print.mjs']);
+const staticFiles = new Set(['apps-model.mjs', 'team.html', 'team-ui.js', 'team-http.mjs', 'team-delivery.mjs', 'team.css', 'forms.css', 'forms-detail-ui.js', 'forms-schema.mjs', 'forms-model.mjs', 'forms-rules.mjs', 'forms-print.mjs']);
 const cookieName = 'flowlens_session';
 export function createTeamServer({database = resolve(root, '.local/team.sqlite'), origin = 'http://127.0.0.1:4186'} = {}) {
   const canonical = new URL(origin);
@@ -74,12 +74,12 @@ export function createTeamServer({database = resolve(root, '.local/team.sqlite')
         // Successful logins do not consume the shared proxy's failure allowance.
         accountAttempt.count--;
         addressAttempt.count--;
-        return send(res, 200, {user: result.user}, {'Set-Cookie': cookie(result.token, 8 * 3600)});
+        return send(res, 200, {user: result.user, context: store.serviceContext(result.user)}, {'Set-Cookie': cookie(result.token, 8 * 3600)});
       }
       const token = (req.headers.cookie ?? '').split(';').map(item => item.trim()).find(item => item.startsWith(cookieName + '='))?.slice(cookieName.length + 1);
       const user = store.session(token);
       if (req.method === 'GET') {
-        if (path === '/api/team/me') return send(res, 200, {user});
+        if (path === '/api/team/me') return send(res, 200, {user, context: store.serviceContext(user)});
         if (path === '/api/team/workspace') {
           const summary = req.headers['x-flowlens-client'] === '3' ? Object.fromEntries(new URL(req.url, origin).searchParams) : undefined;
           return send(res, 200, store.visibleWorkspace(user, {inlineAttachments: !['2', '3'].includes(req.headers['x-flowlens-client']), summary}));

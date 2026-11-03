@@ -3,11 +3,13 @@ import {canEdit} from './forms-model.mjs';
 import {renderDetailField} from './forms-detail-ui.js';
 import {printableForm} from './forms-print.mjs';
 import {deliveryStatusLabels} from './team-delivery.mjs';
+import {teamJsonRequest} from './team-http.mjs';
 
 const content = document.querySelector('#content');
 const account = document.querySelector('#account');
 const notice = document.querySelector('#notice');
 let user, workspace, memberships = [], selectedId = '', projectId = '', busy = false, pending = null;
+let serviceContext = null;
 let deliveryDraft = null;
 let selectedRecord = null, listing = null, roleOptions = {};
 let listQuery = {page: 1, filter: 'all', search: ''};
@@ -30,11 +32,13 @@ const select = (name, options, value) => {
   element.value = value ?? options[0]?.[0] ?? ''; return element;
 };
 function say(text, error = false) { notice.textContent = text; notice.classList.toggle('error', error); }
+function acceptSession(result) {
+  if (typeof result.context?.instanceId !== 'string' || !result.context.instanceId) throw Error('服务端缺少恢复上下文，请联系管理员更新服务后重新登录。');
+  user = result.user; serviceContext = result.context;
+}
 async function api(path, data) {
-  const response = await fetch('/api/team/' + path, {method: data === undefined ? 'GET' : 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', 'X-FlowLens-Request': '1', 'X-FlowLens-Client': '3'}, body: data === undefined ? undefined : JSON.stringify(data)});
-  const result = await response.json();
-  if (!response.ok) throw Object.assign(Error(result.error || '请求失败'), {status: response.status});
-  return result;
+  const timeoutMs = ['import', 'definitions'].includes(path) || data?.type === 'attachment' ? 120000 : 30000;
+  return teamJsonRequest('/api/team/' + path, {method: data === undefined ? 'GET' : 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', 'X-FlowLens-Request': '1', 'X-FlowLens-Client': '3'}, body: data === undefined ? undefined : JSON.stringify(data)}, timeoutMs);
 }
 async function task(action) {
   if (busy) return;
@@ -98,6 +102,7 @@ function accountView() {
   account.append(controls);
 }
 function loginView() {
+  serviceContext = null;
   selectedRecord = null; listing = null; roleOptions = {}; projectId = ''; listQuery = {page: 1, filter: 'all', search: ''};
   account.replaceChildren(); content.replaceChildren();
   const panel = node('div', undefined, 'panel login');
@@ -106,12 +111,13 @@ function loginView() {
   const password = input('密码', 'password'); password.autocomplete = 'current-password'; password.required = true;
   const form = node('form'); const submit = node('button', '登录', 'primary'); submit.type = 'submit';
   form.append(label('账号', username), label('密码', password), submit);
-  form.onsubmit = event => { event.preventDefault(); task(async () => { user = (await api('login', {username: username.value, password: password.value})).user; await refresh(); home(); say('已登录，选择项目开始办理。'); }); };
+  form.onsubmit = event => { event.preventDefault(); task(async () => { acceptSession(await api('login', {username: username.value, password: password.value})); await refresh(); home(); say('已登录，选择项目开始办理。'); }); };
   panel.append(form); content.append(panel);
 }
 function home() {
   accountView(); content.replaceChildren(); selectedId = '';
   const hero = node('section', undefined, 'hero'); hero.append(node('span', 'PROJECTS, CONNECTED', 'badge'), node('h1', '从待办开始，把一件事办到底。'));
+  const retry = button('重试原请求', sendPending); retry.id = 'retry-request'; retry.hidden = !pending; hero.append(retry);
   if (!workspace.projects.length) {
     hero.append(node('p', user.admin ? '先在管理后台导入应用包，再创建账号并分配项目角色。' : '当前账号还没有项目，请联系管理员分配。'));
     content.append(hero); return;
@@ -160,7 +166,6 @@ function home() {
   const previous = button('上一页', async () => { await refresh({...listQuery, page: listing.page - 1}); home(); }); previous.disabled = listing.page <= 1;
   const next = button('下一页', async () => { await refresh({...listQuery, page: listing.page + 1}); home(); }); next.disabled = listing.page >= listing.pages;
   pagination.append(previous, node('span', '第 ' + listing.page + ' / ' + listing.pages + ' 页 · 每页 ' + listing.pageSize + ' 份'), next); content.append(pagination);
-  const retry = button('重试原请求', sendPending); retry.id = 'retry-request'; retry.hidden = !pending; content.append(retry);
 }
 async function openRecord(id) {
   if (!clean()) return;
@@ -169,7 +174,7 @@ async function openRecord(id) {
 }
 async function command(data) {
   if (pending) throw Error('上一项业务操作的结果尚未确认，请先点击“重试原请求”，或下载草稿并重新读取。');
-  pending = {...data, operationId: crypto.randomUUID()};
+  pending = {...data, operationId: crypto.randomUUID(), expectedInstanceId: serviceContext.instanceId};
   await sendPending();
 }
 async function sendPending() {
@@ -183,7 +188,7 @@ async function sendPending() {
       recordView();
       throw Error('业务已保存，但清单刷新失败。请稍后重新读取。' + error.message);
     }
-    if (error.status) pending = null;
+    if (error.status && error.status < 500) pending = null;
     const form = content.querySelector('.record-form'); if (form) form.inert = !!pending;
     const note = content.querySelector('#operation-note'); if (note) note.disabled = !!pending;
     const retry = content.querySelector('#retry-request'); if (retry) retry.hidden = !pending;
@@ -556,5 +561,5 @@ async function adminView() {
   for (const event of data.audit) audit.append(node('p', event.at + ' · ' + (data.users.find(item => item.id === event.user_id)?.name || event.user_id) + ' · ' + event.action + ' · ' + event.target));
   content.append(button('下载最近审计记录', () => download('FlowLens-审计记录.json', JSON.stringify(data.audit, null, 2))), audit);
 }
-try { user = (await api('me')).user; await refresh(); home(); say('服务器工作区已就绪。'); }
+try { acceptSession(await api('me')); await refresh(); home(); say('服务器工作区已就绪。'); }
 catch (error) { loginView(); say(error.status === 401 ? '请登录团队账号。' : error.message, error.status !== 401); }
