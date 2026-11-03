@@ -185,6 +185,7 @@ async function sendPending() {
     }
     if (error.status) pending = null;
     const form = content.querySelector('.record-form'); if (form) form.inert = !!pending;
+    const note = content.querySelector('#operation-note'); if (note) note.disabled = !!pending;
     const retry = content.querySelector('#retry-request'); if (retry) retry.hidden = !pending;
     if (pending) throw Error('尚未收到业务结果确认，请点击“重试原请求”。');
     throw error;
