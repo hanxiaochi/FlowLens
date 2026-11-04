@@ -28,7 +28,7 @@ The team app now separates fields still due at the current stage, issues in comp
 
 ![Downloaded review checklist with fictional data](docs/images/project-review-1.19.png)
 
-This is **1.19.0-dev.1**; the released and cloud versions remain **1.18.0**. All 151 local tests passed. Pagination, record navigation, and downloading have been checked in the browser. Capacity limits, print layout, and release acceptance still need verification. See the [delivery plan (Chinese)](docs/delivery-plan.md).
+This is **1.19.0-dev.1**; the released and cloud versions remain **1.18.0**. All 154 local tests passed, including attachment and report capacity limits. Pagination, record navigation, downloading, and narrow-screen reading have been checked in the browser. Printed pagination and release acceptance still need verification. See the [delivery plan (Chinese)](docs/delivery-plan.md).
 
 ## 1.18 take your project ledger into Excel
 

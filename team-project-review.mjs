@@ -42,7 +42,7 @@ export function reviewProject(workspace, projectId, inspectAttachment = () => 'u
       totals.attachments++;
       const state = inspectAttachment(file, record);
       if (state === 'invalid') add('attachment', 'review', file.name, '附件内容缺失、大小或校验值不一致。', {attachmentId: file.id});
-      else if (state !== 'verified') add('attachment', 'unchecked', file.name, '本轮未完成附件内容校验，请另行核验。', {attachmentId: file.id});
+      else if (state !== 'verified') add('attachment', 'unchecked', file.name, '本轮未完成附件内容校验。可在系统中单独校验并下载；此快照仍保留未完成标记。', {attachmentId: file.id});
     }
     if (issues.length) {
       totals.affectedRecords++;

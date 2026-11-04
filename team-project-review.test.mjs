@@ -8,6 +8,8 @@ import {tmpdir} from 'node:os';
 import {DatabaseSync} from 'node:sqlite';
 import http from 'node:http';
 import {createTeamServer} from './team-server.mjs';
+import {openTeamStore} from './team-store.mjs';
+import {applyOperation} from './forms-model.mjs';
 
 function fixture() {
   const workspace = applicationDemo(), record = workspace.cases[0];
@@ -68,6 +70,66 @@ test('readable review export escapes supplied content and labels its saved snaps
   assert.ok(html.includes('&lt;img src=x onerror=alert(1)&gt;'));
   assert.ok(!html.includes('<script>')); assert.ok(!html.includes('<img '));
   assert.ok(html.includes('生成时的核对快照')); assert.ok(html.includes('default-src'));
+});
+
+test('review follows actual submit, return and resubmit transitions and flags changed upstream snapshots', () => {
+  const {workspace, record} = fixture();
+  record.values.draft = '已填';
+  let current = applyOperation(record, {type: 'submit', role: record.submitter});
+  workspace.cases = [current];
+  assert.deepEqual(reviewProject(workspace, current.projectId).results[0].issues.map(issue => issue.fieldId), ['review']);
+  current = applyOperation(current, {type: 'return', role: current.template.workflow[0].role, note: '补充资料'});
+  workspace.cases = [current];
+  assert.equal(reviewProject(workspace, current.projectId).results.length, 0);
+  current = applyOperation(current, {type: 'submit', role: current.submitter});
+  current = applyOperation(current, {type: 'advance', role: current.template.workflow[0].role, values: {review: '已核对'}});
+  workspace.cases = [current];
+  assert.deepEqual(reviewProject(workspace, current.projectId).results[0].issues.map(issue => issue.fieldId), ['later']);
+  current = applyOperation(current, {type: 'advance', role: current.template.workflow[1].role, values: {later: '已归档'}});
+  const child = {...structuredClone(current), id: crypto.randomUUID(), relatedId: current.id, link: {sourceId: current.id, sourceRevision: current.revision}};
+  workspace.cases = [current, child];
+  assert.equal(reviewProject(workspace, current.projectId).results.length, 0);
+  current.revision++;
+  assert.equal(reviewProject(workspace, current.projectId).results[0].issues[0].kind, 'upstream-revision');
+  current.status = 'draft';
+  assert.ok(reviewProject(workspace, current.projectId).results[0].issues.some(issue => issue.kind === 'upstream-status'));
+});
+
+test('attachment verification honors the actual 64 MiB budget and supports individual verification afterwards', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'flowlens-review-budget-'));
+  const store = openTeamStore(join(directory, 'team.sqlite'));
+  try {
+    const admin = await store.createUser(null, {username: 'admin', name: 'Admin', password: 'project-review-test'});
+    const sample = applicationDemo(), record = sample.cases[0];
+    record.attachments = Array.from({length: 9}, (_, index) => ({id: 'file-' + index, name: 'file-' + index + '.bin', size: 8 * 1024 * 1024, data: 'data:application/octet-stream;base64,' + Buffer.alloc(8 * 1024 * 1024, index).toString('base64')}));
+    store.importApplication(admin, sample);
+    const report = store.projectReview(admin, {projectId: record.projectId});
+    assert.equal(report.attachmentVerification.inspectedBytes, 64 * 1024 * 1024);
+    assert.equal(report.totals.attachments, 9); assert.equal(report.totals.unchecked, 1);
+    const deferred = report.results[0].issues.filter(issue => issue.severity === 'unchecked');
+    assert.deepEqual(deferred.map(issue => issue.attachmentId), ['file-8']);
+    const verified = store.attachment(admin, record.id, 'file-8');
+    assert.equal(verified.data.length, 8 * 1024 * 1024); assert.ok(verified.data.every(byte => byte === 8));
+    assert.equal(store.projectReview(admin, {projectId: record.projectId}).totals.unchecked, 1);
+  } finally { store.close(); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('large valid projects keep paged review available while rejecting oversized full checklists', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'flowlens-review-size-'));
+  const store = openTeamStore(join(directory, 'team.sqlite'));
+  try {
+    const admin = await store.createUser(null, {username: 'admin', name: 'Admin', password: 'project-review-test'});
+    const sample = applicationDemo(), record = sample.cases[0];
+    record.template.fields = Array.from({length: 100}, (_, index) => ({id: 'wide-' + index, label: '&'.repeat(500), owner: 'draft', required: true}));
+    record.template.blocks = record.template.fields.map(field => ({id: field.id, type: 'paragraph', text: ''}));
+    delete record.template.summaryFields; record.values = {}; record.provenance = [];
+    sample.cases = Array.from({length: 400}, () => ({...structuredClone(record), id: crypto.randomUUID()}));
+    store.importApplication(admin, sample);
+    const paged = store.projectReview(admin, {projectId: record.projectId, page: '8'});
+    assert.equal(paged.totals.pending, 40000); assert.equal(paged.results.length, 50); assert.equal(paged.pages, 8);
+    for (const download of ['1', 'html']) assert.throws(() => store.projectReview(admin, {projectId: record.projectId, download}), error => error.status === 413);
+    assert.equal(store.projectReview(admin, {projectId: record.projectId}).page, 1);
+  } finally { store.close(); await rm(directory, {recursive: true, force: true}); }
 });
 
 test('review HTTP pages, downloads and attachment hashes use the latest project permissions', async () => {

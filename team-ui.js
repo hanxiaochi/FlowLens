@@ -373,7 +373,11 @@ async function projectReviewView(targetProject, page = 1) {
     for (const field of record.summary) summary.append(node('dt', field.label), node('dd', field.text));
     card.append(summary);
     const issues = node('ul');
-    for (const issue of record.issues) issues.append(node('li', labels[issue.severity] + ' · ' + issue.label + '：' + issue.message));
+    for (const issue of record.issues) {
+      const item = node('li', labels[issue.severity] + ' · ' + issue.label + '：' + issue.message);
+      if (issue.kind === 'attachment' && issue.severity === 'unchecked') item.append(button('单独校验并下载 ' + issue.label, () => downloadFromServer('/api/team/attachment?' + new URLSearchParams({recordId: record.recordId, attachmentId: issue.attachmentId}), issue.label)));
+      issues.append(item);
+    }
     card.append(issues, button('打开单据', async () => { reviewReturn = {projectId: targetProject, page: result.page}; await openRecord(record.recordId); }));
     content.append(card);
   }
