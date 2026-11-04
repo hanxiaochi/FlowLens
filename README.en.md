@@ -22,6 +22,14 @@ No installation or API key needed. Start with a fictional supervision applicatio
 
 [1.3 release notes and acceptance](docs/release-1.3.0.md)
 
+## 1.16 bring an existing ledger into the workflow
+
+Choose a CSV in your project, map columns to form fields, and review invalid values, duplicate mapped rows and project-value overrides before creating drafts. Identifiers remain text. Fill in required values and continue through the existing workflow. Remapping keeps the file and selections, and interrupted confirmations can resume with the original request.
+
+All 137 local tests and 21 standalone runtime checks pass. Final release acceptance is in progress. [Release notes (Chinese)](docs/release-1.16.0.md)
+
+![Reviewing an invalid ledger row](docs/images/csv-review-1.16.png)
+
 ## 1.15 check who can handle each step
 
 The admin page lists each project's roles and active members, highlighting roles that still need someone assigned. Jump to project permissions and keep the current selection after saving. Empty instances provide a setup entry, with guidance for applications that have no projects yet.
