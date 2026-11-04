@@ -8,6 +8,7 @@ import {applicationDemo} from './apps-demo.mjs';
 import {createProject} from './apps-model.mjs';
 import {openTeamStore} from './team-store.mjs';
 import {createTeamServer} from './team-server.mjs';
+import {projectRoleCoverage} from './team-delivery.mjs';
 
 const password = 'summary-test-password';
 function largeFixture() {
@@ -34,6 +35,10 @@ test('summary pages omit heavy fields, retain whole-project counts and roles, an
     assert.equal(first.workspace.cases[0].values, undefined); assert.equal(first.workspace.cases[0].events, undefined);
     assert.equal(first.workspace.cases[0].template.blocks, undefined); assert.equal(first.workspace.templates[0].fields, undefined);
     assert.ok(first.roleOptions['demo-project'].includes('历史填报人'));
+    const coverage = projectRoleCoverage(first.workspace.projects, first.roleOptions, store.users(admin), store.memberships(admin));
+    assert.equal(coverage.length, 1);
+    assert.ok(coverage[0].missingRoles.includes('历史填报人'));
+    assert.deepEqual(coverage[0].roles.find(item => item.role === '专业监理').members, [{id: member.id, name: 'Member'}]);
     assert.ok(!JSON.stringify(first).includes('private-'));
     const second = store.visibleWorkspace(member, {summary: {page: '2'}});
     assert.equal(second.workspace.cases.length, 11);
