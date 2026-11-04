@@ -26,7 +26,7 @@ No installation or API key needed. Start with a fictional supervision applicatio
 
 Choose a CSV in your project, map columns to form fields, and review invalid values, duplicate mapped rows and project-value overrides before creating drafts. Identifiers remain text. Fill in required values and continue through the existing workflow. Remapping keeps the file and selections, and interrupted confirmations can resume with the original request.
 
-All 137 local tests and 21 standalone runtime checks pass. Final cross-platform CI and five-account cloud comparisons pass. Release-download verification is in progress. [Release notes (Chinese)](docs/release-1.16.0.md)
+All 137 local tests and 21 standalone runtime checks pass. Final cross-platform CI and five-account cloud comparisons pass. The downloaded runtime passes all 21 checks, and all 45 public demo files match. [Release notes (Chinese)](docs/release-1.16.0.md)
 
 ![Reviewing an invalid ledger row](docs/images/csv-review-1.16.png)
 
@@ -278,4 +278,4 @@ The development UI now uses publication previews and browser recovery storage, w
 Version 1.15 adds project role coverage checks. Administrators can see unassigned roles and jump to project permissions. Disabled accounts, historical roles and duplicate assignments are covered, with 125 local tests passing. Browser acceptance now covers an empty instance, importing definitions, adding two projects, assigning roles and creating the first record. Permission saves preserve the selected project, and file inputs fit narrow screens. Standalone runtime and member entry checks pass. The cloud app is on 1.15.0.
 
 
-Version 1.16 adds CSV import. CSV import now previews column mappings, invalid values, project-value overrides and missing required fields before creating a batch of drafts. All 137 local tests pass. Remapping retains the CSV and selections, while paged previews can filter invalid and duplicate mapped rows. Browser checks cover errors beyond the first 50 rows, lost-response recovery and storage quota failure. Concurrency, capacity and restored-instance checks also pass. The cloud app is on 1.16.0. Release-download verification is in progress.
+Version 1.16 adds CSV import. CSV import now previews column mappings, invalid values, project-value overrides and missing required fields before creating a batch of drafts. All 137 local tests pass. Remapping retains the CSV and selections, while paged previews can filter invalid and duplicate mapped rows. Browser checks cover errors beyond the first 50 rows, lost-response recovery and storage quota failure. Concurrency, capacity and restored-instance checks also pass. The cloud app is on 1.16.0. The downloaded runtime passes all 21 checks, and all 45 public demo files match.
