@@ -13,6 +13,42 @@ import {openTeamStore} from './team-store.mjs';
 import {applicationDemo} from './apps-demo.mjs';
 
 const optionsFor = plan => ({operationId: crypto.randomUUID(), planFingerprint: plan.planFingerprint, expectedUserId: plan.userId, expectedInstanceId: plan.instanceId});
+test('CSV history preserves legacy receipts, pages records, and enforces current project access', async () => {
+  const {directory, filename, store, admin, member, source} = await setup();
+  try {
+    const input = {...source, csv: '编号,要求\n' + Array.from({length: 52}, (_, i) => '00' + i + ',检查').join('\n')};
+    const receipt = store.importCsv(member, input, optionsFor(store.previewCsvImport(member, input)));
+    const listing = store.csvHistory(member, {projectId: source.projectId});
+    assert.equal(listing.total, 1); assert.equal(listing.batches[0].actor.name, member.name);
+    assert.ok(listing.batches[0].createdAt);
+    const detail = store.csvHistory(member, {projectId: source.projectId, operationId: receipt.operationId, page: 2});
+    assert.equal(detail.records.length, 2); assert.equal(detail.pages, 2);
+    assert.deepEqual(detail.receipt, receipt); assert.equal(detail.records[0].stage, '待填写');
+    assert.equal(detail.records[0].values, undefined);
+    const connection = new DatabaseSync(filename);
+    try {
+      const legacy = {...receipt}; delete legacy.createdAt; delete legacy.actor;
+      connection.prepare('UPDATE requests SET result=? WHERE id=?').run(JSON.stringify(legacy), receipt.operationId);
+      const old = store.csvHistory(admin, {projectId: source.projectId}).batches[0];
+      assert.equal(old.createdAt, null); assert.equal(old.actorNameHistorical, false);
+      assert.equal(old.actor.name, member.name);
+      for (let i = 0; i < 51; i++) {
+        const id = 'history-fixture-' + i;
+        connection.prepare('INSERT INTO requests VALUES(?,?,?,?)').run(id, member.id, 'fixture', JSON.stringify({...legacy, operationId: id}));
+      }
+      assert.equal(store.csvHistory(admin, {projectId: source.projectId}).batches.length, 50);
+      assert.equal(store.csvHistory(admin, {projectId: source.projectId, page: 2}).batches.length, 2);
+    } finally { connection.close(); }
+    assert.throws(() => store.csvHistory(member, {projectId: 'other', operationId: receipt.operationId}), error => error.status === 404);
+    assert.throws(() => store.csvHistory(member, {projectId: source.projectId, page: -1}), error => error.status === 400);
+    store.setMembership(admin, {userId: member.id, projectId: source.projectId, roles: []});
+    assert.throws(() => store.csvHistory(member, {projectId: source.projectId}), error => error.status === 404);
+    assert.throws(() => store.csvHistory(member, {projectId: source.projectId, operationId: receipt.operationId}), error => error.status === 404);
+    store.setDisabled(admin, {userId: member.id, disabled: true});
+    assert.equal(store.csvHistory(admin, {projectId: source.projectId}).total, 52);
+    assert.throws(() => store.csvHistory(member, {projectId: source.projectId}), error => error.status === 401);
+  } finally { store.close(); await rm(directory, {recursive: true, force: true}); }
+});
 async function setup(recordCount = 1) {
   const directory = await mkdtemp(join(tmpdir(), 'flowlens-csv-'));
   const filename = join(directory, 'team.sqlite');

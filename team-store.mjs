@@ -507,9 +507,40 @@ export function openTeamStore(filename) {
       current.cases.push(...plan.records);
       writeWorkspace(current);
       audit(user, 'cases.csv-import', input.projectId);
-      const result = {imported: plan.records.length, projectId: input.projectId, templateId: input.templateId, operationId: options.operationId, recordIds: plan.records.map(record => record.id)};
+      const result = {imported: plan.records.length, projectId: input.projectId, templateId: input.templateId, operationId: options.operationId, recordIds: plan.records.map(record => record.id), createdAt: new Date().toISOString(), actor: {id: user.id, name: user.name}};
       db.prepare('INSERT INTO requests VALUES(?,?,?,?)').run(options.operationId, user.id, fingerprint, JSON.stringify(result));
       return result;
+    });
+  }
+  function csvHistory(user, {projectId, operationId = '', page = '1'} = {}) {
+    return transaction(() => {
+      const actor = active(user), current = workspace();
+      if (!current.projects.some(project => project.id === projectId) || (!actor.admin && !roles(user, projectId).length)) fail(404, '项目不存在或不可访问');
+      const requestedPage = Number(page);
+      if (!Number.isSafeInteger(requestedPage) || requestedPage < 1 || typeof operationId !== 'string' || operationId.length > 100) fail(400, '批次分页参数无效');
+      // Old receipts have no timestamp. Rowid preserves insertion order without inventing dates.
+      const predicate = "json_extract(result,'$.projectId')=? AND json_type(result,'$.imported')='integer' AND json_type(result,'$.recordIds')='array'";
+      const pageSize = 50;
+      if (operationId) {
+        const row = db.prepare('SELECT result FROM requests WHERE id=? AND ' + predicate).get(operationId, projectId);
+        if (!row) fail(404, '批次不存在或不可访问');
+        const receipt = JSON.parse(row.result);
+        const pages = Math.max(1, Math.ceil(receipt.recordIds.length / pageSize)), selectedPage = Math.min(requestedPage, pages);
+        const byId = new Map(current.cases.filter(record => record.projectId === projectId).map(record => [record.id, record]));
+        const records = receipt.recordIds.slice((selectedPage - 1) * pageSize, selectedPage * pageSize).map(id => {
+          const record = byId.get(id);
+          return record ? {id, title: record.title, status: record.status, stage: record.status === 'draft' ? '待填写' : record.status === 'complete' ? '已完成' : record.template.workflow[record.step]?.label || '办理中'} : {id, unavailable: true};
+        });
+        return {receipt, records, page: selectedPage, pages, total: receipt.recordIds.length};
+      }
+      const total = db.prepare('SELECT count(*) AS total FROM requests WHERE ' + predicate).get(projectId).total;
+      const pages = Math.max(1, Math.ceil(total / pageSize)), selectedPage = Math.min(requestedPage, pages);
+      const batches = db.prepare('SELECT result,user_id FROM requests WHERE ' + predicate + ' ORDER BY rowid DESC LIMIT ? OFFSET ?').all(projectId, pageSize, (selectedPage - 1) * pageSize).map(row => {
+        const result = JSON.parse(row.result);
+        const account = db.prepare('SELECT name FROM users WHERE id=?').get(row.user_id);
+        return {operationId: result.operationId, templateId: result.templateId, imported: result.imported, createdAt: result.createdAt ?? null, actor: result.actor ?? {id: row.user_id, name: account?.name ?? '历史账号'}, actorNameHistorical: !!result.actor};
+      });
+      return {projectId, batches, total, page: selectedPage, pages};
     });
   }
   function updateDefinitions(user, input) {
@@ -602,7 +633,7 @@ export function openTeamStore(filename) {
     });
   }
   return {
-    createUser, login, session, serviceContext, visibleWorkspace, getRecord, importApplication, updateDefinitions, previewDefinitions, publishDefinitions, previewCsvImport, importCsv, setMembership, command, changePassword, resetPassword, operations, deliveryReport, updateDelivery, attachment, projectArchive, previewProjectRestore, restoreProject,
+    createUser, login, session, serviceContext, visibleWorkspace, getRecord, importApplication, updateDefinitions, previewDefinitions, publishDefinitions, previewCsvImport, importCsv, csvHistory, setMembership, command, changePassword, resetPassword, operations, deliveryReport, updateDelivery, attachment, projectArchive, previewProjectRestore, restoreProject,
     checkProjectArchive: (user, bytes) => { admin(user); return checkProjectArchive(bytes, workspace()); },
     requireAdmin: user => admin(user),
     logout: token => db.prepare('DELETE FROM sessions WHERE token=?').run(digest(token)),

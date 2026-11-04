@@ -137,6 +137,7 @@ function home() {
     finally { projects.value = projectId; }
   });
   hero.append(label('当前项目', projects), node('p', '我的项目角色 · ' + (roles().join('、') || '只读管理查看'), 'muted'));
+  hero.append(button('导入批次历史', () => csvHistoryView(projectId)));
   const project = workspace.projects.find(item => item.id === projectId);
   const app = workspace.applications.find(item => item.id === project.appId);
   hero.append(button('下载项目资料包', () => downloadFromServer('/api/team/project-export?projectId=' + encodeURIComponent(projectId), 'FlowLens-项目资料.zip', 'application/zip')));
@@ -341,9 +342,36 @@ async function csvPreviewView(source) {
   content.append(confirm, button('下载完整导入预览', () => download('FlowLens-导入预览.json', JSON.stringify(plan, null, 2))), button('下载原 CSV', () => download('FlowLens-原台账.csv', source.csv, 'text/csv;charset=utf-8')), button('重新映射字段', () => csvImportView(source.templateId, source)));
   say(plan.ready ? '请核对字段值与项目资料覆盖提示后确认。' : '请修正台账或调整字段映射，再重新预览。', !plan.ready);
 }
+async function csvHistoryView(targetProject, operationId = '', page = 1) {
+  const query = new URLSearchParams({projectId: targetProject, operationId, page: String(page)});
+  const result = await api('csv-history?' + query);
+  content.replaceChildren(node('h1', operationId ? '核对本批单据' : '导入批次历史'));
+  content.append(button('返回项目', async () => { await refresh({page: 1}, targetProject); home(); }));
+  if (operationId) {
+    content.append(node('p', '操作编号 ' + operationId), node('p', '本批共 ' + result.total + ' 份。以下为服务器当前状态。'), button('下载本批回执', () => download('FlowLens-导入结果.json', JSON.stringify(result.receipt, null, 2))), button('返回批次清单', () => csvHistoryView(targetProject)));
+    for (const record of result.records) {
+      const card = node('article', undefined, 'panel');
+      card.append(node('h2', record.title || '当前项目中已无法找到此单据'), node('p', record.id, 'record-identifier'));
+      if (!record.unavailable) card.append(node('p', record.stage), button('打开单据', () => openRecord(record.id)));
+      content.append(card);
+    }
+  } else {
+    content.append(node('p', '按导入先后排列，共 ' + result.total + ' 批。旧版未保存导入时间，账号名称可能为当前名称。'));
+    for (const batch of result.batches) {
+      const card = node('article', undefined, 'panel');
+      card.append(node('h2', batch.imported + ' 份草稿 · ' + (workspace.templates.find(item => item.id === batch.templateId)?.title || batch.templateId)), node('p', batch.actor.name + (batch.actorNameHistorical ? ' · 导入时姓名' : ' · 当前账号姓名')), node('p', batch.createdAt ? new Date(batch.createdAt).toLocaleString() : '旧版未记录导入时间'), node('p', batch.operationId, 'record-identifier'), button('核对本批单据', () => csvHistoryView(targetProject, batch.operationId)));
+      content.append(card);
+    }
+  }
+  const navigation = node('div', undefined, 'toolbar');
+  const previous = button('上一页', () => csvHistoryView(targetProject, operationId, result.page - 1)); previous.disabled = result.page <= 1;
+  const next = button('下一页', () => csvHistoryView(targetProject, operationId, result.page + 1)); next.disabled = result.page >= result.pages;
+  navigation.append(previous, node('span', result.page + ' / ' + result.pages), next); content.append(navigation);
+}
 function csvResultView(result) {
   content.replaceChildren(node('h1', '台账草稿已创建'), node('p', '已创建 ' + result.imported + ' 份业务草稿，请逐份核对后提交。'), node('p', '操作编号 ' + result.operationId));
   content.append(button('下载本批单据编号', () => download('FlowLens-导入结果.json', JSON.stringify(result, null, 2))));
+  if (!pending) content.append(button('核对本批单据', () => csvHistoryView(result.projectId, result.operationId)));
   if (pending) content.append(button('重试原请求', sendPending));
   else content.append(button('查看导入项目', async () => { projectId = result.projectId; await refresh({projectId, page: 1, filter: 'all', search: ''}); home(); }));
 }

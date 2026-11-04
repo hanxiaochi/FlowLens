@@ -108,6 +108,7 @@ export function createTeamServer({database = resolve(root, '.local/team.sqlite')
           res.writeHead(200, {'Content-Type': 'application/octet-stream', 'Content-Length': file.size, 'Content-Disposition': "attachment; filename=attachment; filename*=UTF-8''" + name});
           return res.end(file.data);
         }
+        if (path === '/api/team/csv-history') return send(res, 200, store.csvHistory(user, Object.fromEntries(new URL(req.url, origin).searchParams)));
         if (path === '/api/team/admin') return send(res, 200, {users: store.users(user), memberships: store.memberships(user), audit: store.audit(user)});
         if (path === '/api/team/operations') return send(res, 200, {...store.operations(user), uptimeSeconds: Math.floor(process.uptime()), memoryBytes: process.memoryUsage().rss});
         if (path === '/api/team/delivery') return send(res, 200, store.deliveryReport(user, new URL(req.url, origin).searchParams.get('scope') || 'instance', origin));
