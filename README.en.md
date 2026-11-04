@@ -28,7 +28,7 @@ You can close the import result page and come back later. Open **Import batch hi
 
 ![Reviewing records in an import batch](docs/images/batch-review-1.17.png)
 
-All 138 local tests and 22 standalone candidate checks pass. Final cross-platform CI and cloud upgrade checks pass. Release-download verification is underway. [Release notes (Chinese)](docs/release-1.17.0.md)
+All 138 local tests pass. The downloaded release passes 22 runtime checks. Cross-platform CI, cloud data comparisons and restore checks pass, and all 45 public demo files match. [Release notes (Chinese)](docs/release-1.17.0.md)
 
 ## 1.16 bring an existing ledger into the workflow
 
