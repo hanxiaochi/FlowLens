@@ -26,7 +26,7 @@ No installation or API key needed. Start with a fictional supervision applicatio
 
 The admin page lists each project's roles and active members, highlighting roles that still need someone assigned. Jump to project permissions and keep the current selection after saving. Empty instances provide a setup entry, with guidance for applications that have no projects yet.
 
-All 125 local tests and 20 standalone runtime checks pass. Cross-platform CI and five-account cloud comparisons pass. Release-download acceptance is in progress. [Release notes (Chinese)](docs/release-1.15.0.md)
+All 125 local tests and 20 standalone runtime checks pass. Cross-platform CI, five-account cloud comparisons, 20 downloaded-runtime checks and backup restoration pass. All 45 public demo files match. [Release notes (Chinese)](docs/release-1.15.0.md)
 
 ![Project role coverage](docs/images/project-roles-1.15.png)
 
