@@ -1,6 +1,6 @@
 # FlowLens
 
-[简体中文](README.md) · **English** · [v1.14.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.14.0)
+[简体中文](README.md) · **English** · [v1.15.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.15.0)
 
 **[Try the live demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -26,7 +26,9 @@ No installation or API key needed. Start with a fictional supervision applicatio
 
 The admin page lists each project's roles and active members, highlighting roles that still need someone assigned. Jump to project permissions and keep the current selection after saving. Empty instances provide a setup entry, with guidance for applications that have no projects yet.
 
-All 125 local tests and 20 standalone runtime checks pass. Final release-candidate acceptance is in progress. [Release notes (Chinese)](docs/release-1.15.0.md)
+All 125 local tests and 20 standalone runtime checks pass. Cross-platform CI and five-account cloud comparisons pass. Release-download acceptance is in progress. [Release notes (Chinese)](docs/release-1.15.0.md)
+
+![Project role coverage](docs/images/project-roles-1.15.png)
 
 ## 1.14 review changes before publishing
 
@@ -127,7 +129,7 @@ Import an application package into the self-hosted team service, create accounts
 
 The server checks project roles, workflow stages, and record revisions. Repeated requests reuse their result. This release also adds account deactivation, password changes, audit history, versioned template publication, and SQLite backup and restore tools.
 
-Download `FlowLens-1.14.0-team.zip`, install Node.js 24 LTS, initialize the administrator, then run `npm start`. The team runtime bundles its required files and needs no npm install. See the [deployment guide (Chinese)](docs/team-deployment.md) and [release acceptance](docs/release-1.13.0.md).
+Download `FlowLens-1.15.0-team.zip`, install Node.js 24 LTS, initialize the administrator, then run `npm start`. The team runtime bundles its required files and needs no npm install. See the [deployment guide (Chinese)](docs/team-deployment.md) and [release acceptance](docs/release-1.13.0.md).
 
 The public demo runs locally in your browser. The shared service is self-hosted and intended for a small-team pilot. Cloud technical acceptance is recorded. Customer workflows, sustained capacity, and maintenance handover still need validation.
 
@@ -265,4 +267,4 @@ Version 1.14 is adding definition-publication previews and recovery. The server 
 The development UI now uses publication previews and browser recovery storage, with all 124 local tests passing. Expand complex forms to compare nested tables, merged cells and column widths. Browser checks cover concurrent changes, permission changes, storage quota, cleanup failures and reconnection after an API outage following a successful publication. Layout was checked at a 390-pixel viewport. The new UI uses guarded publication endpoints; the legacy endpoint retains its compatible behavior. Version 1.14.0 is released. The downloaded runtime passes 19 checks, all 45 public demo files match, and cloud backup restoration passes.
 
 
-Development for 1.15 adds project role coverage checks. Administrators can see unassigned roles and jump to project permissions. Disabled accounts, historical roles and duplicate assignments are covered, with 125 local tests passing. Browser acceptance now covers an empty instance, importing definitions, adding two projects, assigning roles and creating the first record. Permission saves preserve the selected project, and file inputs fit narrow screens. Standalone runtime and member entry checks are next. The released version is 1.14.0.
+Version 1.15 adds project role coverage checks. Administrators can see unassigned roles and jump to project permissions. Disabled accounts, historical roles and duplicate assignments are covered, with 125 local tests passing. Browser acceptance now covers an empty instance, importing definitions, adding two projects, assigning roles and creating the first record. Permission saves preserve the selected project, and file inputs fit narrow screens. Standalone runtime and member entry checks pass. The cloud app is on 1.15.0.
