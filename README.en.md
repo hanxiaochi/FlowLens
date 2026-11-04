@@ -22,6 +22,14 @@ No installation or API key needed. Start with a fictional supervision applicatio
 
 [1.3 release notes and acceptance](docs/release-1.3.0.md)
 
+## 1.14 review changes before publishing
+
+Upload an update package, compare fields, workflows and form layouts, then confirm publication. An outdated preview asks for another review. If the response is lost, continue with the original request. Existing records retain their historical templates.
+
+All 124 local tests and 19 standalone runtime checks pass. Final cross-platform and cloud acceptance is in progress. [Release notes (Chinese)](docs/release-1.14.0.md)
+
+![Blank form layouts before and after publication](docs/images/publication-layout-1.14.png)
+
 ## 1.13 choose what each record card shows
 
 Open a form template’s summary settings and choose up to three fields in display order. Record numbers, deadlines and issue descriptions can appear directly on the card. Local records, project cards and the team list share the configuration, which travels with exported applications. Existing records retain the template snapshot they were created with.
