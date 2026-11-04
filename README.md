@@ -302,3 +302,6 @@ npm test
 
 
 恢复工具改进已随 **1.19.0-rc.2** 候选版发布：支持只读备份来源，完成全部校验后才生成目标文件。158 项本地测试及云端只读挂载、磁盘不足隔离检查通过；[rc.2 下载与说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.19.0-rc.2)。跨平台 CI 及重新下载后的 24 项运行检查通过。
+
+
+[当前交付门槛与待确认项](docs/delivery-readiness-2026-11-04.md)

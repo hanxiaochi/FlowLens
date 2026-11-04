@@ -311,3 +311,6 @@ Version 1.16 adds CSV import. CSV import now previews column mappings, invalid v
 
 
 Restore hardening is available in the **1.19.0-rc.2** candidate: read-only backup sources are staged privately and the destination appears only after validation and session cleanup. All 158 local tests and isolated cloud read-only/low-disk checks passed. [Download rc.2](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.19.0-rc.2). Cross-platform CI and 24 checks against the downloaded runtime passed.
+
+
+[Delivery gates and pending confirmations (Chinese)](docs/delivery-readiness-2026-11-04.md)
