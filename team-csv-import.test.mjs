@@ -1,21 +1,26 @@
 import test from 'node:test';
+import http from 'node:http';
+import {createTeamServer} from './team-server.mjs';
 import assert from 'node:assert/strict';
 import {mkdtemp, rm} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {DatabaseSync} from 'node:sqlite';
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import {prepareCsvImport, parseCsv} from './team-csv-import.mjs';
 import {openTeamStore} from './team-store.mjs';
 import {applicationDemo} from './apps-demo.mjs';
 
 const optionsFor = plan => ({operationId: crypto.randomUUID(), planFingerprint: plan.planFingerprint, expectedUserId: plan.userId, expectedInstanceId: plan.instanceId});
-async function setup() {
+async function setup(recordCount = 1) {
   const directory = await mkdtemp(join(tmpdir(), 'flowlens-csv-'));
   const filename = join(directory, 'team.sqlite');
   const store = openTeamStore(filename);
   const admin = await store.createUser(null, {username: 'admin', name: 'Admin', password: 'csv-test-password'});
   const member = await store.createUser(admin, {username: 'member', name: 'Member', password: 'csv-test-password'});
   const sample = applicationDemo();
+  if (recordCount > 1) sample.cases = Array.from({length: recordCount}, (_, index) => ({...structuredClone(sample.cases[0]), id: 'existing-' + index}));
   store.importApplication(admin, sample);
   store.setMembership(admin, {userId: member.id, projectId: sample.projects[0].id, roles: ['专业监理']});
   const source = {projectId: sample.projects[0].id, templateId: sample.templates[0].id, csv: '编号,要求\n00001234567890123456789,"检查,第一项"\n00002,"两行\n要求"', mapping: ['instruction-no', 'issue']};
@@ -122,4 +127,88 @@ test('CSV handles supported field identifiers that match object prototype names'
   assert.equal(result.records[0].events.at(-1).diff[0].before, '');
   const missing = prepareCsvImport(workspace, {projectId: workspace.projects[0].id, templateId: template.id, csv: '问题\n待核对', mapping: ['issue']});
   assert.ok(missing.rows[0].missingRequired.includes(field.label));
+});
+
+
+test('CSV duplicate review compares mapped values and preserves all rows for explicit confirmation', () => {
+  const workspace = applicationDemo();
+  const result = prepareCsvImport(workspace, {projectId: workspace.projects[0].id, templateId: workspace.templates[0].id,
+    csv: '编号,备注\n0001,first\n0001,second\n0001,third\n1,fourth', mapping: ['instruction-no', '']});
+  assert.deepEqual(result.rows.map(row => row.duplicateOf), [null, 2, 2, null]);
+  assert.equal(result.records.length, 4); assert.equal(result.ready, true);
+});
+
+test('CSV rechecks batch capacity after another import while completed receipt remains replayable', async () => {
+  const {directory, filename, store, admin, member, source} = await setup(2998);
+  const peer = openTeamStore(filename);
+  try {
+    const first = optionsFor(store.previewCsvImport(member, source));
+    const second = optionsFor(peer.previewCsvImport(member, source));
+    const result = store.importCsv(member, source, first);
+    assert.equal(result.imported, 2);
+    assert.throws(() => peer.importCsv(member, source, second), error => error.status === 413);
+    assert.deepEqual(peer.importCsv(member, source, first), result);
+    assert.equal(store.visibleWorkspace(admin).workspace.cases.length, 3000);
+    assert.equal(store.audit(admin).filter(event => event.action === 'cases.csv-import').length, 1);
+  } finally { peer.close(); store.close(); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('CSV rejects oversized snapshot batches before writing any records', async () => {
+  const {directory, store, admin, member, sample, source} = await setup();
+  try {
+    const updated = structuredClone(sample); updated.templates[0].version++;
+    for (let index = 0; index < 40; index++) updated.templates[0].blocks.push({id: 'large-' + index, type: 'paragraph', text: 'x'.repeat(20000)});
+    store.updateDefinitions(admin, updated);
+    const before = store.visibleWorkspace(admin), audit = store.audit(admin);
+    const oversized = {...source, csv: '编号\n' + '0001\n'.repeat(50), mapping: ['instruction-no']};
+    assert.throws(() => store.previewCsvImport(member, oversized), error => error.status === 413);
+    assert.deepEqual(store.visibleWorkspace(admin), before); assert.deepEqual(store.audit(admin), audit);
+  } finally { store.close(); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('CSV completed and pending requests are refused after CLI restore changes the instance', async () => {
+  const {directory, store, admin, member, source} = await setup();
+  let restored;
+  try {
+    const completed = optionsFor(store.previewCsvImport(member, source));
+    store.importCsv(member, source, completed);
+    const pending = optionsFor(store.previewCsvImport(member, source));
+    const backup = join(directory, 'backup.sqlite'), target = join(directory, 'restored.sqlite');
+    await store.backup(backup);
+    const restore = spawnSync(process.execPath, [fileURLToPath(new URL('./scripts/team-admin.mjs', import.meta.url)), 'restore', backup], {env: {...process.env, FLOWLENS_DATABASE: target}, encoding: 'utf8', windowsHide: true});
+    assert.equal(restore.status, 0, restore.stderr);
+    restored = openTeamStore(target);
+    const before = restored.visibleWorkspace(admin), audit = restored.audit(admin);
+    assert.throws(() => restored.importCsv(member, source, completed), error => error.status === 409);
+    assert.throws(() => restored.importCsv(member, source, pending), error => error.status === 409);
+    assert.deepEqual(restored.visibleWorkspace(admin), before); assert.deepEqual(restored.audit(admin), audit);
+  } finally { restored?.close(); store.close(); await rm(directory, {recursive: true, force: true}); }
+});
+
+
+test('concurrent CSV HTTP retries share a receipt and revoked roles prevent later imports', async () => {
+  const {directory, filename, store, admin, member, source} = await setup();
+  const {server} = createTeamServer({database: filename});
+  try {
+    const session = await store.login('member', 'csv-test-password');
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    const request = (path, input) => new Promise((resolve, reject) => {
+      const req = http.request({hostname: '127.0.0.1', port: server.address().port, path: '/api/team/' + path, method: 'POST', headers: {Host: '127.0.0.1:4186', 'Content-Type': 'application/json', 'X-FlowLens-Request': '1', Cookie: 'flowlens_session=' + session.token}}, response => {
+        let text = ''; response.setEncoding('utf8'); response.on('data', chunk => text += chunk);
+        response.on('end', () => resolve({status: response.statusCode, body: JSON.parse(text)}));
+      });
+      req.on('error', reject); req.end(JSON.stringify(input));
+    });
+    const preview = await request('csv-preview', source); assert.equal(preview.status, 200);
+    const payload = {source, options: optionsFor(preview.body)};
+    const results = await Promise.all([request('csv-import', payload), request('csv-import', payload)]);
+    assert.equal(results[0].status, 200); assert.deepEqual(results[1], results[0]);
+    assert.equal(store.visibleWorkspace(admin).workspace.cases.length, 3);
+    assert.equal(store.audit(admin).filter(event => event.action === 'cases.csv-import').length, 1);
+    const pending = {source, options: optionsFor((await request('csv-preview', source)).body)};
+    store.setMembership(admin, {userId: member.id, projectId: source.projectId, roles: []});
+    assert.equal((await request('csv-import', pending)).status, 403);
+    assert.equal((await request('csv-preview', source)).status, 403);
+    assert.equal(store.visibleWorkspace(admin).workspace.cases.length, 3);
+  } finally { await new Promise(resolve => server.close(resolve)); store.close(); await rm(directory, {recursive: true, force: true}); }
 });

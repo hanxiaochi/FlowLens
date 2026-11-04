@@ -255,13 +255,34 @@ async function enterWorkspace() {
     if (count) say('发现 ' + count + ' 份本机填写草稿，可从“本机填写草稿”核对恢复。');
   } catch (error) { say('本机填写草稿无法读取，请使用下载草稿保留填写内容。' + error.message, true); }
 }
-function csvImportView(templateId) {
+async function csvImportView(templateId, previousSource = null) {
   if (!clean()) return;
-  const targetProject = projectId;
+  const targetProject = previousSource?.projectId ?? projectId;
   selectedId = ''; selectedRecord = null; accountView(); content.replaceChildren();
   content.append(node('h1', '把台账导入为业务草稿'), node('p', '选择 UTF-8 CSV，第一行为列名，每批最多 500 行、200 列、2 MiB。先核对字段映射和数据，再确认创建。每次新确认会创建一批新草稿，请核对是否已经导入过。'));
   const file = input('选择 CSV 台账', 'file'); file.accept = '.csv,text/csv';
   const mappingPanel = node('section', undefined, 'panel stack');
+  async function showMapping(source) {
+    mappingPanel.replaceChildren();
+    let discovery;
+    try { discovery = await api('csv-preview', {...source, mapping: undefined}); }
+    catch (error) {
+      mappingPanel.append(node('p', '台账内容仍保留在当前页面，可重试读取或下载保存。'), button('重试读取台账', () => showMapping(source)), button('下载保留的 CSV', () => download('FlowLens-原台账.csv', source.csv, 'text/csv;charset=utf-8')));
+      throw error;
+    }
+    mappingPanel.append(node('h2', '将台账列对应到填写字段'), node('p', discovery.rowCount + ' 行业务。编号按文字保留；日期使用 YYYY-MM-DD，是或否使用 true / false，明细字段使用 JSON 数组。'));
+    const controls = discovery.headers.map((header, index) => {
+      const matches = discovery.fields.filter(field => field.label === header);
+      let initial = matches.length === 1 ? matches[0].id : '';
+      if (source.mapping) initial = discovery.fields.some(field => field.id === source.mapping[index]) ? source.mapping[index] : '';
+      const control = select('台账列 ' + header, [['', '忽略此列'], ...discovery.fields.map(field => [field.id, field.label + ' · ' + FIELD_TYPES[field.type || 'text']])], initial);
+      mappingPanel.append(label(header, control)); return control;
+    });
+    const sample = node('details'); sample.append(node('summary', '查看前 10 行原始内容'));
+    for (const row of discovery.sample) sample.append(node('p', '第 ' + row.line + ' 行 · ' + row.values.map(value => value.slice(0, 150)).join(' | ')));
+    mappingPanel.append(sample, button('预览导入结果', () => csvPreviewView({...source, mapping: controls.map(control => control.value)}), 'primary'));
+    say('CSV 已保留，请核对每列对应的填写字段。重新选择文件会替换当前内容。');
+  }
   file.onchange = () => task(async () => {
     mappingPanel.replaceChildren();
     const selected = file.files[0]; if (!selected) return;
@@ -269,37 +290,45 @@ function csvImportView(templateId) {
     let csv;
     try { csv = new TextDecoder('utf-8', {fatal: true}).decode(await selected.arrayBuffer()); }
     catch { throw Error('无法按 UTF-8 读取，请从表格软件另存为 CSV UTF-8。'); }
-    const source = {csv, projectId: targetProject, templateId};
-    const discovery = await api('csv-preview', source);
-    mappingPanel.append(node('h2', '将台账列对应到填写字段'), node('p', discovery.rowCount + ' 行业务。编号按文字保留；日期使用 YYYY-MM-DD，是或否使用 true / false，明细字段使用 JSON 数组。'));
-    const controls = discovery.headers.map(header => {
-      const matches = discovery.fields.filter(field => field.label === header);
-      const initial = matches.length === 1 ? matches[0].id : '';
-      const control = select('台账列 ' + header, [['', '忽略此列'], ...discovery.fields.map(field => [field.id, field.label + ' · ' + FIELD_TYPES[field.type || 'text']])], initial);
-      mappingPanel.append(label(header, control)); return control;
-    });
-    const sample = node('details'); sample.append(node('summary', '查看前 10 行原始内容'));
-    for (const row of discovery.sample) sample.append(node('p', '第 ' + row.line + ' 行 · ' + row.values.map(value => value.slice(0, 150)).join(' | ')));
-    mappingPanel.append(sample, button('预览导入结果', () => csvPreviewView({...source, mapping: controls.map(control => control.value)}), 'primary'));
-    say('CSV 已读取，请核对每列对应的填写字段。');
+    await showMapping({csv, projectId: targetProject, templateId});
   });
   content.append(file, mappingPanel, button('返回项目', async () => { await refresh(); home(); }));
+  if (previousSource) await showMapping(previousSource);
 }
+
 async function csvPreviewView(source) {
   acceptSession(await api('me'));
   const plan = await api('csv-preview', source);
   if (plan.userId !== user.id || plan.instanceId !== serviceContext.instanceId) throw Error('账号或服务环境已变化，请重新预览。');
-  content.replaceChildren(node('h1', '核对台账导入'), node('p', plan.rowCount + ' 行将生成业务草稿。缺少必填项可在草稿中补齐后提交，格式错误需先修正。'));
-  for (const row of plan.rows.slice(0, 50)) {
-    const card = node('article', undefined, 'panel csv-preview-row'); card.append(node('h2', 'CSV 第 ' + row.line + ' 行'));
-    for (const [id, value] of Object.entries(row.values)) card.append(node('p', plan.fields.find(field => field.id === id).label + ' · ' + value.slice(0, 2000)));
-    for (const error of row.errors) card.append(node('p', error, 'status-warning'));
-    for (const warning of row.warnings) card.append(node('p', warning.field + ' 将覆盖项目带入值 · ' + warning.before + ' → ' + warning.after, 'status-warning'));
-    if (row.missingRequired.length) card.append(node('p', '提交前需补齐 · ' + row.missingRequired.join('、')));
-    content.append(card);
-  }
+  content.replaceChildren(node('h1', '核对台账导入'), node('p', '准备导入 ' + plan.rowCount + ' 行。确认后生成业务草稿，缺少必填项可在草稿中补齐后提交，格式错误需先修正。'));
   const invalid = plan.rows.filter(row => row.errors.length).length;
-  content.append(node('p', '共 ' + invalid + ' 行存在格式错误。页面展示前 50 行，每个值最多 2000 字符，可下载完整预览核对所有行。'));
+  const duplicates = plan.rows.filter(row => row.duplicateOf !== null).length;
+  content.append(node('p', '格式错误 ' + invalid + ' 行 · 与前面填写值相同 ' + duplicates + ' 行。相同行仍会分别创建草稿，请确认是否需要保留。'));
+  const filter = select('预览行筛选', [['all', '全部行'], ['errors', '格式错误行'], ['duplicates', '重复填写行']]);
+  const rowsPanel = node('section');
+  const pager = node('div', undefined, 'toolbar');
+  let page = 0;
+  function renderRows() {
+    const rows = plan.rows.filter(row => filter.value === 'all' || filter.value === 'errors' && row.errors.length || filter.value === 'duplicates' && row.duplicateOf !== null);
+    const pages = Math.max(1, Math.ceil(rows.length / 50));
+    page = Math.min(page, pages - 1); rowsPanel.replaceChildren(); pager.replaceChildren();
+    for (const row of rows.slice(page * 50, (page + 1) * 50)) {
+      const card = node('article', undefined, 'panel csv-preview-row'); card.append(node('h2', 'CSV 第 ' + row.line + ' 行'));
+      for (const [id, value] of Object.entries(row.values)) card.append(node('p', plan.fields.find(field => field.id === id).label + ' · ' + value.slice(0, 2000)));
+      for (const error of row.errors) card.append(node('p', error, 'status-warning'));
+      for (const warning of row.warnings) card.append(node('p', warning.field + ' 将覆盖项目带入值 · ' + warning.before + ' → ' + warning.after, 'status-warning'));
+      if (row.duplicateOf !== null) card.append(node('p', '与第 ' + row.duplicateOf + ' 行的已映射填写值相同，请核对。', 'status-warning'));
+      if (row.missingRequired.length) card.append(node('p', '提交前需补齐 · ' + row.missingRequired.join('、')));
+      rowsPanel.append(card);
+    }
+    if (!rows.length) rowsPanel.append(node('p', '当前筛选下没有数据行。'));
+    const previous = button('上一页预览', () => { page--; renderRows(); }); previous.disabled = page === 0;
+    const next = button('下一页预览', () => { page++; renderRows(); }); next.disabled = page + 1 === pages;
+    pager.append(previous, node('span', '第 ' + (page + 1) + ' / ' + pages + ' 页 · 当前筛选 ' + rows.length + ' 行'), next);
+  }
+  filter.onchange = () => { page = 0; renderRows(); };
+  content.append(label('查看数据行', filter), rowsPanel, pager, node('p', '每页 50 行，每个值最多展示 2000 字符，可下载完整预览核对原值。'));
+  renderRows();
   const confirm = button('确认创建这批草稿', async () => {
     if (pending) throw Error('请先处理待确认操作。');
     const request = {type: 'import-csv', projectId: source.projectId, templateId: source.templateId, source, planFingerprint: plan.planFingerprint, operationId: crypto.randomUUID(), expectedUserId: plan.userId, expectedInstanceId: plan.instanceId};
@@ -309,8 +338,8 @@ async function csvPreviewView(source) {
     pending = entry.request; pendingDraft = null; confirm.disabled = true; await sendPending();
   }, 'primary');
   confirm.disabled = !plan.ready;
-  content.append(confirm, button('下载完整导入预览', () => download('FlowLens-导入预览.json', JSON.stringify(plan, null, 2))), button('下载原 CSV', () => download('FlowLens-原台账.csv', source.csv, 'text/csv;charset=utf-8')), button('重新选择与映射', () => csvImportView(source.templateId)));
-  say(plan.ready ? '请核对字段值与项目资料覆盖提示后确认。' : '请先修正错误，再重新上传预览。', !plan.ready);
+  content.append(confirm, button('下载完整导入预览', () => download('FlowLens-导入预览.json', JSON.stringify(plan, null, 2))), button('下载原 CSV', () => download('FlowLens-原台账.csv', source.csv, 'text/csv;charset=utf-8')), button('重新映射字段', () => csvImportView(source.templateId, source)));
+  say(plan.ready ? '请核对字段值与项目资料覆盖提示后确认。' : '请修正台账或调整字段映射，再重新预览。', !plan.ready);
 }
 function csvResultView(result) {
   content.replaceChildren(node('h1', '台账草稿已创建'), node('p', '已创建 ' + result.imported + ' 份业务草稿，请逐份核对后提交。'), node('p', '操作编号 ' + result.operationId));

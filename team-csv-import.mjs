@@ -67,6 +67,7 @@ export function prepareCsvImport(workspace, input) {
   const mapped = mapping.filter(Boolean);
   if (!mapped.length || new Set(mapped).size !== mapped.length) throw Error('至少映射一个字段，同一字段不能映射多列');
   const records = [], rows = [];
+  const firstMatchingRow = new Map();
   for (const source of table.rows) {
     const errors = [], warnings = [], values = {};
     if (source.values.length !== table.headers.length) errors.push(`列数为 ${source.values.length}，应为 ${table.headers.length}`);
@@ -80,13 +81,16 @@ export function prepareCsvImport(workspace, input) {
       Object.defineProperty(values, id, {value, enumerable: true});
       if (Object.hasOwn(initial.values, id) && initial.values[id] !== value) warnings.push({field: field.label, before: initial.values[id], after: value, reason: '覆盖项目带入值'});
     }
-    let record;
+    let record, duplicateOf = null;
     if (!errors.length) {
       record = startProjectCase(workspace, {appId: project.appId, projectId: project.id, templateId: template.id}).record;
       record = applyOperation(record, {type: 'save', role: record.submitter, values, note: `CSV 导入，第 ${source.line} 行，请核对后提交`});
       records.push(record);
+      const key = JSON.stringify(values);
+      duplicateOf = firstMatchingRow.get(key) ?? null;
+      if (duplicateOf === null) firstMatchingRow.set(key, source.line);
     }
-    rows.push({line: source.line, values, errors, warnings, missingRequired: record ? missingRequired(record, 'draft').map(field => field.label) : []});
+    rows.push({line: source.line, values, errors, warnings, duplicateOf, missingRequired: record ? missingRequired(record, 'draft').map(field => field.label) : []});
   }
   return {project, template, application, headers: table.headers, fields, rows, records, ready: rows.every(row => !row.errors.length)};
 }
