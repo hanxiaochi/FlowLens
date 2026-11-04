@@ -1,6 +1,6 @@
 # FlowLens
 
-[简体中文](README.md) · **English** · [v1.13.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.13.0)
+[简体中文](README.md) · **English** · [v1.14.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.14.0)
 
 **[Try the live demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -26,7 +26,7 @@ No installation or API key needed. Start with a fictional supervision applicatio
 
 Upload an update package, compare fields, workflows and form layouts, then confirm publication. An outdated preview asks for another review. If the response is lost, continue with the original request. Existing records retain their historical templates.
 
-All 124 local tests and 19 standalone runtime checks pass. Final cross-platform and cloud acceptance is in progress. [Release notes (Chinese)](docs/release-1.14.0.md)
+All 124 local tests and 19 standalone runtime checks pass. Final cross-platform CI and five-account cloud data comparisons pass. [Release notes (Chinese)](docs/release-1.14.0.md)
 
 ![Blank form layouts before and after publication](docs/images/publication-layout-1.14.png)
 
@@ -121,7 +121,7 @@ Import an application package into the self-hosted team service, create accounts
 
 The server checks project roles, workflow stages, and record revisions. Repeated requests reuse their result. This release also adds account deactivation, password changes, audit history, versioned template publication, and SQLite backup and restore tools.
 
-Download `FlowLens-1.13.0-team.zip`, install Node.js 24 LTS, initialize the administrator, then run `npm start`. The team runtime bundles its required files and needs no npm install. See the [deployment guide (Chinese)](docs/team-deployment.md) and [release acceptance](docs/release-1.13.0.md).
+Download `FlowLens-1.14.0-team.zip`, install Node.js 24 LTS, initialize the administrator, then run `npm start`. The team runtime bundles its required files and needs no npm install. See the [deployment guide (Chinese)](docs/team-deployment.md) and [release acceptance](docs/release-1.13.0.md).
 
 The public demo runs locally in your browser. The shared service is self-hosted and intended for a small-team pilot. Cloud technical acceptance is recorded. Customer workflows, sustained capacity, and maintenance handover still need validation.
 
@@ -256,4 +256,4 @@ Found a problem or have an idea? Open an [issue](https://github.com/hanxiaochi/F
 
 Version 1.14 is adding definition-publication previews and recovery. The server now provides a read-only preview and guarded publication endpoints that bind the account, service instance, configuration baseline and update package. Repeating an operation ID returns the original result; ordinary record edits can continue during review.
 
-The development UI now uses publication previews and browser recovery storage, with all 124 local tests passing. Expand complex forms to compare nested tables, merged cells and column widths. Browser checks cover concurrent changes, permission changes, storage quota, cleanup failures and reconnection after an API outage following a successful publication. Layout was checked at a 390-pixel viewport. The new UI uses guarded publication endpoints; the legacy endpoint retains its compatible behavior. The released and cloud versions remain 1.13.0 while 1.14 undergoes package and release acceptance.
+The development UI now uses publication previews and browser recovery storage, with all 124 local tests passing. Expand complex forms to compare nested tables, merged cells and column widths. Browser checks cover concurrent changes, permission changes, storage quota, cleanup failures and reconnection after an API outage following a successful publication. Layout was checked at a 390-pixel viewport. The new UI uses guarded publication endpoints; the legacy endpoint retains its compatible behavior. The cloud app is on 1.14.0. Release-download and final backup checks are in progress.
