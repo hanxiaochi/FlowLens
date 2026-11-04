@@ -1,6 +1,6 @@
 # FlowLens
 
-[简体中文](README.md) · **English** · [v1.17.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.17.0)
+[简体中文](README.md) · **English** · [v1.18.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.18.0)
 
 **[Try the live demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -22,11 +22,11 @@ No installation or API key needed. Start with a fictional supervision applicatio
 
 [1.3 release notes and acceptance](docs/release-1.3.0.md)
 
-## In development: take your project ledger into Excel
+## 1.18 take your project ledger into Excel
 
 The team app now exports an XLSX workbook with one row per record and separate detail sheets linked by record ID. Different historical form structures get separate sheets. Long identifiers, leading zeros, and formula-like input remain text. Use this workbook for review and handoff; use the project archive for attachments, workflow history, and recovery.
 
-Checked in desktop Excel and against an actual browser download containing 57 fictional records, 342 field values, and their detail rows. This is **1.18.0-dev.1**; the released and cloud versions remain **1.17.0**. Packaging and deployment acceptance are still pending. See the [delivery plan (Chinese)](docs/delivery-plan.md).
+Checked in desktop Excel and against an actual browser download containing 57 fictional records, 342 field values, and their detail rows. All 145 local tests, 23 candidate runtime checks, and cross-platform CI passed. The cloud app has been upgraded: five-account data comparisons and 10 ledger downloads matched. See the [release notes and acceptance status (Chinese)](docs/release-1.18.0.md).
 
 ## 1.17 find imported records by batch
 

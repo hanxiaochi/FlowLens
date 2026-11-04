@@ -1,6 +1,6 @@
 # FlowLens
 
-**简体中文** · [English](README.en.md) · [v1.17.0 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.17.0)
+**简体中文** · [English](README.en.md) · [v1.18.0 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.18.0)
 
 **[直接打开在线 Demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -18,11 +18,11 @@
 
 [需求研究与下一阶段缺口](docs/fde-product-audit-2026-11-02.md) · [业务访谈与交付验收工作单](docs/fde-discovery-worksheet.md)
 
-## 开发中：把项目台账交给 Excel
+## 1.18 把项目台账交给 Excel
 
 团队版新增“下载 Excel 台账”：每份单据一行，明细另起工作表，并保留所属单据编号。历史表式字段不同会分表，长编号、前导零和填写的公式文本按原值保留。台账用于核对和交接；完整附件、办理历史和恢复资料仍在项目资料包中。
 
-已通过本机 Excel 打开检查，以及浏览器实际下载的 57 份虚构业务、342 个填写字段和明细逐项比对。目前为 **1.18.0-dev.1**，正式发行和云端仍为 **1.17.0**，后续发布验收见[交付计划](docs/delivery-plan.md)。
+已通过本机 Excel 打开检查，以及浏览器实际下载的 57 份虚构业务、342 个填写字段和明细逐项比对。145 项本地回归、23 项候选运行检查及跨平台 CI 通过；云端已升级，五账号数据与 10 次台账下载核对一致。[本版说明与验收状态](docs/release-1.18.0.md)。
 
 ## 1.17 按批次找回导入的单据
 
