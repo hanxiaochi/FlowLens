@@ -1,3 +1,4 @@
+import {projectRoleCoverage} from './team-delivery.mjs';
 import http from 'node:http';
 import {unzipSync} from './team-vendor/fflate.mjs';
 import {buildProjectArchive, projectExportLimit} from './team-project-export.mjs';
@@ -631,4 +632,27 @@ test('project export releases its single-transfer slot after an interrupted HTTP
     await new Promise(resolve => server.close(resolve));
     await rm(directory, {recursive: true, force: true});
   }
+});
+
+
+test('project role coverage excludes disabled accounts and keeps historical project roles', () => {
+  const projects = [{id: 'one', name: 'First'}, {id: 'two', name: 'Second'}];
+  const roles = {one: ['Writer', 'Reviewer', 'Historical'], two: ['Writer']};
+  const users = [{id: 'admin', name: 'Admin', admin: true}, {id: 'active', name: 'Active'}, {id: 'disabled', name: 'Disabled', disabled: true}];
+  const memberships = [
+    {userId: 'active', projectId: 'one', roles: ['Writer']},
+    {userId: 'active', projectId: 'one', roles: ['Writer']},
+    {userId: 'disabled', projectId: 'one', roles: ['Reviewer']},
+    {userId: 'deleted', projectId: 'one', roles: ['Historical']},
+    {userId: 'active', projectId: 'two', roles: ['Writer']}
+  ];
+  const snapshot = structuredClone({projects, roles, users, memberships});
+  const result = projectRoleCoverage(projects, roles, users, memberships);
+  assert.deepEqual(result[0].missingRoles, ['Reviewer', 'Historical']);
+  assert.deepEqual(result[0].roles[0].members, [{id: 'active', name: 'Active'}]);
+  assert.deepEqual(result[1].missingRoles, []);
+  assert.deepEqual({projects, roles, users, memberships}, snapshot);
+  assert.deepEqual(projectRoleCoverage([], {}, users, memberships), []);
+  users[2].disabled = false;
+  assert.deepEqual(projectRoleCoverage(projects, roles, users, memberships)[0].missingRoles, ['Historical']);
 });

@@ -14,3 +14,14 @@ export const deliveryChecks = {
 };
 
 export const deliveryStatusLabels = {pending: '待确认', passed: '已确认通过', blocked: '待解决', 'needs-review': '需要重新核验'};
+
+export function projectRoleCoverage(projects, roleOptions, users, memberships) {
+  const activeUsers = new Map(users.filter(user => !user.disabled).map(user => [user.id, user]));
+  return projects.map(project => {
+    const roles = (roleOptions[project.id] ?? []).map(role => {
+      const memberIds = new Set(memberships.filter(member => member.projectId === project.id && member.roles.includes(role)).map(member => member.userId));
+      return {role, members: [...memberIds].filter(id => activeUsers.has(id)).map(id => ({id, name: activeUsers.get(id).name}))};
+    });
+    return {projectId: project.id, name: project.name, roles, missingRoles: roles.filter(item => !item.members.length).map(item => item.role)};
+  });
+}

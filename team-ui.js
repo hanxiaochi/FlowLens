@@ -2,7 +2,7 @@ import {projectRoles} from './apps-model.mjs';
 import {canEdit} from './forms-model.mjs';
 import {renderDetailField} from './forms-detail-ui.js';
 import {printableForm} from './forms-print.mjs';
-import {deliveryStatusLabels} from './team-delivery.mjs';
+import {deliveryStatusLabels, projectRoleCoverage} from './team-delivery.mjs';
 import {teamJsonRequest} from './team-http.mjs';
 import {createRecoveryStore} from './team-recovery.mjs';
 import {createDraftStore, draftForRecord} from './team-drafts.mjs';
@@ -852,6 +852,22 @@ async function adminView() {
   }
   member.onchange = showRoles; project.onchange = showRoles; showRoles();
   permissions.append(label('成员', member), label('项目', project), checkboxes, button('保存项目权限', async () => { await api('membership', {userId: member.value, projectId: project.value, roles: Array.from(checkboxes.querySelectorAll('input:checked')).map(item => item.value)}); await adminView(); say('项目权限已更新。取消全部角色会撤销项目访问。'); }, 'primary'));
+  const coverage = node('section', undefined, 'panel stack'); coverage.append(node('h2', '项目办理角色检查'));
+  coverage.append(node('p', '核对每个角色是否有启用成员承办，包含旧单据仍使用的角色。实际职责请在交付检查中确认。', 'muted'));
+  if (!workspace.projects.length) coverage.append(node('p', '先导入包含项目的应用包，再配置办理成员。'));
+  for (const item of projectRoleCoverage(workspace.projects, roleOptions, data.users, data.memberships)) {
+    const section = node('section', undefined, 'stack'); section.append(node('h3', item.name));
+    let status = '所有办理角色都有启用成员。';
+    if (item.missingRoles.length) status = '待分配 · ' + item.missingRoles.join('、');
+    if (!item.roles.length) status = '尚无办理角色，请检查应用表式配置。';
+    section.append(node('p', status));
+    for (const role of item.roles) section.append(node('p', role.role + ' · ' + (role.members.map(member => member.name).join('、') || '暂无启用成员')));
+    const configure = node('button', '配置此项目角色'); configure.type = 'button';
+    configure.onclick = () => { project.value = item.projectId; showRoles(); project.focus(); permissions.scrollIntoView({block: 'center'}); };
+    section.append(configure);
+    coverage.append(section);
+  }
+  content.append(coverage);
   grid.append(imports, users, permissions); content.append(grid, node('h2', '最近审计记录'));
   const memberList = node('section', undefined, 'panel'); memberList.append(node('h2', '账号状态'));
   for (const member of data.users) {
