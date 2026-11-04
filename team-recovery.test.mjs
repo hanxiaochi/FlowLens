@@ -130,3 +130,21 @@ test('recovery retains an isolated source-draft version for cleanup after reload
     assert.equal(entry.request.draft, undefined);
   } finally { await store.close(); }
 });
+
+
+test('CSV recovery preserves source and mappings across reload and blocks competing imports for one form', async () => {
+  const factory = new IDBFactory();
+  let store = createRecoveryStore(factory);
+  try {
+    const original = request({type: 'import-csv', projectId: 'project', templateId: 'form', source: {csv: '编号\n0001', mapping: ['code']}, planFingerprint: 'plan'});
+    await store.stage('user-a', 'instance-a', original);
+    original.source.csv = 'changed';
+    await assert.rejects(store.stage('user-a', 'instance-a', {...original, operationId: crypto.randomUUID()}), /待确认/);
+    await store.close(); store = createRecoveryStore(factory);
+    const entries = await store.list('user-a');
+    assert.equal(entries[0].request.source.csv, '编号\n0001');
+    assert.deepEqual(entries[0].request.source.mapping, ['code']);
+    assert.deepEqual(await store.list('other'), []);
+    assert.deepEqual(entries[0].scope, ['user-a', 'instance-a', 'csv', 'project', 'form']);
+  } finally { await store.close(); }
+});

@@ -71,7 +71,7 @@ export function startProjectCase(workspace, {appId, projectId, templateId, sourc
   record.appId = appId;
   record.projectId = projectId;
   record.provenance = [];
-  const values = {};
+  const values = Object.create(null);
   for (const binding of app.bindings.filter(item => item.templateId === templateId)) {
     const field = template.fields.find(item => item.id === binding.fieldId);
     const value = project[binding.key] ?? '';

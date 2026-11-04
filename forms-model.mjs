@@ -14,7 +14,7 @@ export function createCase(template,{title='',project='',role='填报人',relate
  return {id:uid(),title:title.trim()||template.title,project,relatedId,template:clone(template),values:{},attachments:[],submitter:role,status:'draft',step:-1,revision:0,events:[],createdAt:new Date().toISOString()};
 }
 export function canEdit(record,field,role){return record.status!=='complete'&&((record.status==='draft'&&role===record.submitter&&field.owner==='draft')||(record.status==='active'&&record.template.workflow[record.step]?.role===role&&field.owner===record.template.workflow[record.step].id));}
-export function missingRequired(record,owner){return record.template.fields.filter(f=>f.owner===owner&&((f.required&&!String(record.values[f.id]??'').trim())||missingDetailValues(f,record.values[f.id])));}
+export function missingRequired(record,owner){return record.template.fields.filter(f=>{const value=Object.hasOwn(record.values,f.id)?record.values[f.id]:'';return f.owner===owner&&((f.required&&!String(value).trim())||missingDetailValues(f,value));});}
 export function applyOperation(record,{type,role,values={},note='',at=new Date().toISOString(),expectedRevision=record.revision,operationId=uid()}){
  if(typeof operationId!=='string'||!operationId.trim()||operationId.length>200)throw Error('操作编号无效');
  const previous=record.events.find(e=>e.operationId===operationId);if(previous){if(previous.role!==role||previous.type!==type)throw Error('操作编号已用于其他办理');return clone(record);}
@@ -28,7 +28,8 @@ export function applyOperation(record,{type,role,values={},note='',at=new Date()
   const f=r.template.fields.find(x=>x.id===key);if(!f||!canEdit(r,f,role))throw Error('不能修改其他办理阶段的字段');
   const value=raw===null?'':(f.type==='number'&&typeof raw==='number'||f.type==='boolean'&&typeof raw==='boolean')?String(raw):raw;
   validateFieldValue(f,value);
-  if(value!==(r.values[key]??'')){diff.push({field:f.label,before:r.values[key]??'',after:value});r.values[key]=value;}
+  const before=Object.hasOwn(r.values,key)?r.values[key]:'';
+  if(value!==before){diff.push({field:f.label,before,after:value});Object.defineProperty(r.values,key,{value,enumerable:true,writable:true,configurable:true});}
  }
  const from=r.status==='draft'?'填报':current.label;
  if(type==='return'){
@@ -67,7 +68,7 @@ export function summarizeRecord(record) {
   const selected = record.template.summaryFields;
   const fields = selected?.length ? selected.map(id => record.template.fields.find(field => field.id === id)) : record.template.fields;
   for (const field of fields) {
-    const value = record.values[field.id];
+    const value = Object.hasOwn(record.values, field.id) ? record.values[field.id] : undefined;
     if (value === undefined || value === null || String(value).trim() === '') continue;
     let text = String(value);
     if (field.type === 'table') {

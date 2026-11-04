@@ -1,4 +1,5 @@
 import {definitionDetails} from './team-definition-diff.mjs';
+import {parseCsv, prepareCsvImport} from './team-csv-import.mjs';
 import {summarizeWorkspace} from './team-read-model.mjs';
 import {prepareProjectRestore} from './team-project-restore.mjs';
 import {checkProjectArchive, inspectProjectArchive} from './team-project-check.mjs';
@@ -445,6 +446,72 @@ export function openTeamStore(filename) {
       return result;
     });
   }
+  function csvContext(user, current, input) {
+    active(user);
+    const project = current.projects.find(item => item.id === input.projectId);
+    const template = current.templates.find(item => item.id === input.templateId);
+    if (!project || !template) fail(404, '项目或表式不存在');
+    authorize(user, project.id, template.submitterRole || '填报人');
+    const application = current.applications.find(item => item.id === project.appId);
+    startProjectCase(current, {appId: project.appId, projectId: project.id, templateId: template.id});
+    return {project, template, application};
+  }
+  function csvPlan(user, current, input) {
+    const {project, template, application} = csvContext(user, current, input);
+    const table = parseCsv(input.csv);
+    if (current.cases.length + table.rows.length > 3000) fail(413, '导入后超过单实例 3000 份业务上限，请减少本批数据或使用独立实例');
+    const currentBytes = Buffer.byteLength(JSON.stringify(current));
+    if (currentBytes + Buffer.byteLength(JSON.stringify(template)) * table.rows.length > 32 * 1024 * 1024) fail(413, '本批表式快照超过工作区容量，请减少行数');
+    const context = {...serviceContext(user), userId: user.id};
+    if (input.mapping === undefined) return {
+      ...context, projectId: project.id, templateId: template.id, headers: table.headers,
+      fields: template.fields.filter(field => field.owner === 'draft'), rowCount: table.rows.length,
+      sample: table.rows.slice(0, 10), ready: false
+    };
+    const prepared = prepareCsvImport(current, input);
+    const projectedBytes = Buffer.byteLength(JSON.stringify({...current, cases: [...current.cases, ...prepared.records]}));
+    if (projectedBytes > 32 * 1024 * 1024) fail(413, '导入后超过工作区 32 MiB 容量，请减少行数');
+    return {
+      ...context, projectId: project.id, templateId: template.id, templateVersion: template.version,
+      headers: prepared.headers, fields: prepared.fields, rows: prepared.rows, ready: prepared.ready,
+      rowCount: table.rows.length, records: prepared.records,
+      planFingerprint: digest(JSON.stringify({input, project, template, application, ...context}))
+    };
+  }
+  function previewCsvImport(user, input) {
+    return transaction(() => {
+      const {records, ...plan} = csvPlan(user, workspace(), input);
+      return plan;
+    });
+  }
+  function importCsv(user, input, options) {
+    active(user);
+    if (!options || typeof options.operationId !== 'string' || !/^[\w-]{8,100}$/.test(options.operationId) || !/^[a-f0-9]{64}$/.test(options.planFingerprint ?? '')) fail(400, '请先预览台账并保留原导入操作编号');
+    const fingerprint = digest(JSON.stringify({type: 'csv.import', input, options}));
+    return transaction(() => {
+      if (options.expectedUserId !== user.id || options.expectedInstanceId !== serviceContext(user).instanceId) fail(409, '账号或服务环境已变化，请重新核对导入');
+      const current = workspace();
+      csvContext(user, current, input);
+      const prior = db.prepare('SELECT * FROM requests WHERE id=?').get(options.operationId);
+      if (prior) {
+        if (prior.user_id !== user.id || prior.fingerprint !== fingerprint) fail(409, '操作编号已用于不同请求');
+        return JSON.parse(prior.result);
+      }
+      const plan = csvPlan(user, current, input);
+      if (plan.planFingerprint !== options.planFingerprint) fail(409, '表式、项目或导入内容已变化，请重新预览');
+      if (!plan.ready) fail(400, '台账仍有错误，请修正后重新预览');
+      for (const record of plan.records) {
+        record.createdBy = {id: user.id, name: user.name};
+        for (const event of record.events) event.actor = {id: user.id, name: user.name};
+      }
+      current.cases.push(...plan.records);
+      writeWorkspace(current);
+      audit(user, 'cases.csv-import', input.projectId);
+      const result = {imported: plan.records.length, projectId: input.projectId, templateId: input.templateId, operationId: options.operationId, recordIds: plan.records.map(record => record.id)};
+      db.prepare('INSERT INTO requests VALUES(?,?,?,?)').run(options.operationId, user.id, fingerprint, JSON.stringify(result));
+      return result;
+    });
+  }
   function updateDefinitions(user, input) {
     admin(user);
     const incoming = upgradeWorkspace(input);
@@ -535,7 +602,7 @@ export function openTeamStore(filename) {
     });
   }
   return {
-    createUser, login, session, serviceContext, visibleWorkspace, getRecord, importApplication, updateDefinitions, previewDefinitions, publishDefinitions, setMembership, command, changePassword, resetPassword, operations, deliveryReport, updateDelivery, attachment, projectArchive, previewProjectRestore, restoreProject,
+    createUser, login, session, serviceContext, visibleWorkspace, getRecord, importApplication, updateDefinitions, previewDefinitions, publishDefinitions, previewCsvImport, importCsv, setMembership, command, changePassword, resetPassword, operations, deliveryReport, updateDelivery, attachment, projectArchive, previewProjectRestore, restoreProject,
     checkProjectArchive: (user, bytes) => { admin(user); return checkProjectArchive(bytes, workspace()); },
     requireAdmin: user => admin(user),
     logout: token => db.prepare('DELETE FROM sessions WHERE token=?').run(digest(token)),

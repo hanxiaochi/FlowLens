@@ -1,5 +1,6 @@
 import {projectRoles} from './apps-model.mjs';
 import {canEdit} from './forms-model.mjs';
+import {FIELD_TYPES} from './forms-schema.mjs';
 import {renderDetailField} from './forms-detail-ui.js';
 import {printableForm} from './forms-print.mjs';
 import {deliveryStatusLabels, projectRoleCoverage} from './team-delivery.mjs';
@@ -42,7 +43,7 @@ function acceptSession(result) {
   user = result.user; serviceContext = result.context;
 }
 async function api(path, data) {
-  const timeoutMs = ['import', 'definitions', 'definitions-preview', 'definitions-publish'].includes(path) || data?.type === 'attachment' ? 120000 : 30000;
+  const timeoutMs = ['import', 'definitions', 'definitions-preview', 'definitions-publish', 'csv-preview', 'csv-import'].includes(path) || data?.type === 'attachment' ? 120000 : 30000;
   return teamJsonRequest('/api/team/' + path, {method: data === undefined ? 'GET' : 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', 'X-FlowLens-Request': '1', 'X-FlowLens-Client': '3'}, body: data === undefined ? undefined : JSON.stringify(data)}, timeoutMs);
 }
 async function task(action) {
@@ -148,6 +149,8 @@ function home() {
     else {
       const create = button('发起 ' + template.title, () => command({type: 'create', projectId, templateId: template.id}), 'primary');
       create.disabled = !roles().includes(template.submitterRole || '填报人'); card.append(create);
+      const importCsv = button('从 CSV 导入 ' + template.title, () => csvImportView(template.id));
+      importCsv.disabled = create.disabled; card.append(importCsv);
     }
     templates.append(card);
   }
@@ -217,6 +220,7 @@ function updatePendingControls() {
 async function sendPending() {
   if (!pending) throw Error('当前没有待确认的业务操作。');
   if (pending.type === 'publish-definitions') return sendDefinitionPending();
+  if (pending.type === 'import-csv') return sendCsvPending();
   updatePendingControls();
   let result;
   try {
@@ -250,6 +254,84 @@ async function enterWorkspace() {
     const count = (await drafts.list(user.id)).length;
     if (count) say('发现 ' + count + ' 份本机填写草稿，可从“本机填写草稿”核对恢复。');
   } catch (error) { say('本机填写草稿无法读取，请使用下载草稿保留填写内容。' + error.message, true); }
+}
+function csvImportView(templateId) {
+  if (!clean()) return;
+  const targetProject = projectId;
+  selectedId = ''; selectedRecord = null; accountView(); content.replaceChildren();
+  content.append(node('h1', '把台账导入为业务草稿'), node('p', '选择 UTF-8 CSV，第一行为列名，每批最多 500 行、200 列、2 MiB。先核对字段映射和数据，再确认创建。每次新确认会创建一批新草稿，请核对是否已经导入过。'));
+  const file = input('选择 CSV 台账', 'file'); file.accept = '.csv,text/csv';
+  const mappingPanel = node('section', undefined, 'panel stack');
+  file.onchange = () => task(async () => {
+    mappingPanel.replaceChildren();
+    const selected = file.files[0]; if (!selected) return;
+    if (selected.size > 2 * 1024 * 1024) throw Error('CSV 最大 2 MiB，请拆分后导入');
+    let csv;
+    try { csv = new TextDecoder('utf-8', {fatal: true}).decode(await selected.arrayBuffer()); }
+    catch { throw Error('无法按 UTF-8 读取，请从表格软件另存为 CSV UTF-8。'); }
+    const source = {csv, projectId: targetProject, templateId};
+    const discovery = await api('csv-preview', source);
+    mappingPanel.append(node('h2', '将台账列对应到填写字段'), node('p', discovery.rowCount + ' 行业务。编号按文字保留；日期使用 YYYY-MM-DD，是或否使用 true / false，明细字段使用 JSON 数组。'));
+    const controls = discovery.headers.map(header => {
+      const matches = discovery.fields.filter(field => field.label === header);
+      const initial = matches.length === 1 ? matches[0].id : '';
+      const control = select('台账列 ' + header, [['', '忽略此列'], ...discovery.fields.map(field => [field.id, field.label + ' · ' + FIELD_TYPES[field.type || 'text']])], initial);
+      mappingPanel.append(label(header, control)); return control;
+    });
+    const sample = node('details'); sample.append(node('summary', '查看前 10 行原始内容'));
+    for (const row of discovery.sample) sample.append(node('p', '第 ' + row.line + ' 行 · ' + row.values.map(value => value.slice(0, 150)).join(' | ')));
+    mappingPanel.append(sample, button('预览导入结果', () => csvPreviewView({...source, mapping: controls.map(control => control.value)}), 'primary'));
+    say('CSV 已读取，请核对每列对应的填写字段。');
+  });
+  content.append(file, mappingPanel, button('返回项目', async () => { await refresh(); home(); }));
+}
+async function csvPreviewView(source) {
+  acceptSession(await api('me'));
+  const plan = await api('csv-preview', source);
+  if (plan.userId !== user.id || plan.instanceId !== serviceContext.instanceId) throw Error('账号或服务环境已变化，请重新预览。');
+  content.replaceChildren(node('h1', '核对台账导入'), node('p', plan.rowCount + ' 行将生成业务草稿。缺少必填项可在草稿中补齐后提交，格式错误需先修正。'));
+  for (const row of plan.rows.slice(0, 50)) {
+    const card = node('article', undefined, 'panel csv-preview-row'); card.append(node('h2', 'CSV 第 ' + row.line + ' 行'));
+    for (const [id, value] of Object.entries(row.values)) card.append(node('p', plan.fields.find(field => field.id === id).label + ' · ' + value.slice(0, 2000)));
+    for (const error of row.errors) card.append(node('p', error, 'status-warning'));
+    for (const warning of row.warnings) card.append(node('p', warning.field + ' 将覆盖项目带入值 · ' + warning.before + ' → ' + warning.after, 'status-warning'));
+    if (row.missingRequired.length) card.append(node('p', '提交前需补齐 · ' + row.missingRequired.join('、')));
+    content.append(card);
+  }
+  const invalid = plan.rows.filter(row => row.errors.length).length;
+  content.append(node('p', '共 ' + invalid + ' 行存在格式错误。页面展示前 50 行，每个值最多 2000 字符，可下载完整预览核对所有行。'));
+  const confirm = button('确认创建这批草稿', async () => {
+    if (pending) throw Error('请先处理待确认操作。');
+    const request = {type: 'import-csv', projectId: source.projectId, templateId: source.templateId, source, planFingerprint: plan.planFingerprint, operationId: crypto.randomUUID(), expectedUserId: plan.userId, expectedInstanceId: plan.instanceId};
+    let entry;
+    try { entry = await recovery.stage(plan.userId, plan.instanceId, request, '导入台账 · ' + plan.rowCount + ' 行'); }
+    catch (error) { const reason = error.name === 'QuotaExceededError' ? '本机恢复存储空间不足。' : error.message; throw Error(reason + ' 导入请求尚未发送，请下载原 CSV 保留数据。'); }
+    pending = entry.request; pendingDraft = null; confirm.disabled = true; await sendPending();
+  }, 'primary');
+  confirm.disabled = !plan.ready;
+  content.append(confirm, button('下载完整导入预览', () => download('FlowLens-导入预览.json', JSON.stringify(plan, null, 2))), button('下载原 CSV', () => download('FlowLens-原台账.csv', source.csv, 'text/csv;charset=utf-8')), button('重新选择与映射', () => csvImportView(source.templateId)));
+  say(plan.ready ? '请核对字段值与项目资料覆盖提示后确认。' : '请先修正错误，再重新上传预览。', !plan.ready);
+}
+function csvResultView(result) {
+  content.replaceChildren(node('h1', '台账草稿已创建'), node('p', '已创建 ' + result.imported + ' 份业务草稿，请逐份核对后提交。'), node('p', '操作编号 ' + result.operationId));
+  content.append(button('下载本批单据编号', () => download('FlowLens-导入结果.json', JSON.stringify(result, null, 2))));
+  if (pending) content.append(button('重试原请求', sendPending));
+  else content.append(button('查看导入项目', async () => { projectId = result.projectId; await refresh({projectId, page: 1, filter: 'all', search: ''}); home(); }));
+}
+async function sendCsvPending() {
+  let result;
+  try {
+    const {source, operationId, planFingerprint, expectedUserId, expectedInstanceId} = pending;
+    result = await api('csv-import', {source, options: {operationId, planFingerprint, expectedUserId, expectedInstanceId}});
+  } catch (error) {
+    try { await recoveryView(); }
+    catch { content.replaceChildren(node('h1', '台账导入结果待确认'), node('p', '原请求已保存在本机，恢复连接后可继续确认。'), button('重试原请求', sendPending), button('下载原导入请求', () => download('FlowLens-待确认导入.json', JSON.stringify(pending, null, 2)))); }
+    if (!error.status || error.status >= 500) throw Error('尚未收到导入结果确认，原请求已保存在本机，请恢复连接后继续确认。');
+    throw error;
+  }
+  try { await recovery.remove(pending.expectedUserId, pending.operationId); }
+  catch { csvResultView(result); throw Error('导入已确认，但本机记录清理失败。请重试原请求完成清理。'); }
+  pending = null; pendingDraft = null; csvResultView(result); say('这批业务草稿已保存到服务器。');
 }
 async function definitionPreviewView(incoming, previousEntry = null) {
   if (previousEntry) {
@@ -364,7 +446,7 @@ async function recoveryView() {
     await refresh(); home(); say('原请求保留在本机恢复列表，可从“恢复待确认操作”返回。');
   }));
   if (!entries.length) content.append(node('p', '当前没有待确认操作。'));
-  const actionNames = {create: '新建单据', save: '保存填写', submit: '提交办理', advance: '办理并继续', return: '退回修改', attachment: '添加附件', 'publish-definitions': '发布表式更新'};
+  const actionNames = {create: '新建单据', save: '保存填写', submit: '提交办理', advance: '办理并继续', return: '退回修改', attachment: '添加附件', 'publish-definitions': '发布表式更新', 'import-csv': '导入台账草稿'};
   for (const entry of entries) {
     const card = node('article', undefined, 'panel');
     card.append(node('h2', entry.description), node('p', new Date(entry.createdAt).toLocaleString() + ' · ' + (actionNames[entry.request.type] ?? entry.request.type)), node('p', '操作编号 ' + entry.operationId));
@@ -376,6 +458,7 @@ async function recoveryView() {
       if (pending && pending.operationId !== entry.operationId) throw Error('请先处理当前待确认操作。');
       pending = entry.request; pendingDraft = entry.draft ?? null; await sendPending();
     }, 'primary'); resume.disabled = !matches || (entry.request.type === 'publish-definitions' && !user.admin);
+    if (entry.request.type === 'import-csv') card.append(button('下载原 CSV', () => download('FlowLens-原台账.csv', entry.request.source.csv, 'text/csv;charset=utf-8')), node('p', '基线冲突时，请先核对服务器业务，再移除这条本机记录并重新上传原 CSV 预览。'));
     const reviewed = input('已核对服务器状态', 'checkbox');
     const remove = button('移除这条本机记录', async () => {
       await recovery.remove(entry.userId, entry.operationId);

@@ -136,7 +136,7 @@ export function createTeamServer({database = resolve(root, '.local/team.sqlite')
           return send(res, 200, store.restoreProject(user, bytes, options));
         } finally { checkingProject = false; }
       }
-      const input = await body(req, ['/api/team/import', '/api/team/definitions', '/api/team/definitions-preview', '/api/team/definitions-publish'].includes(path) ? 32 * 1024 * 1024 : path === '/api/team/command' ? 15 * 1024 * 1024 : 64 * 1024);
+      const input = await body(req, ['/api/team/import', '/api/team/definitions', '/api/team/definitions-preview', '/api/team/definitions-publish', '/api/team/csv-preview', '/api/team/csv-import'].includes(path) ? 32 * 1024 * 1024 : path === '/api/team/command' ? 15 * 1024 * 1024 : 64 * 1024);
       if (path === '/api/team/logout') { store.logout(token); return send(res, 200, {ok: true}, {'Set-Cookie': cookie('', 0)}); }
       if (path === '/api/team/password') { await store.changePassword(user, input.oldPassword, input.newPassword); return send(res, 200, {ok: true}, {'Set-Cookie': cookie('', 0)}); }
       if (path === '/api/team/command') return send(res, 200, store.command(user, input, {inlineAttachments: !['2', '3'].includes(req.headers['x-flowlens-client'])}));
@@ -144,6 +144,8 @@ export function createTeamServer({database = resolve(root, '.local/team.sqlite')
       if (path === '/api/team/import') return send(res, 200, store.importApplication(user, input));
       if (path === '/api/team/definitions-preview') return send(res, 200, store.previewDefinitions(user, input));
       if (path === '/api/team/definitions-publish') return send(res, 200, store.publishDefinitions(user, input.workspace, input.options));
+      if (path === '/api/team/csv-preview') return send(res, 200, store.previewCsvImport(user, input));
+      if (path === '/api/team/csv-import') return send(res, 200, store.importCsv(user, input.source, input.options));
       if (path === '/api/team/definitions') return send(res, 200, store.updateDefinitions(user, input));
       if (path === '/api/team/users') return send(res, 201, await store.createUser(user, input));
       if (path === '/api/team/membership') return send(res, 200, store.setMembership(user, input));
