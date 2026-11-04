@@ -18,6 +18,7 @@ const drafts = createDraftStore();
 let editorSession = null, pendingDraft = null;
 let deliveryDraft = null;
 let selectedRecord = null, listing = null, roleOptions = {};
+let batchReturn = null;
 let listQuery = {page: 1, filter: 'all', search: ''};
 const node = (tag, text, className) => {
   const element = document.createElement(tag);
@@ -110,6 +111,7 @@ function accountView() {
   account.append(controls);
 }
 function loginView() {
+  batchReturn = null;
   serviceContext = null;
   selectedRecord = null; listing = null; roleOptions = {}; projectId = ''; listQuery = {page: 1, filter: 'all', search: ''};
   account.replaceChildren(); content.replaceChildren();
@@ -123,6 +125,7 @@ function loginView() {
   panel.append(form); content.append(panel);
 }
 function home() {
+  batchReturn = null;
   accountView(); content.replaceChildren(); selectedId = '';
   const hero = node('section', undefined, 'hero'); hero.append(node('span', 'PROJECTS, CONNECTED', 'badge'), node('h1', '从待办开始，把一件事办到底。'));
   const retry = button('重试原请求', sendPending); retry.id = 'retry-request'; retry.hidden = !pending; hero.append(retry);
@@ -345,21 +348,27 @@ async function csvPreviewView(source) {
 async function csvHistoryView(targetProject, operationId = '', page = 1) {
   const query = new URLSearchParams({projectId: targetProject, operationId, page: String(page)});
   const result = await api('csv-history?' + query);
+  selectedId = ''; selectedRecord = null; batchReturn = null;
   content.replaceChildren(node('h1', operationId ? '核对本批单据' : '导入批次历史'));
   content.append(button('返回项目', async () => { await refresh({page: 1}, targetProject); home(); }));
   if (operationId) {
-    content.append(node('p', '操作编号 ' + operationId), node('p', '本批共 ' + result.total + ' 份。以下为服务器当前状态。'), button('下载本批回执', () => download('FlowLens-导入结果.json', JSON.stringify(result.receipt, null, 2))), button('返回批次清单', () => csvHistoryView(targetProject)));
+    content.append(node('p', '操作编号 ' + operationId), node('p', '本批共 ' + result.total + ' 份。以下为服务器当前状态。'), button('下载本批回执', async () => { const latest = await api('csv-history?' + query); download('FlowLens-导入结果.json', JSON.stringify(latest.receipt, null, 2)); }), button('返回批次清单', () => csvHistoryView(targetProject)));
+    const cards = node('div', undefined, 'cards');
     for (const record of result.records) {
       const card = node('article', undefined, 'panel');
       card.append(node('h2', record.title || '当前项目中已无法找到此单据'), node('p', record.id, 'record-identifier'));
-      if (!record.unavailable) card.append(node('p', record.stage), button('打开单据', () => openRecord(record.id)));
-      content.append(card);
+      const summary = node('dl', undefined, 'record-summary');
+      for (const field of record.summary ?? []) summary.append(node('dt', field.label), node('dd', field.text));
+      card.append(summary);
+      if (!record.unavailable) card.append(node('p', record.stage), button('打开单据', async () => { batchReturn = {projectId: targetProject, operationId, page: result.page}; await openRecord(record.id); }));
+      cards.append(card);
     }
+    content.append(cards);
   } else {
     content.append(node('p', '按导入先后排列，共 ' + result.total + ' 批。旧版未保存导入时间，账号名称可能为当前名称。'));
     for (const batch of result.batches) {
       const card = node('article', undefined, 'panel');
-      card.append(node('h2', batch.imported + ' 份草稿 · ' + (workspace.templates.find(item => item.id === batch.templateId)?.title || batch.templateId)), node('p', batch.actor.name + (batch.actorNameHistorical ? ' · 导入时姓名' : ' · 当前账号姓名')), node('p', batch.createdAt ? new Date(batch.createdAt).toLocaleString() : '旧版未记录导入时间'), node('p', batch.operationId, 'record-identifier'), button('核对本批单据', () => csvHistoryView(targetProject, batch.operationId)));
+      card.append(node('h2', '导入 ' + batch.imported + ' 份 · ' + (workspace.templates.find(item => item.id === batch.templateId)?.title || batch.templateId)), node('p', batch.actor.name + (batch.actorNameHistorical ? ' · 导入时姓名' : ' · 当前账号姓名')), node('p', batch.createdAt ? new Date(batch.createdAt).toLocaleString() : '旧版未记录导入时间'), node('p', batch.operationId, 'record-identifier'), button('核对本批单据', () => csvHistoryView(targetProject, batch.operationId)));
       content.append(card);
     }
   }
@@ -367,6 +376,8 @@ async function csvHistoryView(targetProject, operationId = '', page = 1) {
   const previous = button('上一页', () => csvHistoryView(targetProject, operationId, result.page - 1)); previous.disabled = result.page <= 1;
   const next = button('下一页', () => csvHistoryView(targetProject, operationId, result.page + 1)); next.disabled = result.page >= result.pages;
   navigation.append(previous, node('span', result.page + ' / ' + result.pages), next); content.append(navigation);
+  content.scrollIntoView({block: 'start'});
+  say(operationId ? '已读取本批单据的当前状态。' : '已读取项目导入批次。');
 }
 function csvResultView(result) {
   content.replaceChildren(node('h1', '台账草稿已创建'), node('p', '已创建 ' + result.imported + ' 份业务草稿，请逐份核对后提交。'), node('p', '操作编号 ' + result.operationId));
@@ -591,6 +602,7 @@ function recordView(restoredDraft = null) {
   const record = current(); if (!record) { home(); return; }
   const role = roleFor(record); const editable = roles().includes(role) && record.status !== 'complete';
   const toolbar = node('div', undefined, 'toolbar');
+  if (batchReturn) toolbar.append(button('返回导入批次', async () => { if (clean()) await csvHistoryView(batchReturn.projectId, batchReturn.operationId, batchReturn.page); }));
   toolbar.append(button('返回项目', async () => { if (clean()) { selectedId = ''; await refresh(); home(); } }), button('下载当前草稿', draft), button('下载草稿并重新读取', async () => { draft(); pending = null; await refresh(); recordView(); say('已重新读取服务器版本，请核对已下载草稿中的内容。'); }), button('下载打印版', () => { if (clean()) download('FlowLens-业务打印.html', printableForm(record, {shared: true}), 'text/html'); }));
   content.append(toolbar, node('h1', record.title), node('p', record.project + ' · 修订 ' + record.revision + ' · ' + (record.status === 'complete' ? '已归档' : '当前办理角色 ' + role), 'muted'));
   const layout = node('div', undefined, 'record-layout'); const form = node('article', undefined, 'panel record-form');

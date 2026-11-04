@@ -207,7 +207,7 @@ test('CSV completed and pending requests are refused after CLI restore changes t
   let restored;
   try {
     const completed = optionsFor(store.previewCsvImport(member, source));
-    store.importCsv(member, source, completed);
+    const receipt = store.importCsv(member, source, completed);
     const pending = optionsFor(store.previewCsvImport(member, source));
     const backup = join(directory, 'backup.sqlite'), target = join(directory, 'restored.sqlite');
     await store.backup(backup);
@@ -215,6 +215,8 @@ test('CSV completed and pending requests are refused after CLI restore changes t
     assert.equal(restore.status, 0, restore.stderr);
     restored = openTeamStore(target);
     const before = restored.visibleWorkspace(admin), audit = restored.audit(admin);
+    assert.equal(restored.csvHistory(member, {projectId: source.projectId}).batches[0].operationId, receipt.operationId);
+    assert.deepEqual(restored.csvHistory(member, {projectId: source.projectId, operationId: receipt.operationId}).receipt, receipt);
     assert.throws(() => restored.importCsv(member, source, completed), error => error.status === 409);
     assert.throws(() => restored.importCsv(member, source, pending), error => error.status === 409);
     assert.deepEqual(restored.visibleWorkspace(admin), before); assert.deepEqual(restored.audit(admin), audit);
@@ -229,7 +231,7 @@ test('concurrent CSV HTTP retries share a receipt and revoked roles prevent late
     const session = await store.login('member', 'csv-test-password');
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     const request = (path, input) => new Promise((resolve, reject) => {
-      const req = http.request({hostname: '127.0.0.1', port: server.address().port, path: '/api/team/' + path, method: 'POST', headers: {Host: '127.0.0.1:4186', 'Content-Type': 'application/json', 'X-FlowLens-Request': '1', Cookie: 'flowlens_session=' + session.token}}, response => {
+      const req = http.request({hostname: '127.0.0.1', port: server.address().port, path: '/api/team/' + path, method: input === undefined ? 'GET' : 'POST', headers: {Host: '127.0.0.1:4186', 'Content-Type': 'application/json', 'X-FlowLens-Request': '1', Cookie: 'flowlens_session=' + session.token}}, response => {
         let text = ''; response.setEncoding('utf8'); response.on('data', chunk => text += chunk);
         response.on('end', () => resolve({status: response.statusCode, body: JSON.parse(text)}));
       });
@@ -241,8 +243,18 @@ test('concurrent CSV HTTP retries share a receipt and revoked roles prevent late
     assert.equal(results[0].status, 200); assert.deepEqual(results[1], results[0]);
     assert.equal(store.visibleWorkspace(admin).workspace.cases.length, 3);
     assert.equal(store.audit(admin).filter(event => event.action === 'cases.csv-import').length, 1);
+    const historyPath = 'csv-history?' + new URLSearchParams({projectId: source.projectId});
+    assert.equal((await request(historyPath)).body.total, 1);
+    const detailPath = historyPath + '&operationId=' + results[0].body.operationId;
+    const detail = await request(detailPath);
+    assert.equal(detail.status, 200); assert.deepEqual(detail.body.receipt, results[0].body);
+    assert.equal(detail.body.records[0].summary.find(field => field.label === '指令编号').text, '00001234567890123456789');
+    assert.equal((await request(historyPath + '&page=invalid')).status, 400);
+    assert.equal((await request('csv-history?projectId=unassigned&operationId=' + results[0].body.operationId)).status, 404);
     const pending = {source, options: optionsFor((await request('csv-preview', source)).body)};
     store.setMembership(admin, {userId: member.id, projectId: source.projectId, roles: []});
+    assert.equal((await request(historyPath)).status, 404);
+    assert.equal((await request(detailPath)).status, 404);
     assert.equal((await request('csv-import', pending)).status, 403);
     assert.equal((await request('csv-preview', source)).status, 403);
     assert.equal(store.visibleWorkspace(admin).workspace.cases.length, 3);

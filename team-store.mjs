@@ -11,7 +11,7 @@ import {mkdirSync, statSync, statfsSync, createReadStream, chmodSync} from 'node
 import {dirname} from 'node:path';
 import {emptyWorkspace, upgradeWorkspace} from './forms-store.mjs';
 import {startProjectCase, projectRoles} from './apps-model.mjs';
-import {applyOperation, attachFile} from './forms-model.mjs';
+import {applyOperation, attachFile, summarizeRecord} from './forms-model.mjs';
 import {deliveryChecks} from './team-delivery.mjs';
 import {decodeAttachment, storeRecordAttachments, hydrateRecordAttachments, validateAttachmentSnapshot, migrateAttachments} from './team-attachments.mjs';
 
@@ -529,7 +529,7 @@ export function openTeamStore(filename) {
         const byId = new Map(current.cases.filter(record => record.projectId === projectId).map(record => [record.id, record]));
         const records = receipt.recordIds.slice((selectedPage - 1) * pageSize, selectedPage * pageSize).map(id => {
           const record = byId.get(id);
-          return record ? {id, title: record.title, status: record.status, stage: record.status === 'draft' ? '待填写' : record.status === 'complete' ? '已完成' : record.template.workflow[record.step]?.label || '办理中'} : {id, unavailable: true};
+          return record ? {id, title: record.title, summary: summarizeRecord(record), status: record.status, stage: record.status === 'draft' ? '待填写' : record.status === 'complete' ? '已完成' : record.template.workflow[record.step]?.label || '办理中'} : {id, unavailable: true};
         });
         return {receipt, records, page: selectedPage, pages, total: receipt.recordIds.length};
       }

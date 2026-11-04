@@ -22,6 +22,14 @@ No installation or API key needed. Start with a fictional supervision applicatio
 
 [1.3 release notes and acceptance](docs/release-1.3.0.md)
 
+## 1.17 find imported records by batch
+
+You can close the import result page and come back later. Open **Import batch history** from the project to find the records, check their current workflow stages, open a form and return to the same page. Receipts can be downloaded again. Dates missing from older receipts are labeled as unknown.
+
+![Reviewing records in an import batch](docs/images/batch-review-1.17.png)
+
+All 138 local tests and 22 standalone candidate checks pass. Final release verification is underway. [Release notes (Chinese)](docs/release-1.17.0.md)
+
 ## 1.16 bring an existing ledger into the workflow
 
 Choose a CSV in your project, map columns to form fields, and review invalid values, duplicate mapped rows and project-value overrides before creating drafts. Identifiers remain text. Fill in required values and continue through the existing workflow. Remapping keeps the file and selections, and interrupted confirmations can resume with the original request.
