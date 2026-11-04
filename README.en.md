@@ -303,3 +303,6 @@ Version 1.15 adds project role coverage checks. Administrators can see unassigne
 
 
 Version 1.16 adds CSV import. CSV import now previews column mappings, invalid values, project-value overrides and missing required fields before creating a batch of drafts. All 137 local tests pass. Remapping retains the CSV and selections, while paged previews can filter invalid and duplicate mapped rows. Browser checks cover errors beyond the first 50 rows, lost-response recovery and storage quota failure. Concurrency, capacity and restored-instance checks also pass. The cloud app is on 1.16.0. The downloaded runtime passes all 21 checks, and all 45 public demo files match.
+
+
+[1.19.0-rc.1 candidate packages](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.19.0-rc.1) are available. The downloaded team package matched its SHA256 and passed 24 runtime checks.

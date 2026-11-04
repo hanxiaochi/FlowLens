@@ -15,12 +15,12 @@
 ## 已验证与边界
 
 - 155 项本地测试通过，覆盖历史表式、退回重提、跨项目隔离、权限撤销、附件损坏与容量边界。
-- 代码 bb06d0b 的 Windows、Ubuntu、容器 CI 通过；候选版版本标记后的检查另行记录。
+- 候选版本提交 b6668da 的 Windows、Ubuntu、容器 CI 41763846731 全部通过。
 - 最新开发运行包通过 24 项独立检查，包括并发冲突、重复请求、项目恢复和数据库备份还原。
 - 浏览器已验证分页返回、筛选保留、390 像素视口操作、单独附件下载及筛选为空时完整项目下载。
 - 400 份单据、40000 项问题的样例验证超大整份报告返回明确限制，分页仍可使用。
 
-以上使用隔离虚构资料。真实表式、职责和交付签字仍需要业务负责人确认。打印分页、正式云端升级和候选发行包重新下载验收尚未完成，不用自动测试结果代替这些验收。
+以上使用隔离虚构资料。真实表式、职责和交付签字仍需要业务负责人确认。GitHub 下载后的候选协作包 SHA256 一致，24 项独立运行检查通过。打印分页和正式云端升级尚未完成，不用自动测试结果代替这些验收。
 
 ## English
 
@@ -28,4 +28,4 @@ This release candidate adds a project review checklist: required fields by workf
 
 The checklist is a timestamped, read-only snapshot. Attachment verification is capped at 64 MiB per report, with remaining files explicitly marked unchecked and available for individual verification/download. It does not replace business sign-off.
 
-155 local tests and the code-level Windows/Ubuntu/container checks passed. Browser interaction and narrow-screen checks passed on fictional fixtures. Printed pagination and final release/deployment acceptance remain pending. The stable cloud service and public demo remain on 1.18.0.
+155 local tests and the code-level Windows/Ubuntu/container checks passed. Browser interaction and narrow-screen checks passed on fictional fixtures. The published team ZIP was downloaded again, matched its SHA256, and passed 24 independent runtime checks. Printed pagination and final stable release/deployment acceptance remain pending. The stable cloud service and public demo remain on 1.18.0.
