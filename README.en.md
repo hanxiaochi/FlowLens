@@ -308,3 +308,6 @@ Version 1.16 adds CSV import. CSV import now previews column mappings, invalid v
 
 
 [1.19.0-rc.1 candidate packages](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.19.0-rc.1) are available. The downloaded team package matched its SHA256 and passed 24 runtime checks.
+
+
+Restore hardening is under acceptance in **1.19.0-rc.2** development code: read-only backup sources are staged privately and the destination appears only after validation and session cleanup. All 157 local tests and isolated cloud read-only/low-disk checks passed. rc.2 is not published yet.
