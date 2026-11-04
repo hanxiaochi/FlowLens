@@ -250,15 +250,19 @@ async function enterWorkspace() {
     if (count) say('发现 ' + count + ' 份本机填写草稿，可从“本机填写草稿”核对恢复。');
   } catch (error) { say('本机填写草稿无法读取，请使用下载草稿保留填写内容。' + error.message, true); }
 }
-async function definitionPreviewView(incoming) {
-  if (!clean()) return;
+async function definitionPreviewView(incoming, previousEntry = null) {
+  if (previousEntry) {
+    if (pending && pending.operationId !== previousEntry.operationId) throw Error('请先处理当前待确认操作。');
+  } else if (!clean()) return;
   acceptSession(await api('me'));
+  if (previousEntry && (previousEntry.userId !== user.id || previousEntry.instanceId !== serviceContext.instanceId)) throw Error('原请求的账号或服务环境已变化，请下载更新包并人工核对。');
   const plan = await api('definitions-preview', incoming);
   if (plan.userId !== user.id || plan.instanceId !== serviceContext.instanceId) throw Error('账号或服务环境已变化，请重新预览。');
   selectedId = ''; selectedRecord = null; accountView(); content.replaceChildren();
   content.append(node('h1', '核对表式发布'), node('p', '该应用已有 ' + plan.preservedRecords + ' 份业务沿用原表式快照。新建业务使用发布后的定义。'));
   content.append(node('p', '涉及应用 · ' + plan.affectedApplications.map(app => app.name).join('、')));
   content.append(node('p', plan.changed ? '以下为更新包与服务器当前定义的差异。' : '当前定义与更新包一致，可以确认当前状态。'));
+  if (previousEntry) content.append(node('p', '这份预览按当前服务器状态重新计算。原请求仍保留，操作编号 ' + previousEntry.operationId + '。请先确认原请求的处理结果。', 'status-warning'));
   const collectionNames = {applications: '应用', templates: '表式', projects: '项目'};
   let remaining = 200;
   for (const change of plan.changes.slice(0, 50)) {
@@ -285,8 +289,19 @@ async function definitionPreviewView(incoming) {
     pending = entry.request; pendingDraft = null; publish.disabled = true;
     await sendPending();
   }, 'primary');
+  publish.disabled = !!previousEntry;
   actions.append(publish, button('下载完整预览', () => download('FlowLens-表式发布预览.json', JSON.stringify(plan, null, 2))), button('下载更新包', () => download('FlowLens-待发布应用.json', JSON.stringify(incoming, null, 2))), button('返回管理后台', async () => { if (clean()) await adminView(); }));
-  content.append(actions); say('预览已完成，请核对变更后发布。');
+  if (previousEntry) {
+    const checked = input('已核对原发布结果', 'checkbox');
+    const replace = button('移除旧恢复记录并重新预览', async () => {
+      await recovery.remove(previousEntry.userId, previousEntry.operationId);
+      if (pending?.operationId === previousEntry.operationId) { pending = null; pendingDraft = null; }
+      await definitionPreviewView(incoming);
+    }); replace.disabled = true; checked.onchange = () => { replace.disabled = !checked.checked; };
+    content.append(label('我已核对原请求处理结果，决定移除旧恢复记录后重新预览', checked), replace);
+    actions.append(button('继续确认原请求', async () => { pending = previousEntry.request; pendingDraft = null; await sendPending(); }), button('返回恢复列表', recoveryView));
+  }
+  content.append(actions); say(previousEntry ? '新预览已生成，原请求保留在恢复列表。' : '预览已完成，请核对变更后发布。');
 }
 function definitionResultView(result) {
   selectedId = ''; selectedRecord = null; accountView();
@@ -346,6 +361,7 @@ async function recoveryView() {
     }); remove.disabled = true; reviewed.onchange = () => { remove.disabled = !reviewed.checked; };
     const actions = node('div', undefined, 'toolbar');
     actions.append(resume, button('下载完整原请求', () => download('FlowLens-待确认操作-' + entry.operationId + '.json', JSON.stringify(entry, null, 2))));
+    if (entry.request.type === 'publish-definitions' && matches && user.admin) actions.append(button('重新预览原更新包', () => definitionPreviewView(entry.request.workspace, entry)));
     const reviewLabel = label('我已核对服务器状态，确认可以移除本机记录', reviewed); reviewLabel.className = 'check';
     card.append(preview, actions, reviewLabel, remove);
     content.append(card);

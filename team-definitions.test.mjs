@@ -7,6 +7,8 @@ import {openTeamStore} from './team-store.mjs';
 import {applicationDemo} from './apps-demo.mjs';
 import {createTeamServer} from './team-server.mjs';
 import http from 'node:http';
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 
 const password = 'publication-test-password';
 const optionsFor = plan => ({operationId: crypto.randomUUID(), planFingerprint: plan.planFingerprint, expectedUserId: plan.userId, expectedInstanceId: plan.instanceId});
@@ -112,4 +114,27 @@ test('definition HTTP endpoints enforce admin access and replay one publication 
     server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
     store.close(); await rm(directory, {recursive: true, force: true});
   }
+});
+
+test('CLI restoration refuses both pending and previously completed publications from the old instance', async () => {
+  const {directory, store, admin, initial} = await setup();
+  let restored;
+  try {
+    const incoming = structuredClone(initial); incoming.applications[0].name = 'Published before backup';
+    const completed = optionsFor(store.previewDefinitions(admin, incoming));
+    store.publishDefinitions(admin, incoming, completed);
+    const next = structuredClone(incoming); next.applications[0].name = 'Pending before backup';
+    const pending = optionsFor(store.previewDefinitions(admin, next));
+    const backup = join(directory, 'backup.sqlite'), target = join(directory, 'restored.sqlite');
+    await store.backup(backup);
+    const result = spawnSync(process.execPath, [fileURLToPath(new URL('./scripts/team-admin.mjs', import.meta.url)), 'restore', backup], {env: {...process.env, FLOWLENS_DATABASE: target}, encoding: 'utf8', windowsHide: true});
+    assert.equal(result.status, 0, result.stderr);
+    restored = openTeamStore(target);
+    assert.notEqual(restored.serviceContext(admin).instanceId, completed.expectedInstanceId);
+    const before = restored.visibleWorkspace(admin), audit = restored.audit(admin);
+    assert.throws(() => restored.publishDefinitions(admin, incoming, completed), error => error.status === 409);
+    assert.throws(() => restored.publishDefinitions(admin, next, pending), error => error.status === 409);
+    assert.deepEqual(restored.visibleWorkspace(admin), before);
+    assert.deepEqual(restored.audit(admin), audit);
+  } finally { restored?.close(); store.close(); await rm(directory, {recursive: true, force: true}); }
 });
