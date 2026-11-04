@@ -13,7 +13,7 @@ CLI 先在目标目录下建立受限暂存副本，完成完整性检查、附�
 - 158 项本地测试通过，包括两个真实恢复进程竞争同一目标，仅一个成功；发布前强杀后无目标、可重试。
 - 云端隔离容器将原备份只读挂载，修复后的 CLI 恢复成功；5 个账号、2 个项目、10 份单据、4 个附件及二次备份还原一致。
 - 1 MiB 临时磁盘实际触发 ENOSPC，目标未生成、暂存目录已清理。
-- 跨平台与发行包重新下载结果在完成后补充。上述云端检查使用候选镜像加当前恢复脚本，并非正式服务升级。
+- 提交 db0f432 的 Windows、Ubuntu、容器 CI 41765530343 全部通过；GitHub 协作包重新下载 SHA256 一致，24 项独立运行检查通过。上述云端检查使用候选镜像加当前恢复脚本，并非正式服务升级。
 
 ## English
 
@@ -21,6 +21,6 @@ This candidate keeps the project review features from rc.1 and hardens database 
 
 158 local tests passed, including competing CLI processes and interruption before publication. An isolated cloud check restored a read-only mounted backup, and an actual ENOSPC test left no destination or temporary files. Hard links and additional staging space are required. A killed process can leave a private staging directory for manual inspection.
 
-Cross-platform and downloaded-package results will be recorded after verification. Printed pagination and stable cloud deployment remain pending. The production service remains on 1.18.0.
+Windows, Ubuntu, and container CI 41765530343 passed. The published team ZIP was downloaded again, matched its SHA256, and passed 24 independent runtime checks. Printed pagination and stable cloud deployment remain pending. The production service remains on 1.18.0.
 
 [恢复部署说明](team-deployment.md) · [资料核对使用说明](project-review-guide.md) · [Review guide](project-review-guide.en.md)

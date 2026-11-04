@@ -22,7 +22,7 @@ No installation or API key needed. Start with a fictional supervision applicatio
 
 [1.3 release notes and acceptance](docs/release-1.3.0.md)
 
-## In development: review project records before handoff
+## Release candidate: review project records before handoff
 
 The team app now separates fields still due at the current stage, issues in completed stages, and attachments whose verification is incomplete. Open a record from the review and return to the same page. Download a readable HTML checklist for review or printing without additional software.
 
@@ -32,7 +32,7 @@ The team app now separates fields still due at the current stage, issues in comp
 
 The review list now supports issue categories, record/summary search, and records your assigned roles can handle. Returning from a record preserves the filters and page. Downloads still include the whole project.
 
-This is **1.19.0-rc.1**; the released and cloud versions remain **1.18.0**. All 155 local tests passed, including attachment and report capacity limits, search across pages, and role-based review filters. Pagination, record navigation, downloading, and narrow-screen reading have been checked in the browser. Printed pagination and release acceptance still need verification. See the [delivery plan (Chinese)](docs/delivery-plan.md).
+This is **1.19.0-rc.2**; the released and cloud versions remain **1.18.0**. All 158 local tests passed, including attachment and report capacity limits, search across pages, and role-based review filters. Pagination, record navigation, downloading, and narrow-screen reading have been checked in the browser. Printed pagination and release acceptance still need verification. See the [delivery plan (Chinese)](docs/delivery-plan.md).
 
 ## 1.18 take your project ledger into Excel
 
@@ -310,4 +310,4 @@ Version 1.16 adds CSV import. CSV import now previews column mappings, invalid v
 [1.19.0-rc.1 candidate packages](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.19.0-rc.1) are available. The downloaded team package matched its SHA256 and passed 24 runtime checks.
 
 
-Restore hardening is under acceptance in **1.19.0-rc.2** development code: read-only backup sources are staged privately and the destination appears only after validation and session cleanup. All 158 local tests and isolated cloud read-only/low-disk checks passed. rc.2 is not published yet.
+Restore hardening is available in the **1.19.0-rc.2** candidate: read-only backup sources are staged privately and the destination appears only after validation and session cleanup. All 158 local tests and isolated cloud read-only/low-disk checks passed. [Download rc.2](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.19.0-rc.2). Cross-platform CI and 24 checks against the downloaded runtime passed.
