@@ -127,6 +127,7 @@ function home() {
   const retry = button('重试原请求', sendPending); retry.id = 'retry-request'; retry.hidden = !pending; hero.append(retry);
   if (!workspace.projects.length) {
     hero.append(node('p', user.admin ? '先在管理后台导入应用包，再创建账号并分配项目角色。' : '当前账号还没有项目，请联系管理员分配。'));
+    if (user.admin) hero.append(button('开始配置应用与成员', adminView, 'primary'));
     content.append(hero); return;
   }
   const projects = select('当前项目', workspace.projects.map(project => [project.id, project.name]), projectId);
@@ -822,14 +823,14 @@ async function projectRestoreView(file, report) {
 }
 
 
-async function adminView() {
+async function adminView(selection = {}) {
   const data = await api('admin'); await refresh(); content.replaceChildren(); accountView();
   content.append(node('h1', '应用、成员与项目权限'));
   const grid = node('div', undefined, 'admin-grid');
   const imports = node('section', undefined, 'panel stack'); imports.append(node('h2', '导入应用'));
-  imports.append(node('p', '在设计工作台导出整个应用，将 JSON 文件导入这里。重复编号会被拒绝，请保留原应用版本。', 'muted'));
+  imports.append(node('p', '在设计工作台整理表式和流程、创建项目，再导出整个应用的 JSON 文件。导入后创建成员账号，并按实际职责分配项目角色。重复编号会被拒绝，请保留原应用版本。', 'muted'));
   const file = input('导入应用包', 'file'); file.accept = '.json';
-  file.onchange = () => task(async () => { const selected = file.files[0]; if (!selected) return; if (selected.size > 24 * 1024 * 1024) throw Error('应用包最多 24 MB'); await api('import', JSON.parse(await selected.text())); await adminView(); say('应用已导入，请分配项目角色。'); }); imports.append(file);
+  file.onchange = () => task(async () => { const selected = file.files[0]; if (!selected) return; if (selected.size > 24 * 1024 * 1024) throw Error('应用包最多 24 MB'); await api('import', JSON.parse(await selected.text())); await adminView(); say('应用已导入，请查看项目办理角色检查并补齐配置。'); }); imports.append(file);
   const updateFile = input('选择表式更新包', 'file'); updateFile.accept = '.json';
   imports.append(node('h3', '发布已有应用的新表式'), node('p', '选择设计工作台导出的应用包，先核对差异，再确认发布。新规则用于新建业务，已有业务沿用创建时的表式快照。', 'muted'), updateFile, button('预览表式更新', async () => {
     const selected = updateFile.files[0]; if (!selected) throw Error('请选择应用更新包');
@@ -841,8 +842,8 @@ async function adminView() {
   const isAdmin = input('系统管理员', 'checkbox');
   users.append(label('账号', username), label('显示名', name), label('初始密码，至少 12 位', password), label('系统管理员', isAdmin), button('创建账号', async () => { await api('users', {username: username.value, name: name.value, password: password.value, admin: isAdmin.checked}); await adminView(); say('账号已创建，请分配项目角色。'); }, 'primary'));
   const permissions = node('section', undefined, 'panel stack'); permissions.append(node('h2', '项目角色授权'));
-  const member = select('授权成员', data.users.map(item => [item.id, item.name + ' · ' + item.username]));
-  const project = select('授权项目', workspace.projects.map(item => [item.id, item.name]));
+  const member = select('授权成员', data.users.map(item => [item.id, item.name + ' · ' + item.username + (item.disabled ? ' · 已停用' : '')]), selection.userId);
+  const project = select('授权项目', workspace.projects.map(item => [item.id, item.name]), selection.projectId);
   const checkboxes = node('div', undefined, 'stack');
   function showRoles() {
     checkboxes.replaceChildren(); const selected = workspace.projects.find(item => item.id === project.value); if (!selected) return;
@@ -851,10 +852,17 @@ async function adminView() {
     for (const role of available) { const check = input(role, 'checkbox'); check.value = role; check.checked = saved.includes(role); const row = label(role, check); row.className = 'check'; checkboxes.append(row); }
   }
   member.onchange = showRoles; project.onchange = showRoles; showRoles();
-  permissions.append(label('成员', member), label('项目', project), checkboxes, button('保存项目权限', async () => { await api('membership', {userId: member.value, projectId: project.value, roles: Array.from(checkboxes.querySelectorAll('input:checked')).map(item => item.value)}); await adminView(); say('项目权限已更新。取消全部角色会撤销项目访问。'); }, 'primary'));
+  const savePermissions = button('保存项目权限', async () => { await api('membership', {userId: member.value, projectId: project.value, roles: Array.from(checkboxes.querySelectorAll('input:checked')).map(item => item.value)}); await adminView({userId: member.value, projectId: project.value}); say('项目权限已更新。取消全部角色会撤销项目访问。'); }, 'primary');
+  savePermissions.disabled = !workspace.projects.length;
+  project.disabled = !workspace.projects.length;
+  permissions.append(label('成员', member), label('项目', project), checkboxes, savePermissions);
+  if (!workspace.projects.length) permissions.append(node('p', '添加项目后即可分配办理角色。', 'muted'));
   const coverage = node('section', undefined, 'panel stack'); coverage.append(node('h2', '项目办理角色检查'));
   coverage.append(node('p', '核对每个角色是否有启用成员承办，包含旧单据仍使用的角色。实际职责请在交付检查中确认。', 'muted'));
   if (!workspace.projects.length) coverage.append(node('p', '先导入包含项目的应用包，再配置办理成员。'));
+  for (const app of workspace.applications.filter(app => !workspace.projects.some(project => project.appId === app.id))) {
+    coverage.append(node('p', app.name + ' 尚未创建项目。在设计工作台为此应用创建项目后，重新导出应用包，使用“预览表式更新”补入项目。'));
+  }
   for (const item of projectRoleCoverage(workspace.projects, roleOptions, data.users, data.memberships)) {
     const section = node('section', undefined, 'stack'); section.append(node('h3', item.name));
     let status = '所有办理角色都有启用成员。';
