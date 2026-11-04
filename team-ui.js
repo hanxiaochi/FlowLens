@@ -144,7 +144,9 @@ function home() {
   const project = workspace.projects.find(item => item.id === projectId);
   const app = workspace.applications.find(item => item.id === project.appId);
   hero.append(button('下载项目资料包', () => downloadFromServer('/api/team/project-export?projectId=' + encodeURIComponent(projectId), 'FlowLens-项目资料.zip', 'application/zip')));
-  hero.append(node('p', '包含已保存表单、办理历史、附件与文件校验清单，单次最多 64 MiB。解压后打开 index.html。', 'muted'));
+  hero.append(button('下载 Excel 台账', () => downloadFromServer('/api/team/project-ledger?projectId=' + encodeURIComponent(projectId), 'FlowLens-项目台账.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')));
+  hero.append(node('p', '台账包含全部已保存单据，按历史表式分表，明细单独列出。编号按文本保存；不含附件文件及未保存填写。', 'muted'));
+  hero.append(node('p', '项目资料包包含已保存表单、办理历史、附件与文件校验清单，单次最多 64 MiB。解压后打开 index.html。', 'muted'));
   content.append(hero);
   const templates = node('div', undefined, 'cards');
   for (const template of workspace.templates.filter(item => app.templateIds.includes(item.id))) {

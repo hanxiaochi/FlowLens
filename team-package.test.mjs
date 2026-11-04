@@ -63,6 +63,20 @@ test('standalone distribution starts without dependencies and its CLI restores d
       attachment: {name: '验收附件.bin', data: 'data:application/octet-stream;base64,' + attachmentBytes.toString('base64')}
     });
     const before = store.visibleWorkspace(session.user);
+    const ledger = await new Promise((resolve, reject) => {
+      const request = http.get({hostname: '127.0.0.1', port: server.address().port, path: '/api/team/project-ledger?projectId=demo-project', headers: {Host: '127.0.0.1:4186', Cookie: 'flowlens_session=' + session.token}}, response => {
+        const chunks = []; response.on('data', chunk => chunks.push(chunk));
+        response.on('end', () => resolve({status: response.statusCode, type: response.headers['content-type'], bytes: Buffer.concat(chunks)}));
+      });
+      request.on('error', reject);
+    });
+    assert.equal(ledger.status, 200);
+    assert.equal(ledger.type, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    const {unzipSync} = await import(pathToFileURL(join(output, 'team-vendor/fflate.mjs')));
+    const ledgerFiles = unzipSync(ledger.bytes);
+    assert.ok(ledgerFiles['xl/workbook.xml']);
+    assert.ok(Buffer.from(ledgerFiles['xl/worksheets/sheet2.xml']).toString().includes(record.id));
+    assert.deepEqual(store.visibleWorkspace(session.user), before);
     const summary = store.visibleWorkspace(session.user, {summary: {projectId: 'demo-project'}});
     assert.equal(summary.projection, 'summary');
     assert.equal(summary.listing.total, before.workspace.cases.length);

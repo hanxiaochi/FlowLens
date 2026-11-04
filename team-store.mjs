@@ -4,6 +4,7 @@ import {summarizeWorkspace} from './team-read-model.mjs';
 import {prepareProjectRestore} from './team-project-restore.mjs';
 import {checkProjectArchive, inspectProjectArchive} from './team-project-check.mjs';
 import {buildProjectArchive} from './team-project-export.mjs';
+import {buildProjectLedger} from './team-ledger-export.mjs';
 import {DatabaseSync, backup} from 'node:sqlite';
 import {randomBytes, randomUUID, scrypt as derive, timingSafeEqual, createHash} from 'node:crypto';
 import {promisify} from 'node:util';
@@ -260,6 +261,18 @@ export function openTeamStore(filename) {
     const row = db.prepare('SELECT data,size FROM attachment_blobs WHERE id=?').get(file.blobId);
     if (!row || row.size !== file.size || digest(row.data) !== file.blobId) fail(500, '附件内容校验失败');
     return {name: file.name, data: Buffer.from(row.data), size: row.size};
+  }
+  function projectLedger(user, projectId) {
+    db.exec('BEGIN');
+    try {
+      const actor = active(user);
+      if (!actor.admin && !roles(user, projectId).length) fail(404, '项目不存在或不可访问');
+      const current = workspace();
+      if (!current.projects.some(project => project.id === projectId)) fail(404, '项目不存在或不可访问');
+      const result = buildProjectLedger(current, projectId);
+      db.exec('COMMIT');
+      return result;
+    } catch (error) { db.exec('ROLLBACK'); throw error; }
   }
   function projectArchive(user, projectId) {
     db.exec('BEGIN');
@@ -633,7 +646,7 @@ export function openTeamStore(filename) {
     });
   }
   return {
-    createUser, login, session, serviceContext, visibleWorkspace, getRecord, importApplication, updateDefinitions, previewDefinitions, publishDefinitions, previewCsvImport, importCsv, csvHistory, setMembership, command, changePassword, resetPassword, operations, deliveryReport, updateDelivery, attachment, projectArchive, previewProjectRestore, restoreProject,
+    createUser, login, session, serviceContext, visibleWorkspace, getRecord, importApplication, updateDefinitions, previewDefinitions, publishDefinitions, previewCsvImport, importCsv, csvHistory, setMembership, command, changePassword, resetPassword, operations, deliveryReport, updateDelivery, attachment, projectArchive, projectLedger, previewProjectRestore, restoreProject,
     checkProjectArchive: (user, bytes) => { admin(user); return checkProjectArchive(bytes, workspace()); },
     requireAdmin: user => admin(user),
     logout: token => db.prepare('DELETE FROM sessions WHERE token=?').run(digest(token)),

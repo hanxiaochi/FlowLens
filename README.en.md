@@ -22,6 +22,12 @@ No installation or API key needed. Start with a fictional supervision applicatio
 
 [1.3 release notes and acceptance](docs/release-1.3.0.md)
 
+## In development: take your project ledger into Excel
+
+The team app now exports an XLSX workbook with one row per record and separate detail sheets linked by record ID. Different historical form structures get separate sheets. Long identifiers, leading zeros, and formula-like input remain text. Use this workbook for review and handoff; use the project archive for attachments, workflow history, and recovery.
+
+Checked in desktop Excel and against an actual browser download containing 57 fictional records, 342 field values, and their detail rows. This is **1.18.0-dev.1**; the released and cloud versions remain **1.17.0**. Packaging and deployment acceptance are still pending. See the [delivery plan (Chinese)](docs/delivery-plan.md).
+
 ## 1.17 find imported records by batch
 
 You can close the import result page and come back later. Open **Import batch history** from the project to find the records, check their current workflow stages, open a form and return to the same page. Receipts can be downloaded again. Dates missing from older receipts are labeled as unknown.

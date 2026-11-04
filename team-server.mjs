@@ -85,8 +85,8 @@ export function createTeamServer({database = resolve(root, '.local/team.sqlite')
           return send(res, 200, store.visibleWorkspace(user, {inlineAttachments: !['2', '3'].includes(req.headers['x-flowlens-client']), summary}));
         }
         if (path === '/api/team/record') return send(res, 200, store.getRecord(user, new URL(req.url, origin).searchParams.get('recordId')));
-        if (path === '/api/team/project-export') {
-          if (exportingProject) fail(503, '正在发送另一份项目资料包，请稍后重试');
+        if (['/api/team/project-export', '/api/team/project-ledger'].includes(path)) {
+          if (exportingProject) fail(503, '正在发送另一份项目导出文件，请稍后重试');
           exportingProject = true;
           const releaseExport = () => {
             exportingProject = false;
@@ -96,8 +96,9 @@ export function createTeamServer({database = resolve(root, '.local/team.sqlite')
           res.once('close', releaseExport);
           res.once('finish', releaseExport);
           try {
-            const archive = store.projectArchive(user, new URL(req.url, origin).searchParams.get('projectId'));
-            res.writeHead(200, {'Content-Type': 'application/zip', 'Content-Length': archive.length, 'Content-Disposition': 'attachment; filename=FlowLens-project.zip'});
+            const ledger = path === '/api/team/project-ledger';
+            const archive = store[ledger ? 'projectLedger' : 'projectArchive'](user, new URL(req.url, origin).searchParams.get('projectId'));
+            res.writeHead(200, {'Content-Type': ledger ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/zip', 'Content-Length': archive.length, 'Content-Disposition': 'attachment; filename=' + (ledger ? 'FlowLens-project.xlsx' : 'FlowLens-project.zip')});
             return res.end(archive);
           } catch (error) { releaseExport(); throw error; }
         }
