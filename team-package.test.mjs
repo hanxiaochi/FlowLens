@@ -77,6 +77,12 @@ test('standalone distribution starts without dependencies and its CLI restores d
     assert.ok(ledgerFiles['xl/workbook.xml']);
     assert.ok(Buffer.from(ledgerFiles['xl/worksheets/sheet2.xml']).toString().includes(record.id));
     assert.deepEqual(store.visibleWorkspace(session.user), before);
+    const review = store.projectReview(session.user, {projectId: 'demo-project', download: '1'});
+    assert.equal(review.format, 'flowlens-project-review');
+    assert.equal(review.totals.records, before.workspace.cases.length);
+    assert.equal(review.totals.attachments, 1);
+    assert.equal(review.totals.unchecked, 0);
+    assert.ok(review.results.every(record => !record.issues.some(issue => issue.kind === 'attachment')));
     const summary = store.visibleWorkspace(session.user, {summary: {projectId: 'demo-project'}});
     assert.equal(summary.projection, 'summary');
     assert.equal(summary.listing.total, before.workspace.cases.length);

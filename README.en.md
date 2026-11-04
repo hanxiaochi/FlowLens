@@ -22,6 +22,14 @@ No installation or API key needed. Start with a fictional supervision applicatio
 
 [1.3 release notes and acceptance](docs/release-1.3.0.md)
 
+## In development: review project records before handoff
+
+The team app now separates fields still due at the current stage, issues in completed stages, and attachments whose verification is incomplete. Open a record from the review and return to the same page. Download a readable HTML checklist for review or printing without additional software.
+
+![Downloaded review checklist with fictional data](docs/images/project-review-1.19.png)
+
+This is **1.19.0-dev.1**; the released and cloud versions remain **1.18.0**. All 151 local tests passed. Pagination, record navigation, and downloading have been checked in the browser. Capacity limits, print layout, and release acceptance still need verification. See the [delivery plan (Chinese)](docs/delivery-plan.md).
+
 ## 1.18 take your project ledger into Excel
 
 The team app now exports an XLSX workbook with one row per record and separate detail sheets linked by record ID. Different historical form structures get separate sheets. Long identifiers, leading zeros, and formula-like input remain text. Use this workbook for review and handoff; use the project archive for attachments, workflow history, and recovery.

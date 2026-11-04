@@ -1,5 +1,6 @@
 import http from 'node:http';
 import {projectArchiveLimit} from './team-project-check.mjs';
+import {printableProjectReview} from './team-project-review.mjs';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {resolve, extname} from 'node:path';
@@ -85,6 +86,17 @@ export function createTeamServer({database = resolve(root, '.local/team.sqlite')
           return send(res, 200, store.visibleWorkspace(user, {inlineAttachments: !['2', '3'].includes(req.headers['x-flowlens-client']), summary}));
         }
         if (path === '/api/team/record') return send(res, 200, store.getRecord(user, new URL(req.url, origin).searchParams.get('recordId')));
+        if (path === '/api/team/project-review') {
+          const query = Object.fromEntries(new URL(req.url, origin).searchParams);
+          const report = store.projectReview(user, query);
+          if (query.download === 'html') {
+            const html = printableProjectReview(report);
+            if (Buffer.byteLength(html) > 24 * 1024 * 1024) fail(413, '打印清单超过 24 MiB，请分页查看并处理后重试');
+            res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8', 'Content-Disposition': 'attachment; filename=FlowLens-project-review.html'});
+            return res.end(html);
+          }
+          return send(res, 200, report, query.download === '1' ? {'Content-Disposition': 'attachment; filename=FlowLens-project-review.json'} : {});
+        }
         if (['/api/team/project-export', '/api/team/project-ledger'].includes(path)) {
           if (exportingProject) fail(503, '正在发送另一份项目导出文件，请稍后重试');
           exportingProject = true;

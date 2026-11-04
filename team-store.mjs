@@ -5,6 +5,7 @@ import {prepareProjectRestore} from './team-project-restore.mjs';
 import {checkProjectArchive, inspectProjectArchive} from './team-project-check.mjs';
 import {buildProjectArchive} from './team-project-export.mjs';
 import {buildProjectLedger} from './team-ledger-export.mjs';
+import {reviewProject} from './team-project-review.mjs';
 import {DatabaseSync, backup} from 'node:sqlite';
 import {randomBytes, randomUUID, scrypt as derive, timingSafeEqual, createHash} from 'node:crypto';
 import {promisify} from 'node:util';
@@ -272,6 +273,41 @@ export function openTeamStore(filename) {
       const result = buildProjectLedger(current, projectId);
       db.exec('COMMIT');
       return result;
+    } catch (error) { db.exec('ROLLBACK'); throw error; }
+  }
+  function projectReview(user, {projectId, page = '1', download = '0'} = {}) {
+    const requestedPage = Number(page);
+    if (!Number.isSafeInteger(requestedPage) || requestedPage < 1 || !['0', '1', 'html'].includes(download)) fail(400, '核对清单分页参数无效');
+    db.exec('BEGIN');
+    try {
+      const actor = active(user);
+      if (!actor.admin && !roles(user, projectId).length) fail(404, '项目不存在或不可访问');
+      let inspectedBytes = 0;
+      const checked = new Map();
+      const report = reviewProject(workspace(), projectId, file => {
+        if (typeof file.blobId !== 'string' || !/^[a-f0-9]{64}$/.test(file.blobId)) return 'invalid';
+        if (!checked.has(file.blobId)) {
+          const metadata = db.prepare('SELECT size, length(data) AS actualSize FROM attachment_blobs WHERE id=?').get(file.blobId);
+          let state = 'invalid';
+          if (metadata && metadata.size === metadata.actualSize) {
+            if (inspectedBytes + metadata.size > 64 * 1024 * 1024) state = 'unchecked';
+            else {
+              inspectedBytes += metadata.size;
+              const row = db.prepare('SELECT data FROM attachment_blobs WHERE id=?').get(file.blobId);
+              state = digest(row.data) === file.blobId ? 'verified' : 'invalid';
+            }
+          }
+          checked.set(file.blobId, {state, size: metadata?.size});
+        }
+        const result = checked.get(file.blobId);
+        return result.size === file.size ? result.state : 'invalid';
+      });
+      report.attachmentVerification = {inspectedBytes, limitBytes: 64 * 1024 * 1024};
+      const pages = Math.max(1, Math.ceil(report.results.length / 50));
+      const currentPage = Math.min(requestedPage, pages);
+      const result = download !== '0' ? report : {...report, results: report.results.slice((currentPage - 1) * 50, currentPage * 50), page: currentPage, pages, pageSize: 50};
+      if (download !== '0' && Buffer.byteLength(JSON.stringify(result)) > 16 * 1024 * 1024) fail(413, '核对清单超过 16 MiB，请分页查看并处理后重试');
+      db.exec('COMMIT'); return result;
     } catch (error) { db.exec('ROLLBACK'); throw error; }
   }
   function projectArchive(user, projectId) {
@@ -646,7 +682,7 @@ export function openTeamStore(filename) {
     });
   }
   return {
-    createUser, login, session, serviceContext, visibleWorkspace, getRecord, importApplication, updateDefinitions, previewDefinitions, publishDefinitions, previewCsvImport, importCsv, csvHistory, setMembership, command, changePassword, resetPassword, operations, deliveryReport, updateDelivery, attachment, projectArchive, projectLedger, previewProjectRestore, restoreProject,
+    createUser, login, session, serviceContext, visibleWorkspace, getRecord, importApplication, updateDefinitions, previewDefinitions, publishDefinitions, previewCsvImport, importCsv, csvHistory, setMembership, command, changePassword, resetPassword, operations, deliveryReport, updateDelivery, attachment, projectArchive, projectLedger, projectReview, previewProjectRestore, restoreProject,
     checkProjectArchive: (user, bytes) => { admin(user); return checkProjectArchive(bytes, workspace()); },
     requireAdmin: user => admin(user),
     logout: token => db.prepare('DELETE FROM sessions WHERE token=?').run(digest(token)),

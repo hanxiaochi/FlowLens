@@ -19,6 +19,7 @@ let editorSession = null, pendingDraft = null;
 let deliveryDraft = null;
 let selectedRecord = null, listing = null, roleOptions = {};
 let batchReturn = null;
+let reviewReturn = null;
 let listQuery = {page: 1, filter: 'all', search: ''};
 const node = (tag, text, className) => {
   const element = document.createElement(tag);
@@ -111,6 +112,7 @@ function accountView() {
   account.append(controls);
 }
 function loginView() {
+  reviewReturn = null;
   batchReturn = null;
   serviceContext = null;
   selectedRecord = null; listing = null; roleOptions = {}; projectId = ''; listQuery = {page: 1, filter: 'all', search: ''};
@@ -125,6 +127,7 @@ function loginView() {
   panel.append(form); content.append(panel);
 }
 function home() {
+  reviewReturn = null;
   batchReturn = null;
   accountView(); content.replaceChildren(); selectedId = '';
   const hero = node('section', undefined, 'hero'); hero.append(node('span', 'PROJECTS, CONNECTED', 'badge'), node('h1', '从待办开始，把一件事办到底。'));
@@ -141,6 +144,7 @@ function home() {
   });
   hero.append(label('当前项目', projects), node('p', '我的项目角色 · ' + (roles().join('、') || '只读管理查看'), 'muted'));
   hero.append(button('导入批次历史', () => csvHistoryView(projectId)));
+  hero.append(button('交付前资料核对', () => projectReviewView(projectId)));
   const project = workspace.projects.find(item => item.id === projectId);
   const app = workspace.applications.find(item => item.id === project.appId);
   hero.append(button('下载项目资料包', () => downloadFromServer('/api/team/project-export?projectId=' + encodeURIComponent(projectId), 'FlowLens-项目资料.zip', 'application/zip')));
@@ -347,7 +351,39 @@ async function csvPreviewView(source) {
   content.append(confirm, button('下载完整导入预览', () => download('FlowLens-导入预览.json', JSON.stringify(plan, null, 2))), button('下载原 CSV', () => download('FlowLens-原台账.csv', source.csv, 'text/csv;charset=utf-8')), button('重新映射字段', () => csvImportView(source.templateId, source)));
   say(plan.ready ? '请核对字段值与项目资料覆盖提示后确认。' : '请修正台账或调整字段映射，再重新预览。', !plan.ready);
 }
+async function projectReviewView(targetProject, page = 1) {
+  const query = new URLSearchParams({projectId: targetProject, page: String(page)});
+  const result = await api('project-review?' + query);
+  selectedId = ''; selectedRecord = null; batchReturn = null; reviewReturn = null;
+  content.replaceChildren(node('h1', '交付前资料核对'));
+  content.append(node('p', result.project.name + ' · 工作区修订 ' + result.workspaceRevision + ' · ' + new Date(result.generatedAt).toLocaleString()),
+    node('p', result.scope, 'muted'),
+    node('p', '共核对 ' + result.totals.records + ' 份单据，' + result.totals.affectedRecords + ' 份有待处理项。待补齐 ' + result.totals.pending + ' 项，需核对 ' + result.totals.review + ' 项，未完成校验 ' + result.totals.unchecked + ' 项。'),
+    node('p', '附件引用共 ' + result.totals.attachments + ' 个。本轮最多校验 64 MiB 内容；超出部分明确列为未完成校验。', 'muted'),
+    button('返回项目', async () => { await refresh({page: 1}, targetProject); home(); }),
+    button('重新核对', () => projectReviewView(targetProject, result.page)),
+    button('下载最新核对清单', () => downloadFromServer('/api/team/project-review?' + new URLSearchParams({projectId: targetProject, download: 'html'}), 'FlowLens-资料核对.html', 'text/html;charset=utf-8')),
+    node('p', '下载后用浏览器打开，可直接阅读、打印或保存为 PDF。清单记录下载时的最新资料。', 'muted'));
+  if (!result.results.length) content.append(node('p', '本轮结构检查未发现待处理项。业务正确性、适用表式和交付签字仍需负责人确认。'));
+  const labels = {pending: '待补齐', review: '需核对', unchecked: '未完成校验'};
+  for (const record of result.results) {
+    const card = node('article', undefined, 'panel');
+    card.append(node('h2', record.title), node('p', record.recordId, 'record-identifier'), node('p', record.stage + (record.role ? ' · ' + record.role : '') + ' · 表式版本 ' + record.templateVersion));
+    const summary = node('dl', undefined, 'record-summary');
+    for (const field of record.summary) summary.append(node('dt', field.label), node('dd', field.text));
+    card.append(summary);
+    const issues = node('ul');
+    for (const issue of record.issues) issues.append(node('li', labels[issue.severity] + ' · ' + issue.label + '：' + issue.message));
+    card.append(issues, button('打开单据', async () => { reviewReturn = {projectId: targetProject, page: result.page}; await openRecord(record.recordId); }));
+    content.append(card);
+  }
+  const previous = button('上一页', () => projectReviewView(targetProject, result.page - 1)); previous.disabled = result.page <= 1;
+  const next = button('下一页', () => projectReviewView(targetProject, result.page + 1)); next.disabled = result.page >= result.pages;
+  const navigation = node('div', undefined, 'toolbar'); navigation.append(previous, node('span', result.page + ' / ' + result.pages), next); content.append(navigation);
+  content.scrollIntoView({block: 'start'}); say('已核对服务器保存的资料，检查没有改写业务。');
+}
 async function csvHistoryView(targetProject, operationId = '', page = 1) {
+  reviewReturn = null;
   const query = new URLSearchParams({projectId: targetProject, operationId, page: String(page)});
   const result = await api('csv-history?' + query);
   selectedId = ''; selectedRecord = null; batchReturn = null;
@@ -605,6 +641,7 @@ function recordView(restoredDraft = null) {
   const role = roleFor(record); const editable = roles().includes(role) && record.status !== 'complete';
   const toolbar = node('div', undefined, 'toolbar');
   if (batchReturn) toolbar.append(button('返回导入批次', async () => { if (clean()) await csvHistoryView(batchReturn.projectId, batchReturn.operationId, batchReturn.page); }));
+  if (reviewReturn) toolbar.append(button('返回资料核对', async () => { if (clean()) await projectReviewView(reviewReturn.projectId, reviewReturn.page); }));
   toolbar.append(button('返回项目', async () => { if (clean()) { selectedId = ''; await refresh(); home(); } }), button('下载当前草稿', draft), button('下载草稿并重新读取', async () => { draft(); pending = null; await refresh(); recordView(); say('已重新读取服务器版本，请核对已下载草稿中的内容。'); }), button('下载打印版', () => { if (clean()) download('FlowLens-业务打印.html', printableForm(record, {shared: true}), 'text/html'); }));
   content.append(toolbar, node('h1', record.title), node('p', record.project + ' · 修订 ' + record.revision + ' · ' + (record.status === 'complete' ? '已归档' : '当前办理角色 ' + role), 'muted'));
   const layout = node('div', undefined, 'record-layout'); const form = node('article', undefined, 'panel record-form');
