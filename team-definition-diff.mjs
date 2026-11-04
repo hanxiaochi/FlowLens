@@ -12,9 +12,27 @@ const types = {text: '文字', number: '数字', date: '日期', boolean: '是 /
 const kinds = {review: '审核', receipt: '签收', issue: '签发'};
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
+function layoutDescription(blocks) {
+  const counts = {paragraphs: 0, tables: 0, cells: 0, merged: 0};
+  function visit(list) {
+    for (const block of list) {
+      if (block.type === 'paragraph') { counts.paragraphs++; continue; }
+      counts.tables++;
+      for (const row of block.rows) for (const cell of row) {
+        counts.cells++;
+        if (cell.colspan > 1 || cell.rowspan > 1) counts.merged++;
+        visit(cell.blocks);
+      }
+    }
+  }
+  visit(blocks);
+  return `${counts.paragraphs} 段文字 · ${counts.tables} 个表格 · ${counts.cells} 个单元格 · ${counts.merged} 处合并。展开原表布局对照可查看内容。`;
+}
+
 function display(key, value, definition, templates) {
   if (key === 'summaryFields' && value === undefined) return '自动摘要';
   if (value === undefined) return '未设置';
+  if (key === 'blocks') return layoutDescription(value);
   if (typeof value === 'boolean') return value ? '是' : '否';
   if (key === 'type') return types[value] ?? String(value);
   if (key === 'kind') return kinds[value] ?? String(value);

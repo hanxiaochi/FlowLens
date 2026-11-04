@@ -399,7 +399,11 @@ export function openTeamStore(filename) {
         const previous = current[collection].find(item => item.id === next.id);
         if (JSON.stringify(previous) === JSON.stringify(next)) continue;
         const sections = Object.keys({...previous, ...next}).filter(key => JSON.stringify(previous?.[key]) !== JSON.stringify(next[key]));
-        changes.push({collection, id: next.id, title: next.title ?? next.name, kind: previous ? 'changed' : 'added', beforeVersion: previous?.version, afterVersion: next.version, sections, details: definitionDetails(previous, next, current.templates, [...incoming.templates, ...current.templates.filter(template => !incoming.templates.some(item => item.id === template.id))])});
+        const change = {collection, id: next.id, title: next.title ?? next.name, kind: previous ? 'changed' : 'added', beforeVersion: previous?.version, afterVersion: next.version, sections, details: definitionDetails(previous, next, current.templates, [...incoming.templates, ...current.templates.filter(template => !incoming.templates.some(item => item.id === template.id))])};
+        if (collection === 'templates' && sections.includes('blocks')) {
+          change.layoutBefore = previous ? {title: previous.title, version: previous.version, fields: previous.fields, blocks: previous.blocks} : null;
+        }
+        changes.push(change);
       }
     }
     const result = applyDefinitions(current, incoming);

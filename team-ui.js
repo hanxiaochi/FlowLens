@@ -277,6 +277,23 @@ async function definitionPreviewView(incoming, previousEntry = null) {
       row.append(node('h3', detail.path), before, after); card.append(row);
     }
     remaining = Math.max(0, remaining - change.details.length);
+    if (Object.hasOwn(change, 'layoutBefore')) {
+      const comparison = node('details'); comparison.append(node('summary', '展开原表布局对照'));
+      let rendered = false;
+      comparison.ontoggle = () => {
+        if (!comparison.open || rendered) return;
+        rendered = true;
+        const layouts = node('div', undefined, 'definition-layout');
+        for (const [title, template] of [['当前表式', change.layoutBefore], ['更新后表式', incoming.templates.find(item => item.id === change.id)]]) {
+          const panel = node('section', undefined, 'record-form'); panel.append(node('h3', title));
+          if (template) renderBlocks(panel, template.blocks, {template, values: {}, status: 'complete'}, '', true);
+          else panel.append(node('p', '此前没有此表式。'));
+          layouts.append(panel);
+        }
+        comparison.append(node('p', '空白表式预览保留段落、嵌套表格和合并单元格，可滚动查看完整布局。', 'muted'), layouts);
+      };
+      card.append(comparison);
+    }
     content.append(card);
   }
   content.append(node('p', '页面最多显示 50 项定义、200 处属性差异，每个值最多 2000 字符。完整预览和更新包可以下载保存。', 'muted'));
@@ -285,7 +302,12 @@ async function definitionPreviewView(incoming, previousEntry = null) {
     if (pending) throw Error('请先处理待确认操作。');
     if (user.id !== plan.userId || serviceContext.instanceId !== plan.instanceId) throw Error('账号或服务环境已变化，请重新预览。');
     const request = {type: 'publish-definitions', applicationId: plan.applicationId, workspace: incoming, planFingerprint: plan.planFingerprint, operationId: crypto.randomUUID(), expectedUserId: plan.userId, expectedInstanceId: plan.instanceId};
-    const entry = await recovery.stage(plan.userId, plan.instanceId, request, '发布表式 · ' + incoming.applications[0].name);
+    let entry;
+    try { entry = await recovery.stage(plan.userId, plan.instanceId, request, '发布表式 · ' + incoming.applications[0].name); }
+    catch (error) {
+      const reason = error.name === 'QuotaExceededError' ? '本机恢复存储空间不足。' : error.message;
+      throw Error(reason + ' 发布请求尚未发送，可使用“下载更新包”保留文件。');
+    }
     pending = entry.request; pendingDraft = null; publish.disabled = true;
     await sendPending();
   }, 'primary');
@@ -388,21 +410,32 @@ function fieldControl(parent, field, record, role) {
   if (editable) control.dataset.field = field.id;
   parent.append(label(field.label + (field.required ? ' *' : ''), control));
 }
-function renderBlocks(parent, blocks, record, role) {
+function renderBlocks(parent, blocks, record, role, layoutPreview = false) {
   for (const block of blocks) {
     if (block.type === 'paragraph') {
-      parent.append(node('p', block.text));
+      const paragraph = node('p', block.text);
+      if (layoutPreview && ['center', 'right'].includes(block.align)) paragraph.style.textAlign = block.align;
+      parent.append(paragraph);
       const field = record.template.fields.find(item => item.id === block.id);
       if (field) fieldControl(parent, field, record, role);
       continue;
     }
     const table = node('table');
+    if (layoutPreview && block.grid.length) {
+      const widths = block.grid.map(value => Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : 1);
+      const largest = widths.reduce((maximum, width) => Math.max(maximum, width), 1);
+      const scaled = widths.map(width => width / largest);
+      const total = scaled.reduce((sum, width) => sum + width, 0);
+      const columns = node('colgroup');
+      for (const width of scaled) { const column = node('col'); column.style.width = width / total * 100 + '%'; columns.append(column); }
+      table.append(columns); table.style.tableLayout = 'fixed'; table.style.minWidth = widths.length * 110 + 'px';
+    }
     for (const row of block.rows) {
       const tr = node('tr');
       for (const cell of row) {
         const td = node('td'); td.colSpan = cell.colspan; td.rowSpan = cell.rowspan;
         const field = record.template.fields.find(item => item.id === cell.id);
-        renderBlocks(td, cell.blocks, record, role);
+        renderBlocks(td, cell.blocks, record, role, layoutPreview);
         if (!cell.blocks.length && cell.text) td.append(node('p', cell.text));
         if (field) fieldControl(td, field, record, role);
         tr.append(td);
@@ -834,5 +867,15 @@ async function adminView() {
   for (const event of data.audit) audit.append(node('p', event.at + ' · ' + (data.users.find(item => item.id === event.user_id)?.name || event.user_id) + ' · ' + event.action + ' · ' + event.target));
   content.append(button('下载最近审计记录', () => download('FlowLens-审计记录.json', JSON.stringify(data.audit, null, 2))), audit);
 }
-try { acceptSession(await api('me')); say('服务器工作区已就绪。'); await enterWorkspace(); }
-catch (error) { loginView(); say(error.status === 401 ? '请登录团队账号。' : error.message, error.status !== 401); }
+async function connectWorkspace() {
+  try { acceptSession(await api('me')); say('服务器工作区已就绪。'); await enterWorkspace(); }
+  catch (error) {
+    loginView();
+    if (error.status === 401) say('请登录团队账号。');
+    else {
+      say('暂时无法读取团队服务，网络恢复后可重试连接。' + error.message, true);
+      content.prepend(button('重试连接', connectWorkspace));
+    }
+  }
+}
+await connectWorkspace();

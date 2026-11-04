@@ -138,3 +138,22 @@ test('CLI restoration refuses both pending and previously completed publications
     assert.deepEqual(restored.audit(admin), audit);
   } finally { restored?.close(); store.close(); await rm(directory, {recursive: true, force: true}); }
 });
+
+test('layout previews retain the original blank template and summarize merged tables', async () => {
+  const {directory, store, admin, initial} = await setup();
+  try {
+    const incoming = structuredClone(initial), template = incoming.templates[0];
+    template.version++;
+    template.blocks[0].rows.unshift([{id: 'header', text: '', colspan: 2, rowspan: 1, blocks: [{id: 'header-text', type: 'paragraph', text: 'New merged header'}]}]);
+    const before = store.visibleWorkspace(admin);
+    const plan = store.previewDefinitions(admin, incoming);
+    const change = plan.changes.find(item => item.id === template.id);
+    assert.deepEqual(change.layoutBefore.blocks, initial.templates[0].blocks);
+    assert.deepEqual(change.layoutBefore.fields, initial.templates[0].fields);
+    assert.equal(change.layoutBefore.values, undefined);
+    const layout = change.details.find(item => item.path === '原表布局');
+    assert.match(layout.after, /1 处合并/);
+    assert.ok(!layout.after.includes('"rows"'));
+    assert.deepEqual(store.visibleWorkspace(admin), before);
+  } finally { store.close(); await rm(directory, {recursive: true, force: true}); }
+});
