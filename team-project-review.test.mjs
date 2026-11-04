@@ -184,3 +184,39 @@ test('review HTTP pages, downloads and attachment hashes use the latest project 
     inspection?.close(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true});
   }
 });
+
+test('review filters before pagination, preserves full totals and requires actual actor roles', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'flowlens-review-filter-'));
+  const store = openTeamStore(join(directory, 'team.sqlite'));
+  try {
+    const admin = await store.createUser(null, {username: 'admin', name: 'Admin', password: 'project-review-test'});
+    const member = await store.createUser(admin, {username: 'member', name: 'Member', password: 'project-review-test'});
+    const sample = applicationDemo(), original = sample.cases[0], projectId = original.projectId;
+    sample.cases = Array.from({length: 53}, (_, index) => ({...structuredClone(original), id: 'review-' + index, values: {...original.values, 'instruction-no': '000' + index}}));
+    sample.cases[52].template.summaryFields = ['instruction-no'];
+    sample.cases[51].status = 'complete';
+    sample.cases[51].step = sample.cases[51].template.workflow.length;
+    store.importApplication(admin, sample);
+    store.setMembership(admin, {userId: member.id, projectId, roles: ['专业监理']});
+    const before = store.visibleWorkspace(admin), audit = store.audit(admin);
+    const searched = store.projectReview(member, {projectId, search: '00052', page: '2'});
+    assert.equal(searched.results.length, 1); assert.equal(searched.results[0].recordId, 'review-52');
+    assert.equal(searched.page, 1); assert.equal(searched.matchedRecords, 1); assert.equal(searched.totals.records, 53);
+    assert.deepEqual(searched.filters, {severity: 'all', assignee: 'all', search: '00052'});
+    assert.equal(store.projectReview(member, {projectId, search: 'REVIEW-52'}).matchedRecords, 1);
+    assert.equal(store.projectReview(member, {projectId, assignee: 'mine'}).matchedRecords, 52);
+    assert.equal(store.projectReview(member, {projectId, assignee: 'mine', page: '2'}).results.length, 2);
+    assert.equal(store.projectReview(admin, {projectId, assignee: 'mine'}).matchedRecords, 0);
+    assert.equal(store.projectReview(member, {projectId, severity: 'review'}).matchedRecords, 1);
+    assert.equal(store.projectReview(member, {projectId, severity: 'review', assignee: 'mine'}).matchedRecords, 0);
+    assert.equal(store.projectReview(member, {projectId, severity: 'unchecked'}).matchedRecords, 0);
+    assert.equal(store.projectReview(member, {projectId, search: 'no-such-record'}).totals.affectedRecords, 53);
+    assert.equal(store.projectReview(member, {projectId, search: 'no-such-record', download: '1'}).results.length, 53);
+    for (const invalid of [{severity: 'bad'}, {assignee: 'admin'}, {search: 'a'.repeat(201)}, {search: []}]) assert.throws(() => store.projectReview(member, {projectId, ...invalid}), error => error.status === 400);
+    assert.deepEqual(store.visibleWorkspace(admin), before); assert.deepEqual(store.audit(admin), audit);
+    store.setMembership(admin, {userId: member.id, projectId, roles: ['总监']});
+    assert.equal(store.projectReview(member, {projectId, assignee: 'mine'}).matchedRecords, 0);
+    store.setMembership(admin, {userId: member.id, projectId, roles: []});
+    assert.throws(() => store.projectReview(member, {projectId, search: '00052'}), error => error.status === 404);
+  } finally { store.close(); await rm(directory, {recursive: true, force: true}); }
+});

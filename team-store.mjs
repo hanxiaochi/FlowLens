@@ -275,9 +275,9 @@ export function openTeamStore(filename) {
       return result;
     } catch (error) { db.exec('ROLLBACK'); throw error; }
   }
-  function projectReview(user, {projectId, page = '1', download = '0'} = {}) {
+  function projectReview(user, {projectId, page = '1', download = '0', severity = 'all', assignee = 'all', search = ''} = {}) {
     const requestedPage = Number(page);
-    if (!Number.isSafeInteger(requestedPage) || requestedPage < 1 || !['0', '1', 'html'].includes(download)) fail(400, '核对清单分页参数无效');
+    if (!Number.isSafeInteger(requestedPage) || requestedPage < 1 || !['0', '1', 'html'].includes(download) || !['all', 'pending', 'review', 'unchecked'].includes(severity) || !['all', 'mine'].includes(assignee) || typeof search !== 'string' || search.length > 200) fail(400, '核对清单分页或筛选参数无效');
     db.exec('BEGIN');
     try {
       const actor = active(user);
@@ -303,9 +303,14 @@ export function openTeamStore(filename) {
         return result.size === file.size ? result.state : 'invalid';
       });
       report.attachmentVerification = {inspectedBytes, limitBytes: 64 * 1024 * 1024};
-      const pages = Math.max(1, Math.ceil(report.results.length / 50));
+      const actorRoles = roles(actor, projectId), needle = search.trim().toLowerCase();
+      const matches = report.results.filter(record =>
+        (severity === 'all' || record.issues.some(issue => issue.severity === severity)) &&
+        (assignee === 'all' || record.status !== 'complete' && actorRoles.includes(record.role)) &&
+        (!needle || [record.recordId, record.title, ...record.summary.map(field => field.text)].some(value => String(value).toLowerCase().includes(needle))));
+      const pages = Math.max(1, Math.ceil(matches.length / 50));
       const currentPage = Math.min(requestedPage, pages);
-      const result = download !== '0' ? report : {...report, results: report.results.slice((currentPage - 1) * 50, currentPage * 50), page: currentPage, pages, pageSize: 50};
+      const result = download !== '0' ? report : {...report, results: matches.slice((currentPage - 1) * 50, currentPage * 50), page: currentPage, pages, pageSize: 50, matchedRecords: matches.length, filters: {severity, assignee, search}};
       if (download !== '0' && Buffer.byteLength(JSON.stringify(result)) > 16 * 1024 * 1024) fail(413, '核对清单超过 16 MiB，请分页查看并处理后重试');
       db.exec('COMMIT'); return result;
     } catch (error) { db.exec('ROLLBACK'); throw error; }
