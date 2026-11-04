@@ -29,3 +29,8 @@ This release candidate adds a project review checklist: required fields by workf
 The checklist is a timestamped, read-only snapshot. Attachment verification is capped at 64 MiB per report, with remaining files explicitly marked unchecked and available for individual verification/download. It does not replace business sign-off.
 
 155 local tests and the code-level Windows/Ubuntu/container checks passed. Browser interaction and narrow-screen checks passed on fictional fixtures. The published team ZIP was downloaded again, matched its SHA256, and passed 24 independent runtime checks. Printed pagination and final stable release/deployment acceptance remain pending. The stable cloud service and public demo remain on 1.18.0.
+
+
+## 目标主机隔离补验
+
+候选镜像已在云服务器上使用 1.18 备份副本完成隔离检查：5 个账号、2 个项目、10 份单据、4 个附件及 10 次项目核对通过，备份再还原后的工作区一致。容器无网络、无对外端口，正式服务未升级。只读来源恢复存在 SQLite 旁文件限制，暂用经校验的可写副本，见部署说明；该限制的工具改进仍待完成。
