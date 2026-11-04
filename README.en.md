@@ -26,6 +26,8 @@ No installation or API key needed. Start with a fictional supervision applicatio
 
 The team app now separates fields still due at the current stage, issues in completed stages, and attachments whose verification is incomplete. Open a record from the review and return to the same page. Download a readable HTML checklist for review or printing without additional software.
 
+[Candidate user guide](docs/project-review-guide.en.md)
+
 ![Downloaded review checklist with fictional data](docs/images/project-review-1.19.png)
 
 The review list now supports issue categories, record/summary search, and records your assigned roles can handle. Returning from a record preserves the filters and page. Downloads still include the whole project.
