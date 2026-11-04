@@ -1,6 +1,6 @@
 # FlowLens
 
-[简体中文](README.md) · **English** · [v1.16.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.16.0)
+[简体中文](README.md) · **English** · [v1.17.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.17.0)
 
 **[Try the live demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -28,7 +28,7 @@ You can close the import result page and come back later. Open **Import batch hi
 
 ![Reviewing records in an import batch](docs/images/batch-review-1.17.png)
 
-All 138 local tests and 22 standalone candidate checks pass. Final release verification is underway. [Release notes (Chinese)](docs/release-1.17.0.md)
+All 138 local tests and 22 standalone candidate checks pass. Final cross-platform CI and cloud upgrade checks pass. Release-download verification is underway. [Release notes (Chinese)](docs/release-1.17.0.md)
 
 ## 1.16 bring an existing ledger into the workflow
 
@@ -145,7 +145,7 @@ Import an application package into the self-hosted team service, create accounts
 
 The server checks project roles, workflow stages, and record revisions. Repeated requests reuse their result. This release also adds account deactivation, password changes, audit history, versioned template publication, and SQLite backup and restore tools.
 
-Download `FlowLens-1.16.0-team.zip`, install Node.js 24 LTS, initialize the administrator, then run `npm start`. The team runtime bundles its required files and needs no npm install. See the [deployment guide (Chinese)](docs/team-deployment.md) and [release acceptance](docs/release-1.13.0.md).
+Download `FlowLens-1.17.0-team.zip`, install Node.js 24 LTS, initialize the administrator, then run `npm start`. The team runtime bundles its required files and needs no npm install. See the [deployment guide (Chinese)](docs/team-deployment.md) and [release acceptance](docs/release-1.13.0.md).
 
 The public demo runs locally in your browser. The shared service is self-hosted and intended for a small-team pilot. Cloud technical acceptance is recorded. Customer workflows, sustained capacity, and maintenance handover still need validation.
 
