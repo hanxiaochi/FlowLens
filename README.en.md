@@ -22,6 +22,12 @@ No installation or API key needed. Start with a fictional supervision applicatio
 
 [1.3 release notes and acceptance](docs/release-1.3.0.md)
 
+## 1.15 check who can handle each step
+
+The admin page lists each project's roles and active members, highlighting roles that still need someone assigned. Jump to project permissions and keep the current selection after saving. Empty instances provide a setup entry, with guidance for applications that have no projects yet.
+
+All 125 local tests and 20 standalone runtime checks pass. Final release-candidate acceptance is in progress. [Release notes (Chinese)](docs/release-1.15.0.md)
+
 ## 1.14 review changes before publishing
 
 Upload an update package, compare fields, workflows and form layouts, then confirm publication. An outdated preview asks for another review. If the response is lost, continue with the original request. Existing records retain their historical templates.
