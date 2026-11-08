@@ -23,3 +23,13 @@ test('static demo has resolvable assets, no server or key files, and no credenti
  const html=await readFile(join(root,'index.html'),'utf8');assert.match(html,/name="flowlens-demo"/);assert.ok(!/(?:src|href)="\//.test(html));assert.ok(!html.includes('"/vendor/'));
  const js=await readFile(join(root,'studio.js'),'utf8');assert.match(js,/if\(publicDemo\).*公开演示不连接模型服务/);assert.match(js,/\$\('settings-dialog'\)\.remove/);
 });
+
+
+test('design and team page labels match the source package version', async () => {
+ const {version}=JSON.parse(await readFile('package.json','utf8'));
+ const studio=await readFile('studio.html','utf8'), team=await readFile('team.html','utf8');
+ assert.ok(studio.includes('<title>FlowLens '+version+' ·'));
+ assert.ok(studio.includes('<span>v'+version+'</span>'));
+ assert.ok(team.includes('<title>FlowLens '+version+' ·'));
+ assert.ok(team.includes('<span>'+version+' · 团队协作</span>'));
+});

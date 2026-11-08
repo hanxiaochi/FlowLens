@@ -1,3 +1,5 @@
+import {runApplicationScenario, saveApplicationScenario, applicationScenarioStatus} from './apps-scenarios.mjs';
+import {saveRequirement} from './apps-requirements.mjs';
 import test from 'node:test';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
@@ -12,7 +14,7 @@ import {applicationDemo} from './apps-demo.mjs';
 import {createCase} from './forms-model.mjs';
 
 const password = 'restore-test-password';
-async function setup({legacySubmitter = false} = {}) {
+async function setup({legacySubmitter = false, discovery = false} = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'flowlens-restore-'));
   const store = openTeamStore(join(directory, 'target.sqlite'));
   const admin = await store.createUser(null, {username: 'admin', name: 'Target admin', password});
@@ -36,6 +38,13 @@ async function setup({legacySubmitter = false} = {}) {
   }
   const draft = createCase(app.templates[0], {project: app.projects[0].name, role: legacySubmitter ? '历史填报人' : app.templates[0].submitterRole});
   draft.appId = app.applications[0].id; draft.projectId = app.projects[0].id; app.cases.push(draft);
+  if (discovery) {
+    const template = app.templates[0];
+    app.applications[0] = saveRequirement(app.applications[0], app.templates, {statement: '指令后发起整改', source: '虚构恢复验收', origin: 'manual', target: {kind: 'template', templateId: template.id, id: template.id}});
+    const requirementId = app.applications[0].requirements[0].id;
+    const report = runApplicationScenario(app, app.applications[0].id, [requirementId]);
+    app.applications[0] = saveApplicationScenario(app.applications[0], app.templates, report);
+  }
   source.importApplication(sourceAdmin, app);
   // Imported source history normally loses actors. Simulate a saved source event for provenance checks.
   const db = new DatabaseSync(join(directory, 'source.sqlite'));
@@ -146,5 +155,33 @@ test('restoration and membership editing retain historical submitters that diffe
     const draft = store.visibleWorkspace(member, {inlineAttachments: false}).workspace.cases.find(record => record.status === 'draft');
     const saved = store.command(member, {type: 'save', recordId: draft.id, expectedRevision: draft.revision, operationId: crypto.randomUUID(), values: {issue: '旧角色继续办理'}}, {inlineAttachments: false});
     assert.equal(saved.record.events.at(-1).role, '历史填报人');
+  } finally { store.close(); await rm(directory, {recursive: true, force: true}); }
+});
+
+
+test('project archive restores cross-form history with source snapshots and requires a new run in the copy', async () => {
+  const {directory, store, admin, archive, options, app} = await setup({discovery: true});
+  try {
+    const plan = store.previewProjectRestore(admin, archive, options);
+    const result = store.restoreProject(admin, archive, {...options, planFingerprint: plan.planFingerprint, confirmed: true});
+    const workspace = store.visibleWorkspace(admin, {inlineAttachments: false}).workspace;
+    const project = workspace.projects.find(item => item.id === result.projectId);
+    const restored = workspace.applications.find(item => item.id === project.appId);
+    assert.ok(restored);
+    const original = app.applications[0];
+    assert.deepEqual(restored.scenarioRuns, original.scenarioRuns);
+    assert.notEqual(restored.id, original.id);
+    assert.equal(restored.requirements[0].target.templateId, restored.templateIds[0]);
+    assert.equal(applicationScenarioStatus(restored, workspace.templates, restored.scenarioRuns[0]), 'changed');
+    assert.equal(restored.scenarioRuns[0].report.application.id, original.id);
+    const saved = saveApplicationScenario(restored, workspace.templates, runApplicationScenario(workspace, restored.id, [restored.requirements[0].id]));
+    assert.equal(applicationScenarioStatus(saved, workspace.templates, saved.scenarioRuns[1]), 'passed');
+    const backupPath = join(directory, 'history-backup.sqlite');
+    await store.backup(backupPath);
+    const backup = openTeamStore(backupPath);
+    try {
+      const login = await backup.login('admin', password);
+      assert.deepEqual(backup.visibleWorkspace(login.user).workspace.applications[0].scenarioRuns, original.scenarioRuns);
+    } finally { backup.close(); }
   } finally { store.close(); await rm(directory, {recursive: true, force: true}); }
 });
