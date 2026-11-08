@@ -1,10 +1,54 @@
 import {uid} from './forms-model.mjs';
 import {FIELD_TYPES} from './forms-schema.mjs';
+import {verifyTemplate} from './forms-acceptance.mjs';
 
 export const requirementStatusLabels = {pending: '待确认', confirmed: '已记录确认', changed: '需重新确认', missing: '关联对象已移除'};
+export const scenarioStatusLabels = {passed: '本地场景通过', failed: '本地场景有失败项', changed: '定义已变化，需重新运行', missing: '关联对象已移除'};
 
 function text(value, limit, required = true) {
   if (typeof value !== 'string' || value.length > limit || (required && !value.trim())) throw Error('需求记录需填写有效文字，最多 ' + limit + ' 字符');
+}
+
+function validateDefinitionSnapshot(serialized) {
+  text(serialized, 200000);
+  let definition;
+  try { definition = JSON.parse(serialized); } catch { throw Error('确认定义快照无效'); }
+  if (!definition || typeof definition !== 'object' || !definition.template || !definition.target) throw Error('确认定义快照无效');
+}
+
+function validateScenarioRuns(runs = []) {
+  if (!Array.isArray(runs) || runs.length > 20) throw Error('每条需求最多保存 20 次场景运行');
+  const ids = new Set();
+  for (const run of runs) {
+    if (!run || typeof run !== 'object') throw Error('场景运行格式无效');
+    text(run.id, 200); text(run.at, 100);
+    if (ids.has(run.id) || !Number.isFinite(Date.parse(run.at))) throw Error('场景编号或日期无效');
+    ids.add(run.id);
+    validateDefinitionSnapshot(run.definition);
+    const report = run.report;
+    if (!report || !Array.isArray(report.results) || !report.results.length || report.results.length > 2000 || JSON.stringify(report).length > 1000000) throw Error('场景报告格式无效或超过容量');
+    text(report.scope, 1000);
+    for (const result of report.results) {
+      text(result.name, 1000); text(result.title, 1000); text(result.expected, 4000); text(result.actual, 4000);
+      if (typeof result.passed !== 'boolean' || !Array.isArray(result.steps) || result.steps.length > 32) throw Error('场景结果无效');
+      for (const step of result.steps) {
+        if (!step || !['save', 'submit', 'advance', 'return'].includes(step.action) || !['accepted', 'rejected'].includes(step.outcome)) throw Error('场景操作无效');
+        text(step.role, 200); text(step.note, 20000, false);
+        if (step.message !== undefined) text(step.message, 20000);
+        for (const state of [step.before, step.after]) {
+          if (!state || !['draft', 'active', 'complete'].includes(state.status) || !Number.isSafeInteger(state.revision) || state.revision < 0 || !Number.isSafeInteger(state.events) || state.events < 0) throw Error('场景状态无效');
+          text(state.stage, 500); text(state.recordId, 200);
+        }
+        if (!step.input || typeof step.input !== 'object' || Array.isArray(step.input) || !Array.isArray(step.changes)) throw Error('场景输入或变化无效');
+        for (const value of Object.values(step.input)) text(value, 20000, false);
+        for (const change of step.changes) {
+          if (!change || typeof change !== 'object') throw Error('场景字段变化无效');
+          text(change.field, 500); text(change.before, 20000, false); text(change.after, 20000, false);
+        }
+      }
+    }
+    if (report.passed !== report.results.every(result => result.passed)) throw Error('场景总结果与逐项结果不一致');
+  }
 }
 
 export function validateRequirements(entries = []) {
@@ -22,16 +66,14 @@ export function validateRequirements(entries = []) {
     text(entry.target.templateId, 200);
     text(entry.target.id, 200);
     if (!Array.isArray(entry.reviews) || entry.reviews.length > 50) throw Error('每条需求最多保存 50 次确认记录');
+    validateScenarioRuns(entry.runs);
     for (const review of entry.reviews) {
       if (!review || typeof review !== 'object') throw Error('确认记录格式无效');
       text(review.reviewer, 200);
       text(review.evidence, 4000);
       text(review.at, 100);
       if (!Number.isFinite(Date.parse(review.at))) throw Error('确认日期无效');
-      text(review.definition, 200000);
-      let definition;
-      try { definition = JSON.parse(review.definition); } catch { throw Error('确认定义快照无效'); }
-      if (!definition || typeof definition !== 'object' || !definition.template || !definition.target) throw Error('确认定义快照无效');
+      validateDefinitionSnapshot(review.definition);
     }
   }
 }
@@ -79,6 +121,7 @@ export function saveRequirement(app, templates, input) {
   if (input.id && !old) throw Error('需求记录已不存在，请重新读取');
   const entry = {id: old?.id ?? uid(), statement: input.statement, source: input.source, origin: input.origin,
     target: structuredClone(input.target), reviews: structuredClone(old?.reviews ?? [])};
+  if (old?.runs) entry.runs = structuredClone(old.runs);
   validateRequirements([entry]);
   if (!requirementTarget(app, templates, entry.target)) throw Error('请选择当前应用中的表式、字段或办理动作');
   const next = old ? entries.map(item => item.id === old.id ? entry : item) : [...entries, entry];
@@ -106,11 +149,50 @@ export function requirementDefinition(app, templates, id) {
 export function retainRequirementHistory(previous, incoming) {
   if (!previous?.requirements?.length) return incoming;
   if (incoming.requirements === undefined) return {...incoming, requirements: structuredClone(previous.requirements)};
+  const merged = structuredClone(incoming);
   for (const old of previous.requirements) {
-    const next = incoming.requirements.find(entry => entry.id === old.id);
+    const next = merged.requirements.find(entry => entry.id === old.id);
     if (!next || JSON.stringify(next.reviews.slice(0, old.reviews.length)) !== JSON.stringify(old.reviews)) throw Error('发布需保留已有需求依据与确认历史，请先取得最新应用定义');
+    if (next.runs === undefined && old.runs) next.runs = structuredClone(old.runs);
+    if (old.runs && JSON.stringify(next.runs.slice(0, old.runs.length)) !== JSON.stringify(old.runs)) throw Error('发布需保留已有场景运行历史，请先取得最新应用定义');
   }
-  return incoming;
+  return merged;
+}
+
+export function runRequirementScenario(app, templates, id) {
+  const entry = app.requirements?.find(item => item.id === id);
+  if (!entry) throw Error('需求记录已不存在');
+  const target = requirementTarget(app, templates, entry.target);
+  if (!target) throw Error('关联对象已移除，请先重新关联');
+  const run = {id: uid(), at: new Date().toISOString(), definition: definitionFor(app, templates, entry), report: verifyTemplate(target.template)};
+  const updated = {...entry, runs: [...(entry.runs ?? []), run]};
+  validateRequirements([updated]);
+  return {...app, requirements: app.requirements.map(item => item.id === id ? updated : item)};
+}
+
+export function scenarioRunStatus(app, templates, entry, run) {
+  const current = definitionFor(app, templates, entry);
+  if (current === null) return 'missing';
+  if (run.definition !== current) return 'changed';
+  return run.report.passed ? 'passed' : 'failed';
+}
+
+export function scenarioRunText(run) {
+  const template = JSON.parse(run.definition).template;
+  const fields = Array.isArray(template.fields) ? template.fields : [];
+  const actions = {save: '保存', submit: '提交', advance: '继续', return: '退回'};
+  const scenarios = run.report.results.map(result => {
+    const steps = result.steps.map(step => {
+      const inputs = Object.entries(step.input).map(([id, value]) => (fields.find(field => field?.id === id)?.label ?? id) + ' = ' + value).join('\n');
+      const changes = step.changes.map(change => change.field + ' 从“' + change.before + '”变为“' + change.after + '”').join('\n');
+      return [step.role + '执行' + actions[step.action], '输入\n' + (inputs || '无填写输入'), '办理意见 ' + (step.note || '未填写'),
+        '结果 ' + (step.outcome === 'accepted' ? '已执行' : '已拒绝') + (step.message ? '\n' + step.message : ''),
+        step.before.stage + ' → ' + step.after.stage + '，修订 ' + step.before.revision + ' → ' + step.after.revision + '，历史事件 ' + step.before.events + ' → ' + step.after.events,
+        changes || '字段值保持原值'].join('\n');
+    }).join('\n\n');
+    return [result.title, '预期\n' + result.expected, '实际\n' + result.actual, result.passed ? '此项通过' : '此项失败', steps].join('\n\n');
+  });
+  return ['样例场景运行 ' + run.at, run.report.scope, '使用自动样例值，执行过程保存在独立内存记录中。', ...scenarios].join('\n\n');
 }
 
 export function requirementDefinitionText(serialized) {
@@ -169,7 +251,8 @@ export function requirementsText(app, templates) {
     const target = requirementTarget(app, templates, entry.target);
     const title = target ? `${target.template.title} / ${target.item.label ?? target.item.title}` : `${entry.target.templateId} / ${entry.target.id}`;
     const history = entry.reviews.map(review => `确认人 ${review.reviewer}\n记录时间 ${review.at}\n确认依据 ${review.evidence}\n当时定义摘要\n${requirementDefinitionText(review.definition)}\n\n完整定义快照\n${review.definition}`).join('\n\n');
-    return `${entry.statement}\n关联 ${title}\n来源 ${entry.origin === 'ai' ? 'AI 建议' : '人工录入'}\n材料原文或出处\n${entry.source}\n当前状态 ${requirementStatusLabels[requirementStatus(app, templates, entry)]}\n\n${history || '尚无确认记录'}`;
+    const scenarios = (entry.runs ?? []).map(run => scenarioStatusLabels[scenarioRunStatus(app, templates, entry, run)] + '\n' + scenarioRunText(run)).join('\n\n');
+    return `${entry.statement}\n关联 ${title}\n来源 ${entry.origin === 'ai' ? 'AI 建议' : '人工录入'}\n材料原文或出处\n${entry.source}\n当前状态 ${requirementStatusLabels[requirementStatus(app, templates, entry)]}\n\n${history || '尚无确认记录'}\n\n${scenarios || '尚无样例场景运行'}`;
   });
   return [app.name + ' · 需求依据与确认记录', '确认人及依据由记录者填写；团队发布操作按现有账号审计。', ...sections].join('\n\n');
 }

@@ -36,6 +36,8 @@ The team publication preview now shows readable changes to requirement statement
 
 Expanded review history now explains the original field requirements, detail columns, responsible roles, and conditional returns. The complete definition opens separately, and downloads retain both the summary and original snapshot. Browser checks covered historical summaries and narrow-screen expansion, with all 169 local tests passing. Fields in other forms currently use the identifiers saved in the historical snapshot.
 
+Run sample scenarios from a requirement to inspect the acting role, inputs, rejection reasons, and changes to state, revision, and fields. Each run is tied to its saved definition, so later rule changes prompt another run. Current execution uses generated sample values for one form and its local rules. Field observations, custom inputs, and cross-form scenario execution remain planned. All 171 local tests passed; browser checks covered execution, persistence, downloads, and the exported verifier. This increment is unreleased and has not been deployed.
+
 The team app now separates fields still due at the current stage, issues in completed stages, and attachments whose verification is incomplete. Open a record from the review and return to the same page. Download a readable HTML checklist for review or printing without additional software.
 
 [Candidate user guide](docs/project-review-guide.en.md)

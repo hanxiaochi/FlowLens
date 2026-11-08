@@ -4,7 +4,7 @@ import {applicationDemo} from './apps-demo.mjs';
 import {applicationPackage} from './apps-model.mjs';
 import {upgradeWorkspace} from './forms-store.mjs';
 import {prepareProjectRestore} from './team-project-restore.mjs';
-import {saveRequirement, confirmRequirement, requirementDefinition, requirementStatus, validateRequirements, requirementsText, requirementDefinitionText} from './apps-requirements.mjs';
+import {saveRequirement, confirmRequirement, requirementDefinition, requirementStatus, validateRequirements, requirementsText, requirementDefinitionText, runRequirementScenario, scenarioRunStatus, scenarioRunText, retainRequirementHistory} from './apps-requirements.mjs';
 
 function fixture(kind = 'field') {
   const workspace = applicationDemo();
@@ -135,4 +135,59 @@ test('definition summaries retain detail constraints and tolerate incomplete his
   assert.match(summary, /计算合计/);
   assert.match(requirementDefinitionText('{'), /无法生成摘要/);
   assert.match(requirementDefinitionText(JSON.stringify({template: {title: '旧快照'}, target: {}})), /摘要字段不完整/);
+});
+
+test('requirement scenarios retain real operation traces without changing business records or confirming requirements', () => {
+  const {workspace, app, id} = fixture();
+  app.requirements[0].reviews = [];
+  const before = structuredClone(workspace);
+  const next = runRequirementScenario(app, workspace.templates, id);
+  const entry = next.requirements[0], run = entry.runs[0];
+  assert.deepEqual(workspace, before);
+  assert.equal(app.requirements[0].runs, undefined);
+  assert.equal(requirementStatus(next, workspace.templates, entry), 'pending');
+  assert.equal(scenarioRunStatus(next, workspace.templates, entry, run), 'passed');
+  const submit = run.report.results.find(result => result.name === 'draft: advance and replay');
+  assert.equal(submit.steps[0].role, workspace.templates[0].submitterRole);
+  assert.equal(submit.steps[0].after.revision, 1);
+  assert.deepEqual(submit.steps[1].after, submit.steps[1].before);
+  assert.equal(submit.steps[2].outcome, 'rejected');
+  const returned = run.report.results.find(result => result.name.endsWith(': return'));
+  assert.equal(returned.steps[0].outcome, 'rejected');
+  assert.equal(returned.steps[1].after.stage, '填报');
+  assert.equal(returned.steps.at(-1).after.stage, '指令签发');
+  assert.ok(returned.steps.at(-1).after.events > returned.steps[1].after.events);
+  assert.match(scenarioRunText(run), /预期/);
+  assert.match(scenarioRunText(run), /历史事件/);
+  assert.match(requirementsText(next, workspace.templates), /本地场景通过/);
+  workspace.applications[0] = next;
+  const restored = upgradeWorkspace(applicationPackage(workspace, app.id));
+  assert.deepEqual(restored.applications[0].requirements[0].runs, entry.runs);
+  const changed = saveRequirement(next, workspace.templates, {...entry, source: '新的访谈材料'});
+  assert.equal(scenarioRunStatus(changed, workspace.templates, changed.requirements[0], run), 'changed');
+  const oldClient = structuredClone(next); delete oldClient.requirements[0].runs;
+  assert.deepEqual(retainRequirementHistory(next, oldClient).requirements[0].runs, entry.runs);
+  assert.equal(oldClient.requirements[0].runs, undefined);
+  const tampered = structuredClone(next); tampered.requirements[0].runs = [];
+  assert.throws(() => retainRequirementHistory(next, tampered), /场景运行历史/);
+  const invalid = structuredClone(entry); invalid.runs[0].report.passed = false;
+  assert.throws(() => validateRequirements([invalid]), /总结果/);
+});
+
+test('conditional scenarios show the actual return and keep a failed completion as failed evidence', () => {
+  const workspace = applicationDemo();
+  const template = workspace.templates.find(item => item.id === 'app-reply');
+  const app = saveRequirement(workspace.applications[0], workspace.templates, {statement: '复查退回场景', source: '虚构规则', origin: 'manual', target: {kind: 'template', templateId: template.id, id: template.id}});
+  const id = app.requirements[0].id;
+  const good = runRequirementScenario(app, workspace.templates, id);
+  const condition = good.requirements[0].runs[0].report.results.find(result => result.name.includes(': condition '));
+  assert.equal(condition.passed, true);
+  assert.equal(condition.steps[0].outcome, 'rejected');
+  assert.equal(condition.steps[1].after.stage, '填报');
+  template.fields.find(field => field.id === 'result').options = ['不通过'];
+  const failed = runRequirementScenario(app, workspace.templates, id);
+  const entry = failed.requirements[0], run = entry.runs[0];
+  assert.equal(run.report.passed, false);
+  assert.equal(scenarioRunStatus(failed, workspace.templates, entry, run), 'failed');
+  assert.ok(run.report.results.some(result => !result.passed));
 });

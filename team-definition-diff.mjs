@@ -3,6 +3,7 @@ import {discoveryFields} from './apps-model.mjs';
 const labels = {
   ...Object.fromEntries(discoveryFields), discovery: '需求工作单',
   requirements: '需求依据', statement: '需求描述', origin: '记录来源', target: '关联对象', reviews: '确认历史',
+  runs: '样例场景历史',
   title: '名称', name: '名称', version: '版本', code: '表号', source: '来源',
   submitterRole: '发起角色', fields: '填写区', workflow: '办理流程', summaryFields: '清单摘要',
   templateIds: '应用表式', relations: '单据关联', bindings: '项目资料带入',
@@ -44,6 +45,7 @@ function display(key, value, definition, templates) {
     return `${template?.title ?? value.templateId} / ${value.kind === 'template' ? '整份表式' : target?.label ?? value.id}`;
   }
   if (key === 'reviews') return value.map(review => `确认人 ${review.reviewer}\n记录时间 ${review.at}\n确认依据 ${review.evidence}\n对应表式版本 ${JSON.parse(review.definition).template.version ?? '未记录'}`).join('\n\n') || '尚无确认记录';
+  if (key === 'runs') return value.map(run => `${run.at}\n${run.report.scope}\n${run.report.results.filter(result => result.passed).length} / ${run.report.results.length} 项通过`).join('\n\n') || '尚无场景运行';
   if (typeof value === 'boolean') return value ? '是' : '否';
   if (key === 'type') return types[value] ?? String(value);
   if (key === 'kind') return kinds[value] ?? String(value);

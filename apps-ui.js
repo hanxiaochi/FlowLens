@@ -1,6 +1,6 @@
 import {applicationDelivery} from './apps-delivery.js';
 import {summarizeRecord} from './forms-model.mjs';
-import {saveRequirement, confirmRequirement, requirementDefinition, requirementStatus, requirementStatusLabels, requirementTarget, requirementsText, requirementDefinitionText} from './apps-requirements.mjs';
+import {saveRequirement, confirmRequirement, requirementDefinition, requirementStatus, requirementStatusLabels, requirementTarget, requirementsText, requirementDefinitionText, runRequirementScenario, scenarioRunStatus, scenarioStatusLabels, scenarioRunText} from './apps-requirements.mjs';
 import {createApplication, createProject, startProjectCase, validateRelation, applicationPackage, discoveryFields, discoveryText} from './apps-model.mjs';
 
 const element = (tag, text, className) => {
@@ -164,14 +164,35 @@ export function renderApplications(host, {workspace, appId, projectId, role, onS
         element('p', target ? `${target.template.title} / ${target.item.label ?? target.item.title}` : '原关联对象已移除，请重新选择'), element('pre', entry.source));
       card.append(button('编辑依据', () => editRequirement(entry)));
       if (target) card.append(button('查看表式与规则', () => { list.close(); onOpen('templates', target.template.id); }), button('记录业务确认', () => recordReview(entry)));
+      if (target) card.append(button('运行样例场景', () => scenarioPreview(entry)));
       for (const review of [...entry.reviews].reverse()) {
         const history = element('details');
         history.append(element('summary', `${new Date(review.at).toLocaleString('zh-CN', {hour12: false})} · ${review.reviewer}`), element('p', review.evidence), definitionView(review.definition));
         card.append(history);
       }
+      for (const run of [...(entry.runs ?? [])].reverse()) {
+        const history = element('details');
+        history.append(element('summary', `${new Date(run.at).toLocaleString('zh-CN', {hour12: false})} · ${scenarioStatusLabels[scenarioRunStatus(app, templates, entry, run)]}`),
+          element('p', `${run.report.results.filter(result => result.passed).length} / ${run.report.results.length} 项通过。${run.report.scope}。`),
+          element('pre', scenarioRunText(run)), button('下载这次场景记录', () => download('FlowLens-场景运行.json', JSON.stringify(run, null, 2))));
+        card.append(history);
+      }
       list.append(card);
     }
     if (!app.requirements?.length) list.append(element('p', '还没有需求依据。先选一个字段或办理动作，写下客户的原话和材料出处。'));
+
+    function scenarioPreview(entry) {
+      const dialog = modal('运行关联表式的样例场景');
+      dialog.append(element('p', '使用自动样例值，在独立内存记录中执行缺少必填、错误角色、退回重提、条件退回、继续办理及重复请求。结果随当前需求定义保存，显示每步输入、状态、修订和字段变化。实际业务解释及生产环境权限仍需现场验收。'),
+        button('运行并保存场景记录', async () => {
+          await mutate(next => {
+            const index = next.applications.findIndex(item => item.id === app.id);
+            if (index < 0) throw Error('应用已不存在，请重新读取');
+            next.applications[index] = runRequirementScenario(next.applications[index], next.templates, entry.id);
+          });
+          dialog.close(); list.close(); say('场景运行结果已保存，请打开需求依据查看逐项结果。');
+        }, 'primary'));
+    }
 
     function editRequirement(entry) {
       const dialog = modal(entry ? '编辑需求依据' : '添加需求依据');
