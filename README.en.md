@@ -44,6 +44,8 @@ Publication previews also list sample runs and field observations affected by th
 
 Requirements now offer custom scenario inputs grouped by workflow stage, including editable detail rows. Saved runs retain those inputs and actual operation traces. Advancement checks expect the next stage, so validation errors or conditional returns remain visible as failed checks. Browser checks covered detail editing, narrow screens, execution, reload, and download; all 175 local tests passed. Cross-form scenarios remain in development.
 
+Run cross-form samples from the application home to follow source records, carried fields, acting roles, and revisions in an isolated fictional project. Checks include unfinished upstream records, cross-project references, and duplicate creation. Results remain in the open dialog and can be downloaded as JSON or text before closing. The delivery ZIP verifier also runs these checks. The three-form browser example passed 13 checks, and all 178 local tests passed.
+
 The team app now separates fields still due at the current stage, issues in completed stages, and attachments whose verification is incomplete. Open a record from the review and return to the same page. Download a readable HTML checklist for review or printing without additional software.
 
 [Candidate user guide](docs/project-review-guide.en.md)

@@ -1,3 +1,4 @@
+import {runApplicationScenario, applicationScenarioText} from './apps-scenarios.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {applicationDemo} from './apps-demo.mjs';
@@ -135,4 +136,62 @@ test('all application templates pass local verifier and export usable array sche
     await db.exec(`INSERT INTO "${system.table}" (record_id,"${system.columns.items}") VALUES ('a','[]')`);
     await assert.rejects(db.exec(`UPDATE "${system.table}" SET "${system.columns.items}"='{}'`));
   } finally { await db.close(); }
+});
+
+
+test('cross-form scenarios execute the instruction reply archive chain without touching customer records', () => {
+  const workspace = applicationDemo(), before = structuredClone(workspace);
+  const report = runApplicationScenario(workspace, workspace.applications[0].id);
+  assert.equal(report.passed, true);
+  assert.equal(report.records.length, 3);
+  assert.deepEqual(workspace, before);
+  const [instruction, reply, archive] = report.records;
+  assert.equal(reply.relatedId, instruction.id);
+  assert.equal(archive.relatedId, reply.id);
+  assert.ok(report.records.every(record => record.status === 'complete'));
+  assert.ok(report.records.every(record => record.projectId === report.project.id));
+  assert.ok(report.results.some(result => result.title.includes('上游未完成') && result.passed));
+  assert.ok(report.results.some(result => result.title.includes('项目隔离') && result.passed));
+  for (const record of [reply, archive]) {
+    const source = report.records.find(item => item.id === record.relatedId);
+    assert.equal(record.link.sourceRevision, source.revision);
+    for (const mapping of record.link.mappings) assert.equal(record.values[mapping.to], source.values[mapping.from]);
+  }
+  assert.ok(report.attempts.every(attempt => attempt.outcome === 'accepted' && attempt.after.revision === attempt.before.revision + 1));
+  assert.match(applicationScenarioText(report), /提交 · 填报/);
+  assert.ok(!applicationScenarioText(report).includes('undefined'));
+});
+
+test('cross-form failures retain attempted inputs and do not fabricate completed downstream work', () => {
+  const workspace = applicationDemo();
+  const reply = workspace.templates.find(item => item.id === 'app-reply');
+  reply.fields.find(field => field.id === 'result').options = ['不通过'];
+  const before = structuredClone(workspace);
+  const report = runApplicationScenario(workspace, workspace.applications[0].id);
+  assert.equal(report.passed, false);
+  assert.deepEqual(workspace, before);
+  assert.equal(report.records.length, 2);
+  assert.equal(report.records[1].status, 'active');
+  const failed = report.attempts.find(attempt => attempt.outcome === 'rejected');
+  assert.equal(failed.operation.values.result, '不通过');
+  assert.deepEqual(failed.after, failed.before);
+  assert.match(applicationScenarioText(report), /条件触发退回/);
+  assert.ok(report.results.some(result => result.title === '应用链路覆盖' && !result.passed));
+});
+
+
+test('cross-form traversal follows each branch and stops bounded expansion explicitly', () => {
+  const workspace = applicationDemo(), app = workspace.applications[0];
+  app.relations.push({id: 'direct-archive', label: '直接归档分支', from: app.templateIds[0], to: app.templateIds[2], mappings: []});
+  const report = runApplicationScenario(workspace, app.id);
+  assert.equal(report.passed, true);
+  assert.equal(report.records.length, 4);
+  assert.equal(report.records.filter(record => record.template.id === app.templateIds[2]).length, 2);
+  const many = applicationDemo(), manyApp = many.applications[0];
+  manyApp.relations = [];
+  for (let i = 0; i < 101; i++) manyApp.relations.push({id: 'branch-' + i, label: '分支 ' + i, from: manyApp.templateIds[0], to: manyApp.templateIds[1], mappings: []});
+  const bounded = runApplicationScenario(many, manyApp.id);
+  assert.equal(bounded.records.length, 100);
+  assert.equal(bounded.passed, false);
+  assert.match(bounded.results.at(-1).actual, /超过 100/);
 });
