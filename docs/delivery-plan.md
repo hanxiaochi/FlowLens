@@ -890,3 +890,5 @@ D02 提交 `3a15e6faa425590294c15edcc7f45035f970f635` 的 CI `42502365894` 已�
 171 项本地测试通过，Demo 与团队构建通过。浏览器实际运行监理指令单样例，13 项检查通过；刷新后记录保留，业务确认仍显示需重新确认。运行前后下载包的业务单据和确认历史逐项相同，新增一次运行与单独下载 JSON 一致。实际交付 ZIP 的 application.json 与下载工作包一致，解压后运行 verify-app.mjs 成功。ZIP SHA256 为 86d51a0c1c7129a8ee10bc2c15c4889fb79f2cbe809d8092fa5145c4a621c3f8，证据保存在 outputs/FlowLens-discovery-qa/scenario-download-checks.json。
 
 当前验证范围为自动样例、单份表式及本地规则。D03 继续补充现场预期与观察、自定义输入及跨表业务链场景；D04 将把这些证据和待确认事项整合进开发交接。跨平台 CI 待本次提交后检查，新增功能尚未正式发行或上线，G01–G06 继续跟踪。
+
+D03 场景运行提交 abd8e7acdec09f098966d762ec18a9905ce3d4cb 的 CI 42505144977 已逐项核对，Windows、Ubuntu 的测试和两类构建，以及容器和 Compose 验收全部通过。
