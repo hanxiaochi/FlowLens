@@ -28,6 +28,8 @@ Today you can try form workflows, interaction simulations, and exports of applic
 
 The main branch also includes an unreleased discovery worksheet. Record the business problem, current process, acceptance criteria, source references, and open questions from the application home. Saved notes travel with the application package, and the delivery ZIP includes a readable text copy. Team administrators can review individual changes when publishing application updates. Rule-level source links and confirmation history remain planned. This feature has not been deployed to the public demo or production cloud.
 
+Browser checks covered reload persistence, conflicting edits in two tabs, downloading the rejected draft, and narrow-screen controls. The downloaded ZIP matched the separately exported application JSON, and its bundled verifier passed all three sample forms. All 160 local tests and GitHub CI passed. See the [development acceptance record (Chinese)](docs/delivery-plan.md).
+
 The team app now separates fields still due at the current stage, issues in completed stages, and attachments whose verification is incomplete. Open a record from the review and return to the same page. Download a readable HTML checklist for review or printing without additional software.
 
 [Candidate user guide](docs/project-review-guide.en.md)
