@@ -15,7 +15,11 @@
 
 1.20 候选阶段通过 183 项本地测试、Windows/Ubuntu CI、容器和 Compose 检查。实际下载团队包通过 24 项 HTTP/CLI 检查。浏览器已验证跨标签页冲突、草稿下载、窄屏操作、团队发布及恢复副本继续保存。实际云端候选使用 1.18 新备份核对 5 账号、2 项目、10 单据和 4 附件，并再次备份还原。
 
-正式包构建、跨平台 CI、实际下载及公网升级结果将在完成后补充。本文件当前为正式发行准备记录。
+正式源码固定于 8bfc3e9003bb50097096dbafa425f68cb6be29a2，CI 42511037652 的 Windows、Ubuntu、容器及 Compose 检查全部通过。四类 ZIP 和 SHA256 已发布，GitHub 实际下载团队包再次通过 24 项运行检查。
+
+正式云端已从 1.18 升级到 1.20，升级前备份已保留。五账号的可见数据与升级前逐项一致，10 份 Excel 台账字段及 10 份 HTML 核对报告编号匹配。容器 32 个运行文件与发行构建一致，备份独立恢复验证 2 项目、10 单据、4 附件，旧会话清空、旧实例请求拒绝。最终备份已下载到本机并核对 SHA256。公开 Demo 47 个文件与构建一致。
+
+公网浏览器标签已显示 1.20 标题，但连续读取页面超时，升级后网页交互复验仍待完成。源码标签和附件保持固定，后续验收记录更新在主分支。
 
 ## 仍需核对
 
@@ -29,4 +33,4 @@ This release connects discovery worksheets, source-linked requirements, version-
 
 The 1.20 candidate passed 183 local tests, Windows/Ubuntu CI, container and Compose checks, and 24 checks against the downloaded team runtime. Browser tests covered conflicts, retained drafts, narrow screens, publication, and continued editing after project restoration. An isolated cloud candidate restored a fresh production backup and verified five accounts, two projects, ten records, and four attachments.
 
-Final release artifacts and deployment verification are being prepared. Printed layout received preliminary user approval, while a complete PDF and record-by-record pagination review remain outstanding. Real business acceptance, operator handoff, host reboot, and sustained offsite backup validation are still tracked in the delivery checklist. Public AI remains disabled.
+Release v1.20.0 is pinned to 8bfc3e9. CI 42511037652 passed on Windows, Ubuntu, containers, and Compose. Four archives and SHA256 checksums are published, and the downloaded team runtime passed 24 checks. Production is now on 1.20.0 with matching five-account state, ten Excel exports, ten HTML review reports, and verified backup restoration. The public demo matches all 47 deployed files. Browser inspection timed out after loading the production title, so post-upgrade browser interaction acceptance remains pending. Printed layout received preliminary user approval, while a complete PDF and record-by-record pagination review remain outstanding. Real business acceptance, operator handoff, host reboot, and sustained offsite backup validation are still tracked in the delivery checklist. Public AI remains disabled.

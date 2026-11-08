@@ -1,6 +1,6 @@
 # FlowLens
 
-[简体中文](README.md) · **English** · [v1.18.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.18.0)
+[简体中文](README.md) · **English** · [v1.20.0 release](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.20.0)
 
 **[Try the live demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -10,7 +10,7 @@ No installation or API key needed. Start with a fictional supervision applicatio
 
 FlowLens helps business users, implementation consultants, and forward-deployed engineers discuss requirements through working examples. Start with Word forms, natural language, or screenshots, review fields and workflow rules, then explore data changes and deployment choices before handing the design to developers.
 
-Today you can try form workflows, interaction simulations, and exports of application definitions and API/SQL drafts. Imported Word forms need field and layout review. AI inputs require a configured model endpoint; the public demo uses built-in examples. The 1.20 candidate includes source references, open questions, and business confirmation records so developers can trace the reasoning behind each rule. See the [next-stage plan (Chinese)](docs/delivery-plan.md#discovery-next).
+Today you can try form workflows, interaction simulations, and exports of application definitions and API/SQL drafts. Imported Word forms need field and layout review. AI inputs require a configured model endpoint; the public demo uses built-in examples. Version 1.20 includes source references, open questions, and business confirmation records so developers can trace the reasoning behind each rule. See the [next-stage plan (Chinese)](docs/delivery-plan.md#discovery-next).
 
 ![Fictional inspection form under review](docs/images/forms-demo.png)
 
@@ -24,11 +24,11 @@ Today you can try form workflows, interaction simulations, and exports of applic
 
 [1.3 release notes and acceptance](docs/release-1.3.0.md)
 
-## Release candidate: review project records before handoff
+## 1.20 From discovery to developer handoff
 
-### Requirements discovery on the main branch
+### Requirements discovery and handoff
 
-**1.20.0-rc.1** is available as a prerelease with local, team, source, and public-demo archives. The hosted demo and production cloud remain on 1.18.0. [Download the candidate](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.20.0-rc.1) · [Release notes](docs/release-1.20.0-rc.1.md)
+**1.20.0** is released with local, team, source, and public-demo archives. The hosted demo and production cloud have been updated. [Download 1.20](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.20.0) · [Release notes and acceptance scope](docs/release-1.20.0.md)
 
 - **Discovery worksheets** capture the business problem, current process, scope, source material, open questions, and deployment conditions.
 - **Requirement evidence and reviews** link customer statements to forms, fields, or workflow steps. Reviews retain their definitions and require another check after changes.
@@ -48,7 +48,7 @@ The team app now separates fields still due at the current stage, issues in comp
 
 The review list now supports issue categories, record/summary search, and records your assigned roles can handle. Returning from a record preserves the filters and page. Downloads still include the whole project.
 
-Project review was introduced in **1.19.0-rc.2** and is included in the 1.20 candidate. The stable and cloud versions remain **1.18.0**. At that stage, all 158 local tests passed, including attachment and report capacity limits, search across pages, and role-based review filters. Pagination, record navigation, downloading, and narrow-screen reading have been checked in the browser. Printed pagination and release acceptance still need verification. See the [delivery plan (Chinese)](docs/delivery-plan.md).
+Project review was introduced in **1.19.0-rc.2** and is included in 1.20. At that stage, all 158 local tests passed, including attachment and report capacity limits, search across pages, and role-based review filters. Pagination, record navigation, downloading, and narrow-screen reading have been checked in the browser. Complete PDF pagination checks and post-upgrade production browser interaction acceptance remain pending. See the [delivery plan (Chinese)](docs/delivery-plan.md).
 
 ## 1.18 take your project ledger into Excel
 

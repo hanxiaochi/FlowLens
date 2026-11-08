@@ -1,6 +1,6 @@
 # FlowLens
 
-**简体中文** · [English](README.en.md) · [v1.18.0 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.18.0)
+**简体中文** · [English](README.en.md) · [v1.20.0 发布说明](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.20.0)
 
 **[直接打开在线 Demo →](https://hanxiaochi.github.io/FlowLens/)**
 
@@ -10,7 +10,7 @@
 
 FlowLens 面向业务人员、实施顾问与 FDE（前置交付工程师），帮助大家围绕可操作的样例讨论需求。从 Word 表格、自然语言或截图开始，核对字段和办理规则，再讨论按钮背后的数据变化与部署方式，把讨论结果交给开发团队。
 
-目前可以体验表单流转、交互推演，以及应用定义和 API、SQL 草案导出。Word 导入后需要核对字段与版式，AI 输入需要配置模型接口；公开 Demo 使用内置样例。1.20 候选版已加入材料出处、待确认问题和业务确认记录，让开发接手时能查清每条规则的依据。[下一阶段计划](docs/delivery-plan.md#discovery-next)
+目前可以体验表单流转、交互推演，以及应用定义和 API、SQL 草案导出。Word 导入后需要核对字段与版式，AI 输入需要配置模型接口；公开 Demo 使用内置样例。1.20 已加入材料出处、待确认问题和业务确认记录，让开发接手时能查清每条规则的依据。[下一阶段计划](docs/delivery-plan.md#discovery-next)
 
 ![多表应用与项目工作台](docs/images/application-workspace-1.3.jpg)
 
@@ -22,11 +22,11 @@ FlowLens 面向业务人员、实施顾问与 FDE（前置交付工程师），�
 
 [需求研究与下一阶段缺口](docs/fde-product-audit-2026-11-02.md) · [业务访谈与交付验收工作单](docs/fde-discovery-worksheet.md)
 
-## 候选版：交付前先核对资料
+## 1.20 从需求讨论到开发交接
 
-### 1.20 候选版中的需求调研功能
+### 需求调研与交接
 
-**1.20.0-rc.1** 候选版已发布，可下载本地版、团队版、源码与公开演示包。在线 Demo 和生产云端仍使用 1.18.0。[下载候选版](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.20.0-rc.1) · [版本说明](docs/release-1.20.0-rc.1.md)
+**1.20.0** 已发布，在线 Demo 和团队云端已更新。可下载本地版、团队版、源码与公开演示包。[下载 1.20](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.20.0) · [版本说明及验收范围](docs/release-1.20.0.md)
 
 - **需求工作单**记录业务问题、现状、范围、材料出处、待确认事项和部署条件。
 - **需求依据与确认**把客户原文关联到表式、字段或办理动作，保存当时的定义。原文或规则改变后提示重新确认。
@@ -44,7 +44,7 @@ FlowLens 面向业务人员、实施顾问与 FDE（前置交付工程师），�
 
 ![下载后的资料核对清单，使用虚构数据](docs/images/project-review-1.19.png)
 
-资料核对功能随 **1.19.0-rc.2** 开始提供，已包含在 1.20 候选版中。正式版和云端仍为 **1.18.0**。该阶段 158 项本地测试通过，覆盖附件与报告容量边界、跨页搜索和办理范围。浏览器已验证分页、单据跳转、清单下载及窄屏阅读；打印分页与正式发行验收仍待完成。[交付计划](docs/delivery-plan.md)
+资料核对功能随 **1.19.0-rc.2** 开始提供，已包含在 1.20 中。该阶段 158 项本地测试通过，覆盖附件与报告容量边界、跨页搜索和办理范围。浏览器已验证分页、单据跳转、清单下载及窄屏阅读；完整打印 PDF 核对和升级后的公网浏览器交互复验仍待完成。[交付计划](docs/delivery-plan.md)
 
 ## 1.18 把项目台账交给 Excel
 
