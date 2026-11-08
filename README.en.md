@@ -26,27 +26,19 @@ Today you can try form workflows, interaction simulations, and exports of applic
 
 ## Release candidate: review project records before handoff
 
-The main branch also includes an unreleased discovery worksheet. Record the business problem, current process, acceptance criteria, source references, and open questions from the application home. Saved notes travel with the application package, and the delivery ZIP includes a readable text copy. Team administrators can review individual changes when publishing application updates. This feature has not been deployed to the public demo or production cloud.
+### Requirements discovery on the main branch
 
-Browser checks covered reload persistence, conflicting edits in two tabs, downloading the rejected draft, and narrow-screen controls. The downloaded ZIP matched the separately exported application JSON, and its bundled verifier passed all three sample forms. All 160 local tests and GitHub CI passed. See the [development acceptance record (Chinese)](docs/delivery-plan.md).
+These features are on the main branch and remain unreleased. They have not been deployed to the public demo or production cloud.
 
-Requirement evidence can now link source text to a form, field, or workflow step. AI suggestions begin pending. Recording a reviewer and supporting evidence saves the definition at that point. Changes to the source, form, or application mappings require another review while retaining the history. Version checks currently cover the entire form; reviewer names and conclusions are entered by the person recording the review. All 166 local tests passed, and browser checks covered creation, confirmation, edits, and the downloaded handoff package. Windows, Ubuntu, and container CI passed for this increment.
+- **Discovery worksheets** capture the business problem, current process, scope, source material, open questions, and deployment conditions.
+- **Requirement evidence and reviews** link customer statements to forms, fields, or workflow steps. Reviews retain their definitions and require another check after changes.
+- **Scenario checks** support generated samples, custom fields and detail rows, and cross-form instruction, reply, and archive flows. Reports retain inputs, roles, state changes, carried fields, and failure reasons.
+- **Field observations** record expected and actual results, evidence locations, and follow-up work. Names and conclusions are entered by the recorder.
+- **Developer handoff** brings together requirements, stale evidence, forms with no linked requirements, and contract file paths. Application ZIPs include the index, complete histories, API/SQL drafts, and a local verifier.
 
-The team publication preview now shows readable changes to requirement statements, sources, linked objects, and review history, along with the review statuses that will change. Browser upload, preview, and publication passed on an isolated fictional instance. Existing records and review history matched after publication. Checks at a 390-pixel viewport and all 167 local tests passed.
+Review and single-form evidence track the linked form; cross-form history tracks the complete application definition. Team publication previews show affected records. Older packages inherit existing histories, and publication rejects history removal or replacement. An application can retain 10 cross-form reports of up to two million characters each. Participants still need to check requirement coverage and business meaning.
 
-Expanded review history now explains the original field requirements, detail columns, responsible roles, and conditional returns. The complete definition opens separately, and downloads retain both the summary and original snapshot. Browser checks covered historical summaries and narrow-screen expansion, with all 169 local tests passing. Fields in other forms currently use the identifiers saved in the historical snapshot.
-
-Run sample scenarios from a requirement to inspect the acting role, inputs, rejection reasons, and changes to state, revision, and fields. Each run is tied to its saved definition, so later rule changes prompt another run. Current execution uses generated sample values for one form and its local rules. Field observations, custom inputs, and cross-form scenario execution remain planned. All 171 local tests passed; browser checks covered execution, persistence, downloads, and the exported verifier. This increment is unreleased and has not been deployed.
-
-Field observations now capture preconditions, steps and inputs, expected and observed results, evidence locations, and follow-up actions. Each record retains the current definition and prompts review after changes. Observer names and conclusions are entered by the recorder. Browser checks covered a fictional example, save, reload, and download; all 172 local tests passed. Cross-form scenarios remain planned.
-
-Publication previews also list sample runs and field observations affected by the proposed changes, including those needing another run or review. Browser upload, preview, and publication passed on an isolated fictional instance at a 390-pixel viewport. Existing business records and evidence histories matched after publication. All 173 local tests passed.
-
-Requirements now offer custom scenario inputs grouped by workflow stage, including editable detail rows. Saved runs retain those inputs and actual operation traces. Advancement checks expect the next stage, so validation errors or conditional returns remain visible as failed checks. Browser checks covered detail editing, narrow screens, execution, reload, and download; all 175 local tests passed. Cross-form scenarios remain in development.
-
-Run cross-form samples from the application home to follow source records, carried fields, acting roles, and revisions in an isolated fictional project. Checks include unfinished upstream records, cross-project references, and duplicate creation. Results can be saved in application history or downloaded as JSON or text. The delivery ZIP verifier also runs these checks. The three-form browser example passed 13 checks, and all 178 local tests passed.
-
-Cross-form results can now be saved in application history and linked to selected requirements. Each run retains the application, all form definitions, and selected source text; later changes prompt another run. An application can retain 10 runs of up to two million characters each. Work packages include full reports, and delivery ZIPs include readable text. Browser save, reload, and downloaded-runtime checks passed, along with all 180 local tests.
+All 181 local tests passed. Browser checks covered saving, reloads, downloads, selected concurrent-edit cases, and narrow screens. Downloaded delivery packages were extracted and executed. Real business trials, production authorization, and deployment acceptance remain tracked in the [development plan (Chinese)](docs/delivery-plan.md#discovery-next).
 
 The team app now separates fields still due at the current stage, issues in completed stages, and attachments whose verification is incomplete. Open a record from the review and return to the same page. Download a readable HTML checklist for review or printing without additional software.
 

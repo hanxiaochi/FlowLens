@@ -1,4 +1,5 @@
-import {saveRequirement} from './apps-requirements.mjs';
+import {applicationHandoff, applicationHandoffText} from './apps-handoff.mjs';
+import {saveRequirement, confirmRequirement, requirementDefinition, runRequirementScenario, recordRequirementObservation} from './apps-requirements.mjs';
 import {runApplicationScenario, applicationScenarioText, saveApplicationScenario, applicationScenarioStatus, validateApplicationScenarios, retainApplicationScenarioHistory} from './apps-scenarios.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -232,4 +233,43 @@ test('cross-form history binds selected requirements and survives export with im
   }
   assert.throws(() => validateApplicationScenarios([run, run]), /编号/);
   assert.throws(() => runApplicationScenario(workspace, app.id, ['missing']), /已移除/);
+});
+
+
+test('handoff index preserves missing and stale evidence and exact developer contract paths', () => {
+  const workspace = applicationDemo(), template = workspace.templates[0];
+  const empty = applicationHandoff(workspace.applications[0], workspace.templates);
+  assert.equal(empty.requirements.length, 0);
+  assert.equal(empty.unlinkedTemplates.length, 3);
+  assert.equal(empty.missingDiscovery.length, 9);
+  assert.match(applicationHandoffText(empty), /尚无需求依据记录/);
+  let app = saveRequirement(workspace.applications[0], workspace.templates, {statement: '<script>项目名来源</script>', source: '访谈第 1 页', origin: 'ai', target: {kind: 'field', templateId: template.id, id: template.fields[0].id}});
+  const id = app.requirements[0].id;
+  const expectedDefinition = requirementDefinition(app, workspace.templates, id);
+  app = confirmRequirement(app, workspace.templates, id, {reviewer: '虚构代表', evidence: '样例确认', expectedDefinition});
+  app = runRequirementScenario(app, workspace.templates, id);
+  app = recordRequirementObservation(app, workspace.templates, id, {observer: '虚构观察人', environment: '本地样例', preconditions: '已打开应用', steps: '核对项目名', expected: '自动带入', actual: '需补现场截图', outcome: 'blocked', followUp: '业务代表补材料', expectedDefinition});
+  workspace.applications[0] = app;
+  app = saveApplicationScenario(app, workspace.templates, runApplicationScenario(workspace, app.id, [id]));
+  const before = structuredClone(app);
+  const current = applicationHandoff(app, workspace.templates);
+  assert.deepEqual(app, before);
+  assert.equal(current.requirements[0].confirmation, 'confirmed');
+  assert.equal(current.requirements[0].runs[0].status, 'passed');
+  assert.equal(current.requirements[0].observations[0].status, 'blocked');
+  assert.equal(current.requirements[0].crossFormRuns[0].status, 'passed');
+  assert.equal(current.unlinkedTemplates.length, 2);
+  assert.equal(current.followUps[0].text, '业务代表补材料');
+  assert.equal(current.definitions[0].files.api, 'contracts/' + encodeURIComponent(template.id) + '-v1.openapi.json');
+  const changed = saveRequirement(app, workspace.templates, {...app.requirements[0], source: '访谈第 2 页'});
+  const stale = applicationHandoff(changed, workspace.templates);
+  assert.equal(stale.requirements[0].confirmation, 'changed');
+  assert.equal(stale.requirements[0].runs[0].status, 'changed');
+  assert.equal(stale.requirements[0].observations[0].status, 'changed');
+  assert.equal(stale.crossFormRuns[0].status, 'changed');
+  assert.equal(stale.followUps.length, 1);
+  assert.match(applicationHandoffText(stale), /需重新确认/);
+  assert.match(applicationHandoffText(stale), /需重新运行/);
+  assert.match(applicationHandoffText(stale), /访谈第 2 页/);
+  assert.ok(!Object.hasOwn(stale, 'passed'));
 });

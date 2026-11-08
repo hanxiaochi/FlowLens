@@ -1,3 +1,4 @@
+import {applicationHandoff, applicationHandoffText, handoffRequirementText} from './apps-handoff.mjs';
 import {runApplicationScenario, applicationScenarioText, saveApplicationScenario, applicationScenarioStatus, applicationScenarioStatusLabels} from './apps-scenarios.mjs';
 import {scenarioSampleValues} from './forms-acceptance.mjs';
 import {renderDetailField} from './forms-detail-ui.js';
@@ -82,7 +83,7 @@ export function renderApplications(host, {workspace, appId, projectId, role, onS
   const heading = element('div');
   heading.append(element('span', 'YOUR BUSINESS WORKSPACE', 'eyebrow'), element('h2', app.name), element('p', '选择项目，查看待办，从业务入口开始办理。'));
   const controls = element('div', undefined, 'application-controls');
-  controls.append(button('需求工作单', editDiscovery));
+  controls.append(button('开发交接', handoffView), button('需求工作单', editDiscovery));
   controls.append(button('需求依据与确认', reviewRequirements));
   controls.append(button('运行跨表样例', applicationScenario), button('跨表场景历史', scenarioHistory));
   const projectChoice = choice([['', '请选择项目'], ...projects.map(item => [item.id, item.name])], projectId);
@@ -144,6 +145,33 @@ export function renderApplications(host, {workspace, appId, projectId, role, onS
     journey.append(card);
   }
   host.append(journey);
+
+  function handoffView() {
+    const report = applicationHandoff(app, templates);
+    const dialog = modal('开发交接');
+    dialog.append(element('p', report.scope),
+      button('下载交接索引 JSON', () => download('FlowLens-开发交接.json', JSON.stringify(report, null, 2))),
+      button('下载交接说明', () => download('FlowLens-开发交接.txt', applicationHandoffText(report), 'text/plain;charset=utf-8')),
+      button('下载完整应用交付 ZIP', async () => download('FlowLens-应用交付.zip', await applicationDelivery(workspace, app.id), 'application/zip')),
+      element('h3', '需求工作单'), element('pre', report.discovery.map(item => item.label + '\n' + (item.value.trim() || '待补充')).join('\n\n')),
+      button('补充需求工作单', () => { dialog.close(); editDiscovery(); }),
+      element('h3', '尚未关联需求的表式'), element('p', report.unlinkedTemplates.map(item => item.title).join('、') || '每份表式均有需求关联，具体字段与规则覆盖需逐项核对'),
+      button('查看需求依据与确认', () => { dialog.close(); reviewRequirements(); }));
+    for (const entry of report.requirements) {
+      const section = element('details');
+      section.append(element('summary', entry.statement + ' · ' + requirementStatusLabels[entry.confirmation]), element('pre', handoffRequirementText(entry)));
+      dialog.append(section);
+    }
+    if (!report.requirements.length) dialog.append(element('p', '尚无需求依据记录。'));
+    dialog.append(element('h3', '记录过的跟进事项'), element('p', '逐条保留历史原文，后续观察不会自动关闭此前事项。'));
+    for (const item of report.followUps) dialog.append(element('h4', item.statement), element('p', item.at + ' · ' + observationStatusLabels[item.status]), element('pre', item.text));
+    if (!report.followUps.length) dialog.append(element('p', '尚无跟进事项记录。'));
+    dialog.append(element('h3', '当前定义的开发文件'), element('p', '下列路径位于应用交付 ZIP 内，接口与 SQL 供开发核对。'));
+    for (const item of report.definitions) dialog.append(element('h4', item.title + ' · 版本 ' + item.version), element('pre', Object.values(item.files).join('\n')));
+    dialog.append(element('h3', '应用跨表历史'));
+    for (const run of report.crossFormRuns) dialog.append(element('p', run.at + ' · ' + applicationScenarioStatusLabels[run.status] + ' · 关联 ' + run.requirementIds.length + ' 条需求'));
+    if (!report.crossFormRuns.length) dialog.append(element('p', '尚无已保存跨表场景。'));
+  }
 
   function applicationScenario() {
     const dialog = modal('跨表样例场景');
