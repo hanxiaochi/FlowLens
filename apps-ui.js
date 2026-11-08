@@ -1,4 +1,4 @@
-import {runApplicationScenario, applicationScenarioText} from './apps-scenarios.mjs';
+import {runApplicationScenario, applicationScenarioText, saveApplicationScenario, applicationScenarioStatus, applicationScenarioStatusLabels} from './apps-scenarios.mjs';
 import {scenarioSampleValues} from './forms-acceptance.mjs';
 import {renderDetailField} from './forms-detail-ui.js';
 import {applicationDelivery} from './apps-delivery.js';
@@ -84,7 +84,7 @@ export function renderApplications(host, {workspace, appId, projectId, role, onS
   const controls = element('div', undefined, 'application-controls');
   controls.append(button('需求工作单', editDiscovery));
   controls.append(button('需求依据与确认', reviewRequirements));
-  controls.append(button('运行跨表样例', applicationScenario));
+  controls.append(button('运行跨表样例', applicationScenario), button('跨表场景历史', scenarioHistory));
   const projectChoice = choice([['', '请选择项目'], ...projects.map(item => [item.id, item.name])], projectId);
   projectChoice.onchange = () => { if (guard()) onSelect(appId, projectChoice.value); else projectChoice.value = projectId; };
   controls.append(field('当前项目', projectChoice), button('＋ 新建项目', () => {
@@ -147,16 +147,41 @@ export function renderApplications(host, {workspace, appId, projectId, role, onS
 
   function applicationScenario() {
     const dialog = modal('跨表样例场景');
-    dialog.append(element('p', '使用当前应用定义，在独立的虚构项目中发起和办理每条关联路径，核对资料带入、上游完成要求、跨项目引用和重复发起。结果可下载，关闭窗口前请保存。服务端账号、数据库权限与真实业务解释仍需实际验收。'),
+    const selection = [];
+    for (const entry of app.requirements ?? []) {
+      const input = element('input'); input.type = 'checkbox';
+      selection.push({id: entry.id, input}); dialog.append(field('关联需求 · ' + entry.statement, input));
+    }
+    dialog.append(element('p', '使用当前应用定义，在独立的虚构项目中发起和办理每条关联路径，核对资料带入、上游完成要求、跨项目引用和重复发起。结果可保存到应用历史，也可下载。服务端账号、数据库权限与真实业务解释仍需实际验收。'),
       button('运行跨表检查', () => {
-        const report = runApplicationScenario(workspace, app.id);
+        const report = runApplicationScenario(workspace, app.id, selection.filter(item => item.input.checked).map(item => item.id));
         const result = modal(report.passed ? '跨表场景通过' : '跨表场景有失败项');
         result.append(element('p', `${report.results.filter(item => item.passed).length} / ${report.results.length} 项通过 · ${report.records.length} 张虚构单据`),
+          button('保存到应用历史', async () => {
+            await mutate(next => {
+              const index = next.applications.findIndex(item => item.id === app.id);
+              if (index < 0) throw Error('应用已不存在，请下载报告');
+              next.applications[index] = saveApplicationScenario(next.applications[index], next.templates, report);
+            });
+            result.close(); say('跨表场景已保存，可在应用历史中查看。');
+          }, 'primary'),
           button('下载跨表场景 JSON', () => download('FlowLens-跨表场景.json', JSON.stringify(report, null, 2))),
           button('下载跨表场景文本', () => download('FlowLens-跨表场景.txt', applicationScenarioText(report), 'text/plain;charset=utf-8')),
           element('pre', applicationScenarioText(report)));
         dialog.close();
       }, 'primary'));
+  }
+
+  function scenarioHistory() {
+    const dialog = modal('跨表场景历史');
+    dialog.append(element('p', '每次运行保留当时的应用、表式与关联需求。完整应用定义或所选需求变化后提示重新运行。最多保存 10 次，每份报告最多 200 万字符，报告随应用共享。'));
+    for (const run of [...(app.scenarioRuns ?? [])].reverse()) {
+      const details = element('details');
+      details.append(element('summary', new Date(run.report.at).toLocaleString('zh-CN', {hour12: false}) + ' · ' + applicationScenarioStatusLabels[applicationScenarioStatus(app, templates, run)]),
+        button('下载历史跨表场景', () => download('FlowLens-跨表场景历史.json', JSON.stringify(run, null, 2))), element('pre', applicationScenarioText(run.report)));
+      dialog.append(details);
+    }
+    if (!app.scenarioRuns?.length) dialog.append(element('p', '尚无已保存的跨表场景。运行后选择保存到应用历史。'));
   }
 
   function protectDraft(dialog, inputs) {

@@ -1,3 +1,4 @@
+import {retainApplicationScenarioHistory, applicationScenarioStatus} from './apps-scenarios.mjs';
 import {definitionDetails} from './team-definition-diff.mjs';
 import {retainRequirementHistory, requirementStatus, scenarioRunStatus, observationStatus} from './apps-requirements.mjs';
 import {parseCsv, prepareCsvImport} from './team-csv-import.mjs';
@@ -422,7 +423,7 @@ export function openTeamStore(filename) {
   }
   function applyDefinitions(current, incoming) {
     if (incoming.applications.length !== 1) fail(400, '每次发布一个应用的表式更新');
-    const app = retainRequirementHistory(current.applications.find(item => item.id === incoming.applications[0].id), incoming.applications[0]);
+    const app = retainApplicationScenarioHistory(current.applications.find(item => item.id === incoming.applications[0].id), retainRequirementHistory(current.applications.find(item => item.id === incoming.applications[0].id), incoming.applications[0]));
     const index = current.applications.findIndex(item => item.id === app.id);
     if (index < 0) fail(404, '请先导入这个应用');
     if (current.applications[index].templateIds.some(id => !app.templateIds.includes(id))) fail(400, '表式更新需保留应用已有模板');
@@ -448,7 +449,7 @@ export function openTeamStore(filename) {
     return digest(JSON.stringify({applications: current.applications, templates: current.templates, projects: current.projects}));
   }
   function requirementEvidenceStatuses(current) {
-    return current.applications.flatMap(app => (app.requirements ?? []).flatMap(entry =>
+    const linked = current.applications.flatMap(app => (app.requirements ?? []).flatMap(entry =>
       [['runs', scenarioRunStatus], ['observations', observationStatus]].flatMap(([kind, status]) =>
         (entry[kind] ?? []).map(record => ({
           applicationId: app.id, applicationName: app.name, requirementId: entry.id, statement: entry.statement,
@@ -456,9 +457,13 @@ export function openTeamStore(filename) {
         }))
       )
     ));
+    return [...linked, ...current.applications.flatMap(app => (app.scenarioRuns ?? []).map(run => ({
+      applicationId: app.id, applicationName: app.name, requirementId: null, statement: '应用跨表场景', kind: 'application',
+      recordId: run.id, at: run.report.at, status: applicationScenarioStatus(app, current.templates, run)
+    })))];
   }
   function definitionPlan(user, current, incoming) {
-    incoming.applications = incoming.applications.map(app => retainRequirementHistory(current.applications.find(item => item.id === app.id), app));
+    incoming.applications = incoming.applications.map(app => retainApplicationScenarioHistory(current.applications.find(item => item.id === app.id), retainRequirementHistory(current.applications.find(item => item.id === app.id), app)));
     const previousReviews = new Map(current.applications.flatMap(app => (app.requirements ?? []).map(entry => [JSON.stringify([app.id, entry.id]), requirementStatus(app, current.templates, entry)])));
     const previousEvidence = new Map(requirementEvidenceStatuses(current).map(item =>
       [JSON.stringify([item.applicationId, item.requirementId, item.kind, item.recordId]), item.status]));

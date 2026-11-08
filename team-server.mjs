@@ -7,7 +7,7 @@ import {resolve, extname} from 'node:path';
 import {openTeamStore, fail} from './team-store.mjs';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
-const staticFiles = new Set(['apps-model.mjs', 'apps-requirements.mjs', 'forms-acceptance.mjs', 'team.html', 'team-ui.js', 'team-http.mjs', 'team-recovery.mjs', 'team-drafts.mjs', 'team-delivery.mjs', 'team.css', 'forms.css', 'forms-detail-ui.js', 'forms-schema.mjs', 'forms-model.mjs', 'forms-rules.mjs', 'forms-print.mjs']);
+const staticFiles = new Set(['forms-store.mjs', 'apps-model.mjs', 'apps-requirements.mjs', 'apps-scenarios.mjs', 'forms-acceptance.mjs', 'team.html', 'team-ui.js', 'team-http.mjs', 'team-recovery.mjs', 'team-drafts.mjs', 'team-delivery.mjs', 'team.css', 'forms.css', 'forms-detail-ui.js', 'forms-schema.mjs', 'forms-model.mjs', 'forms-rules.mjs', 'forms-print.mjs']);
 const cookieName = 'flowlens_session';
 export function createTeamServer({database = resolve(root, '.local/team.sqlite'), origin = 'http://127.0.0.1:4186'} = {}) {
   const canonical = new URL(origin);

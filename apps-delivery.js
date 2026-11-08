@@ -1,3 +1,4 @@
+import {applicationScenarioText, applicationScenarioStatus, applicationScenarioStatusLabels} from './apps-scenarios.mjs';
 import {zipSync, strToU8} from './forms-vendor/fflate.js';
 import {applicationPackage, discoveryText} from './apps-model.mjs';
 import {formOpenApi, formSql, formBrief} from './forms-system.mjs';
@@ -8,6 +9,7 @@ export async function applicationDelivery(workspace, appId) {
   const files = {'application.json': strToU8(JSON.stringify(pack, null, 2))};
   files['discovery.txt'] = strToU8(discoveryText(pack.applications[0]));
   files['requirements.txt'] = strToU8(requirementsText(pack.applications[0], pack.templates));
+  files['cross-form-scenarios.txt'] = strToU8((pack.applications[0].scenarioRuns ?? []).map(run => applicationScenarioStatusLabels[applicationScenarioStatus(pack.applications[0], pack.templates, run)] + '\n' + applicationScenarioText(run.report)).join('\n\n') || '尚无已保存跨表场景');
   const definitions = new Map([...pack.templates,...pack.cases.map(record=>record.template)].map(template=>[template.id+'@'+template.version,template]));
   for (const template of definitions.values()) {
     const prefix = 'contracts/' + encodeURIComponent(template.id) + '-v' + template.version;

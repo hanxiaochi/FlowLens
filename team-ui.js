@@ -1,3 +1,4 @@
+import {applicationScenarioStatusLabels} from './apps-scenarios.mjs';
 import {projectRoles} from './apps-model.mjs';
 import {requirementStatusLabels, scenarioStatusLabels, observationStatusLabels} from './apps-requirements.mjs';
 import {canEdit} from './forms-model.mjs';
@@ -477,8 +478,8 @@ async function definitionPreviewView(incoming, previousEntry = null) {
     const evidence = node('section', undefined, 'panel');
     evidence.append(node('h2', '场景与现场观察状态变化'));
     for (const change of plan.requirementEvidenceChanges.slice(0, 100)) {
-      const labels = change.kind === 'runs' ? scenarioStatusLabels : observationStatusLabels;
-      const kind = change.kind === 'runs' ? '样例场景' : '现场观察';
+      const labels = {runs: scenarioStatusLabels, observations: observationStatusLabels, application: applicationScenarioStatusLabels}[change.kind];
+      const kind = {runs: '样例场景', observations: '现场观察', application: '跨表场景'}[change.kind];
       evidence.append(node('h3', change.applicationName + ' · ' + change.statement),
         node('p', kind + ' · ' + new Date(change.at).toLocaleString('zh-CN', {hour12: false})),
         node('p', (labels[change.before] ?? '此前无记录') + ' → ' + labels[change.after]));

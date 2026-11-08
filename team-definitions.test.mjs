@@ -1,3 +1,4 @@
+import {runApplicationScenario, saveApplicationScenario} from './apps-scenarios.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp, rm} from 'node:fs/promises';
@@ -256,5 +257,30 @@ test('team publication previews evidence invalidation and preserves observation 
       assert.throws(() => store.previewDefinitions(admin, invalid), /现场观察历史/);
       assert.deepEqual(store.visibleWorkspace(admin).workspace.cases, current.cases);
     }
+  } finally { store.close(); await rm(directory, {recursive: true, force: true}); }
+});
+
+
+test('team publication preserves cross-form histories and previews invalidation for template changes', async () => {
+  const {directory, store, admin, initial} = await setup();
+  try {
+    const incoming = structuredClone(initial), app = incoming.applications[0];
+    incoming.applications[0] = saveApplicationScenario(app, incoming.templates, runApplicationScenario(incoming, app.id));
+    const first = store.previewDefinitions(admin, incoming);
+    assert.deepEqual(first.requirementEvidenceChanges.map(item => [item.kind, item.before, item.after]), [['application', null, 'passed']]);
+    store.publishDefinitions(admin, incoming, optionsFor(first));
+    const current = store.visibleWorkspace(admin).workspace;
+    const legacy = structuredClone(current); delete legacy.applications[0].scenarioRuns;
+    legacy.templates[0].version++;
+    const plan = store.previewDefinitions(admin, legacy);
+    assert.deepEqual(plan.requirementEvidenceChanges.map(item => [item.kind, item.before, item.after]), [['application', 'passed', 'changed']]);
+    store.publishDefinitions(admin, legacy, optionsFor(plan));
+    const saved = store.visibleWorkspace(admin).workspace;
+    assert.deepEqual(saved.applications[0].scenarioRuns, current.applications[0].scenarioRuns);
+    assert.deepEqual(saved.cases, current.cases);
+    const erased = structuredClone(saved); erased.applications[0].scenarioRuns = [];
+    assert.throws(() => store.previewDefinitions(admin, erased), /跨表场景历史/);
+    const altered = structuredClone(saved); altered.applications[0].scenarioRuns[0].report.scope = '改写';
+    assert.throws(() => store.previewDefinitions(admin, altered), /跨表场景历史/);
   } finally { store.close(); await rm(directory, {recursive: true, force: true}); }
 });

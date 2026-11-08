@@ -1,3 +1,4 @@
+import {validateApplicationScenarios} from './apps-scenarios.mjs';
 import {createCase, applyOperation, uid} from './forms-model.mjs';
 import {validateFieldValue} from './forms-schema.mjs';
 import {validateRequirements} from './apps-requirements.mjs';
@@ -132,6 +133,7 @@ export function validateApplications(workspace) {
   const appIds = new Set();
   for (const app of apps) {
     validateDiscovery(app.discovery);
+    validateApplicationScenarios(app.scenarioRuns);
     validateRequirements(app.requirements);
     if (typeof app.id !== 'string' || app.id.length > 200 || !app.id || appIds.has(app.id) || !app.name?.trim() || app.name.length > 200 || !Array.isArray(app.templateIds) || !app.templateIds.length || new Set(app.templateIds).size !== app.templateIds.length) throw Error('应用定义无效');
     appIds.add(app.id);

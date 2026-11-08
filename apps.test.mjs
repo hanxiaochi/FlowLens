@@ -1,4 +1,5 @@
-import {runApplicationScenario, applicationScenarioText} from './apps-scenarios.mjs';
+import {saveRequirement} from './apps-requirements.mjs';
+import {runApplicationScenario, applicationScenarioText, saveApplicationScenario, applicationScenarioStatus, validateApplicationScenarios, retainApplicationScenarioHistory} from './apps-scenarios.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {applicationDemo} from './apps-demo.mjs';
@@ -194,4 +195,41 @@ test('cross-form traversal follows each branch and stops bounded expansion expli
   assert.equal(bounded.records.length, 100);
   assert.equal(bounded.passed, false);
   assert.match(bounded.results.at(-1).actual, /超过 100/);
+});
+
+
+test('cross-form history binds selected requirements and survives export with immutable publication history', () => {
+  const workspace = applicationDemo(), template = workspace.templates[0];
+  const app = saveRequirement(workspace.applications[0], workspace.templates, {statement: '指令完成后回复', source: '虚构访谈', origin: 'manual', target: {kind: 'template', templateId: template.id, id: template.id}});
+  workspace.applications[0] = app;
+  const report = runApplicationScenario(workspace, app.id, [app.requirements[0].id]);
+  const saved = saveApplicationScenario(app, workspace.templates, report);
+  const run = saved.scenarioRuns[0];
+  assert.equal(app.scenarioRuns, undefined);
+  assert.equal(applicationScenarioStatus(saved, workspace.templates, run), 'passed');
+  workspace.applications[0] = saved;
+  const restored = upgradeWorkspace(applicationPackage(workspace, app.id));
+  assert.deepEqual(restored.applications[0].scenarioRuns, saved.scenarioRuns);
+  const changed = structuredClone(saved); changed.requirements[0].source = '修订原文';
+  assert.equal(applicationScenarioStatus(changed, workspace.templates, run), 'changed');
+  assert.throws(() => saveApplicationScenario(changed, workspace.templates, report), /已变化/);
+  assert.equal(applicationScenarioStatus({...saved, requirements: []}, workspace.templates, run), 'missing');
+  const templates = structuredClone(workspace.templates); templates[1].fields[0].required = !templates[1].fields[0].required;
+  assert.equal(applicationScenarioStatus(saved, templates, run), 'changed');
+  const legacy = structuredClone(saved); delete legacy.scenarioRuns;
+  assert.deepEqual(retainApplicationScenarioHistory(saved, legacy).scenarioRuns, saved.scenarioRuns);
+  assert.equal(legacy.scenarioRuns, undefined);
+  const rewritten = structuredClone(saved); rewritten.scenarioRuns[0].report.scope = '改写';
+  assert.throws(() => retainApplicationScenarioHistory(saved, rewritten), /跨表场景历史/);
+  for (const mutate of [
+    run => { run.report.passed = false; },
+    run => { run.report.application.scenarioRuns = []; },
+    run => { run.report.records[0].template.fields = null; },
+    run => { run.report.attempts[0].operation.values = []; }
+  ]) {
+    const invalid = structuredClone(run); mutate(invalid);
+    assert.throws(() => validateApplicationScenarios([invalid]));
+  }
+  assert.throws(() => validateApplicationScenarios([run, run]), /编号/);
+  assert.throws(() => runApplicationScenario(workspace, app.id, ['missing']), /已移除/);
 });
