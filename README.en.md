@@ -6,9 +6,11 @@
 
 No installation or API key needed. Start with a fictional supervision application, or explore approvals and 3D deployment in the interaction lab. AI generation is disabled in the public demo; your edits stay in your browser. The demo interface is currently in Chinese.
 
-**Click a button. See where the request goes and what changes in the data.**
+**Bring your customer's forms and ideas. Work out what the system should do together.**
 
-**Turn existing Word forms into a workflow you can fill in, run, and discuss.**
+FlowLens helps business users, implementation consultants, and forward-deployed engineers discuss requirements through working examples. Start with Word forms, natural language, or screenshots, review fields and workflow rules, then explore data changes and deployment choices before handing the design to developers.
+
+Today you can try form workflows, interaction simulations, and exports of application definitions and API/SQL drafts. Imported Word forms need field and layout review. AI inputs require a configured model endpoint; the public demo uses built-in examples. Next, we plan to bring source references, open questions, and business confirmation records into the product so developers can trace the reasoning behind each rule. See the [next-stage plan (Chinese)](docs/delivery-plan.md#discovery-next).
 
 ![Fictional inspection form under review](docs/images/forms-demo.png)
 
