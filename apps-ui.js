@@ -1,6 +1,11 @@
+import {applicationHandoff, applicationHandoffText, handoffRequirementText} from './apps-handoff.mjs';
+import {runApplicationScenario, applicationScenarioText, saveApplicationScenario, applicationScenarioStatus, applicationScenarioStatusLabels} from './apps-scenarios.mjs';
+import {scenarioSampleValues} from './forms-acceptance.mjs';
+import {renderDetailField} from './forms-detail-ui.js';
 import {applicationDelivery} from './apps-delivery.js';
 import {summarizeRecord} from './forms-model.mjs';
-import {createApplication, createProject, startProjectCase, validateRelation, applicationPackage} from './apps-model.mjs';
+import {saveRequirement, confirmRequirement, requirementDefinition, requirementStatus, requirementStatusLabels, requirementTarget, requirementsText, requirementDefinitionText, recordRequirementObservation, observationFields, observationStatus, observationStatusLabels, observationText, runRequirementScenario, scenarioRunStatus, scenarioStatusLabels, scenarioRunText} from './apps-requirements.mjs';
+import {createApplication, createProject, startProjectCase, validateRelation, applicationPackage, discoveryFields, discoveryText} from './apps-model.mjs';
 
 const element = (tag, text, className) => {
   const node = document.createElement(tag);
@@ -78,6 +83,9 @@ export function renderApplications(host, {workspace, appId, projectId, role, onS
   const heading = element('div');
   heading.append(element('span', 'YOUR BUSINESS WORKSPACE', 'eyebrow'), element('h2', app.name), element('p', '选择项目，查看待办，从业务入口开始办理。'));
   const controls = element('div', undefined, 'application-controls');
+  controls.append(button('开发交接', handoffView), button('需求工作单', editDiscovery));
+  controls.append(button('需求依据与确认', reviewRequirements));
+  controls.append(button('运行跨表样例', applicationScenario), button('跨表场景历史', scenarioHistory));
   const projectChoice = choice([['', '请选择项目'], ...projects.map(item => [item.id, item.name])], projectId);
   projectChoice.onchange = () => { if (guard()) onSelect(appId, projectChoice.value); else projectChoice.value = projectId; };
   controls.append(field('当前项目', projectChoice), button('＋ 新建项目', () => {
@@ -137,6 +145,277 @@ export function renderApplications(host, {workspace, appId, projectId, role, onS
     journey.append(card);
   }
   host.append(journey);
+
+  function handoffView() {
+    const report = applicationHandoff(app, templates);
+    const dialog = modal('开发交接');
+    dialog.append(element('p', report.scope),
+      button('下载交接索引 JSON', () => download('FlowLens-开发交接.json', JSON.stringify(report, null, 2))),
+      button('下载交接说明', () => download('FlowLens-开发交接.txt', applicationHandoffText(report), 'text/plain;charset=utf-8')),
+      button('下载完整应用交付 ZIP', async () => download('FlowLens-应用交付.zip', await applicationDelivery(workspace, app.id), 'application/zip')),
+      element('h3', '需求工作单'), element('pre', report.discovery.map(item => item.label + '\n' + (item.value.trim() || '待补充')).join('\n\n')),
+      button('补充需求工作单', () => { dialog.close(); editDiscovery(); }),
+      element('h3', '尚未关联需求的表式'), element('p', report.unlinkedTemplates.map(item => item.title).join('、') || '每份表式均有需求关联，具体字段与规则覆盖需逐项核对'),
+      button('查看需求依据与确认', () => { dialog.close(); reviewRequirements(); }));
+    for (const entry of report.requirements) {
+      const section = element('details');
+      section.append(element('summary', entry.statement + ' · ' + requirementStatusLabels[entry.confirmation]), element('pre', handoffRequirementText(entry)));
+      dialog.append(section);
+    }
+    if (!report.requirements.length) dialog.append(element('p', '尚无需求依据记录。'));
+    dialog.append(element('h3', '记录过的跟进事项'), element('p', '逐条保留历史原文，后续观察不会自动关闭此前事项。'));
+    for (const item of report.followUps) dialog.append(element('h4', item.statement), element('p', item.at + ' · ' + observationStatusLabels[item.status]), element('pre', item.text));
+    if (!report.followUps.length) dialog.append(element('p', '尚无跟进事项记录。'));
+    dialog.append(element('h3', '当前定义的开发文件'), element('p', '下列路径位于应用交付 ZIP 内，接口与 SQL 供开发核对。'));
+    for (const item of report.definitions) dialog.append(element('h4', item.title + ' · 版本 ' + item.version), element('pre', Object.values(item.files).join('\n')));
+    dialog.append(element('h3', '应用跨表历史'));
+    for (const run of report.crossFormRuns) dialog.append(element('p', run.at + ' · ' + applicationScenarioStatusLabels[run.status] + ' · 关联 ' + run.requirementIds.length + ' 条需求'));
+    if (!report.crossFormRuns.length) dialog.append(element('p', '尚无已保存跨表场景。'));
+  }
+
+  function applicationScenario() {
+    const dialog = modal('跨表样例场景');
+    const selection = [];
+    for (const entry of app.requirements ?? []) {
+      const input = element('input'); input.type = 'checkbox';
+      selection.push({id: entry.id, input}); dialog.append(field('关联需求 · ' + entry.statement, input));
+    }
+    dialog.append(element('p', '使用当前应用定义，在独立的虚构项目中发起和办理每条关联路径，核对资料带入、上游完成要求、跨项目引用和重复发起。结果可保存到应用历史，也可下载。服务端账号、数据库权限与真实业务解释仍需实际验收。'),
+      button('运行跨表检查', () => {
+        const report = runApplicationScenario(workspace, app.id, selection.filter(item => item.input.checked).map(item => item.id));
+        const result = modal(report.passed ? '跨表场景通过' : '跨表场景有失败项');
+        result.append(element('p', `${report.results.filter(item => item.passed).length} / ${report.results.length} 项通过 · ${report.records.length} 张虚构单据`),
+          button('保存到应用历史', async () => {
+            await mutate(next => {
+              const index = next.applications.findIndex(item => item.id === app.id);
+              if (index < 0) throw Error('应用已不存在，请下载报告');
+              next.applications[index] = saveApplicationScenario(next.applications[index], next.templates, report);
+            });
+            result.close(); say('跨表场景已保存，可在应用历史中查看。');
+          }, 'primary'),
+          button('下载跨表场景 JSON', () => download('FlowLens-跨表场景.json', JSON.stringify(report, null, 2))),
+          button('下载跨表场景文本', () => download('FlowLens-跨表场景.txt', applicationScenarioText(report), 'text/plain;charset=utf-8')),
+          element('pre', applicationScenarioText(report)));
+        dialog.close();
+      }, 'primary'));
+  }
+
+  function scenarioHistory() {
+    const dialog = modal('跨表场景历史');
+    dialog.append(element('p', '每次运行保留当时的应用、表式与关联需求。完整应用定义或所选需求变化后提示重新运行。最多保存 10 次，每份报告最多 200 万字符，报告随应用共享。'));
+    for (const run of [...(app.scenarioRuns ?? [])].reverse()) {
+      const details = element('details');
+      details.append(element('summary', new Date(run.report.at).toLocaleString('zh-CN', {hour12: false}) + ' · ' + applicationScenarioStatusLabels[applicationScenarioStatus(app, templates, run)]),
+        button('下载历史跨表场景', () => download('FlowLens-跨表场景历史.json', JSON.stringify(run, null, 2))), element('pre', applicationScenarioText(run.report)));
+      dialog.append(details);
+    }
+    if (!app.scenarioRuns?.length) dialog.append(element('p', '尚无已保存的跨表场景。运行后选择保存到应用历史。'));
+  }
+
+  function protectDraft(dialog, inputs) {
+    const initial = inputs.map(input => input.value);
+    const dirty = () => inputs.some((input, index) => input.value !== initial[index]);
+    const beforeUnload = event => { if (dirty()) { event.preventDefault(); event.returnValue = ''; } };
+    window.addEventListener('beforeunload', beforeUnload);
+    const close = () => { if (!dirty() || window.confirm('内容尚未保存，确定关闭并放弃本次修改？')) dialog.close(); };
+    dialog.querySelector('button').onclick = close;
+    dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
+    dialog.addEventListener('close', () => window.removeEventListener('beforeunload', beforeUnload));
+  }
+
+  function reviewRequirements() {
+    const list = modal('需求依据与确认');
+    list.append(element('p', '将材料原文与表式、字段或办理动作关联。确认人及依据由记录者填写，团队发布操作沿用账号审计。表式版本、业务定义、关联映射或需求文字改变后，已有确认显示需重新确认。记录随应用共享。'));
+    list.append(button('添加需求依据', () => editRequirement()), button('下载依据与历史', () => download('FlowLens-需求依据.txt', requirementsText(app, templates), 'text/plain;charset=utf-8')));
+    for (const entry of app.requirements ?? []) {
+      const status = requirementStatus(app, templates, entry);
+      const target = requirementTarget(app, templates, entry.target);
+      const card = element('section', undefined, 'requirement-entry');
+      card.append(element('h3', entry.statement), element('p', requirementStatusLabels[status] + ' · ' + (entry.origin === 'ai' ? 'AI 建议' : '人工录入')),
+        element('p', target ? `${target.template.title} / ${target.item.label ?? target.item.title}` : '原关联对象已移除，请重新选择'), element('pre', entry.source));
+      card.append(button('编辑依据', () => editRequirement(entry)));
+      if (target) card.append(button('查看表式与规则', () => { list.close(); onOpen('templates', target.template.id); }), button('记录业务确认', () => recordReview(entry)));
+      if (target) card.append(button('运行样例场景', () => scenarioPreview(entry)), button('用自己的数据试规则', () => customScenario(entry)), button('记录现场观察', () => recordObservation(entry)));
+      for (const review of [...entry.reviews].reverse()) {
+        const history = element('details');
+        history.append(element('summary', `${new Date(review.at).toLocaleString('zh-CN', {hour12: false})} · ${review.reviewer}`), element('p', review.evidence), definitionView(review.definition));
+        card.append(history);
+      }
+      for (const run of [...(entry.runs ?? [])].reverse()) {
+        const history = element('details');
+        history.append(element('summary', `${new Date(run.at).toLocaleString('zh-CN', {hour12: false})} · ${scenarioStatusLabels[scenarioRunStatus(app, templates, entry, run)]}`),
+          element('p', `${run.report.results.filter(result => result.passed).length} / ${run.report.results.length} 项通过。${run.report.scope}。`),
+          element('pre', scenarioRunText(run)), button('下载这次场景记录', () => download('FlowLens-场景运行.json', JSON.stringify(run, null, 2))));
+        card.append(history);
+      }
+      for (const observation of [...(entry.observations ?? [])].reverse()) {
+        const history = element('details');
+        history.append(element('summary', `${new Date(observation.at).toLocaleString('zh-CN', {hour12: false})} · ${observationStatusLabels[observationStatus(app, templates, entry, observation)]}`),
+          element('pre', observationText(observation)), definitionView(observation.definition),
+          button('下载这次现场观察', () => download('FlowLens-现场观察.json', JSON.stringify(observation, null, 2))));
+        card.append(history);
+      }
+      list.append(card);
+    }
+    if (!app.requirements?.length) list.append(element('p', '还没有需求依据。先选一个字段或办理动作，写下客户的原话和材料出处。'));
+
+    function recordObservation(entry) {
+      const dialog = modal('记录现场观察');
+      const expectedDefinition = requirementDefinition(app, templates, entry.id);
+      dialog.append(element('p', entry.statement), element('p', '记录实际使用的环境、操作和结果。观察人及结论由记录者填写，记录随应用共享。保存后保留历史，补充或纠正请追加记录。'));
+      const inputs = new Map();
+      for (const [key, label, limit] of observationFields) {
+        const input = element('textarea'); input.rows = key === 'steps' || key === 'actual' ? 4 : 2; input.maxLength = limit;
+        inputs.set(key, input); dialog.append(field(label, input));
+      }
+      const outcome = choice([['blocked', '待验证'], ['passed', '符合预期'], ['failed', '发现问题']], 'blocked');
+      const values = () => ({...Object.fromEntries([...inputs].map(([key, input]) => [key, input.value])), outcome: outcome.value, expectedDefinition});
+      dialog.append(field('观察结论', outcome), element('p', '发现问题或待验证时，请填写待解决事项与跟进人。'),
+        button('下载现场观察草稿', () => download('FlowLens-现场观察草稿.json', JSON.stringify({requirementId: entry.id, ...values()}, null, 2))),
+        button('保存现场观察', async () => {
+          await mutate(next => {
+            const index = next.applications.findIndex(item => item.id === app.id);
+            if (index < 0) throw Error('应用已不存在，请下载草稿');
+            next.applications[index] = recordRequirementObservation(next.applications[index], next.templates, entry.id, values());
+          });
+          dialog.close(); list.close(); say('现场观察已保存，可在需求依据中查看。');
+        }, 'primary'));
+      protectDraft(dialog, [...inputs.values(), outcome]);
+    }
+
+    function customScenario(entry) {
+      const dialog = modal('用自己的数据试规则');
+      const template = requirementTarget(app, templates, entry.target).template;
+      const expectedDefinition = requirementDefinition(app, templates, entry.id);
+      const defaults = scenarioSampleValues(template);
+      const inputs = new Map();
+      dialog.append(element('p', '修改各阶段的样例输入后运行本地规则检查。继续办理检查预期进入下一阶段；输入为空、格式不符或命中退回条件会保留失败项，可展开查看实际结果。错误角色、缺少必填及条件退回检查会另行构造输入。'));
+      for (const owner of ['draft', ...template.workflow.map(stage => stage.id)]) {
+        dialog.append(element('h3', owner === 'draft' ? '填报' : template.workflow.find(stage => stage.id === owner).label));
+        for (const item of template.fields.filter(field => field.owner === owner)) {
+          if (item.type === 'table') {
+            const host = element('section'); host.append(element('h4', item.label));
+            renderDetailField(host, item, defaults[item.id], true);
+            inputs.set(item.id, host.querySelector('textarea[data-field]')); dialog.append(host);
+            continue;
+          }
+          let input;
+          if (item.type === 'select' || item.type === 'boolean') {
+            const options = item.type === 'boolean' ? [['true', '是'], ['false', '否']] : item.options.map(value => [value, value]);
+            input = choice([['', '未填写'], ...options], defaults[item.id]);
+          } else {
+            input = element('textarea'); input.rows = 2; input.maxLength = 20000; input.value = defaults[item.id];
+          }
+          inputs.set(item.id, input); dialog.append(field(item.label + (item.required ? '（必填）' : ''), input));
+        }
+      }
+      const values = () => Object.fromEntries([...inputs].map(([id, input]) => [id, input.value]));
+      dialog.append(button('下载场景输入草稿', () => download('FlowLens-场景输入草稿.json', JSON.stringify({requirementId: entry.id, expectedDefinition, values: values()}, null, 2))),
+        button('运行并保存自定义场景', async () => {
+          await mutate(next => {
+            const index = next.applications.findIndex(item => item.id === app.id);
+            if (index < 0) throw Error('应用已不存在，请下载草稿');
+            next.applications[index] = runRequirementScenario(next.applications[index], next.templates, entry.id, {expectedDefinition, values: values()});
+          });
+          dialog.close(); list.close(); say('自定义场景已保存，请展开运行记录核对实际结果。');
+        }, 'primary'));
+      protectDraft(dialog, [...inputs.values()]);
+    }
+
+    function scenarioPreview(entry) {
+      const dialog = modal('运行关联表式的样例场景');
+      dialog.append(element('p', '使用自动样例值，在独立内存记录中执行缺少必填、错误角色、退回重提、条件退回、继续办理及重复请求。结果随当前需求定义保存，显示每步输入、状态、修订和字段变化。实际业务解释及生产环境权限仍需现场验收。'),
+        button('运行并保存场景记录', async () => {
+          await mutate(next => {
+            const index = next.applications.findIndex(item => item.id === app.id);
+            if (index < 0) throw Error('应用已不存在，请重新读取');
+            next.applications[index] = runRequirementScenario(next.applications[index], next.templates, entry.id);
+          });
+          dialog.close(); list.close(); say('场景运行结果已保存，请打开需求依据查看逐项结果。');
+        }, 'primary'));
+    }
+
+    function editRequirement(entry) {
+      const dialog = modal(entry ? '编辑需求依据' : '添加需求依据');
+      const options = templates.flatMap(template => [
+        [JSON.stringify({templateId: template.id, kind: 'template', id: template.id}), template.title + ' · 整份表式'],
+        ...template.fields.map(item => [JSON.stringify({templateId: template.id, kind: 'field', id: item.id}), template.title + ' · 字段 · ' + item.label]),
+        ...template.workflow.map(item => [JSON.stringify({templateId: template.id, kind: 'stage', id: item.id}), template.title + ' · 办理 · ' + item.label])
+      ]);
+      const selected = entry ? JSON.stringify({templateId: entry.target.templateId, kind: entry.target.kind, id: entry.target.id}) : '';
+      const target = choice([['', '请选择关联对象'], ...options], selected);
+      const statement = element('textarea'); statement.rows = 3; statement.maxLength = 4000; statement.value = entry?.statement ?? '';
+      const source = element('textarea'); source.rows = 5; source.maxLength = 8000; source.value = entry?.source ?? '';
+      const origin = choice([['manual', '人工录入'], ['ai', 'AI 建议']], entry?.origin ?? 'manual');
+      const input = () => ({id: entry?.id, statement: statement.value, source: source.value, origin: origin.value, target: target.value ? JSON.parse(target.value) : null});
+      dialog.append(field('关联表式、字段或办理动作', target), field('需求或规则描述', statement), field('材料原文、版本与出处', source), field('记录来源', origin),
+        button('下载当前依据草稿', () => download('FlowLens-需求依据草稿.json', JSON.stringify(input(), null, 2))),
+        button('保存需求依据', async () => {
+          await mutate(next => {
+            const index = next.applications.findIndex(item => item.id === app.id);
+            if (index < 0) throw Error('应用已不存在，请下载草稿');
+            next.applications[index] = saveRequirement(next.applications[index], next.templates, input());
+          });
+          dialog.close(); list.close(); say('需求依据已保存。');
+        }, 'primary'));
+      protectDraft(dialog, [target, statement, source, origin]);
+    }
+
+    function recordReview(entry) {
+      const dialog = modal('记录业务确认');
+      const expectedDefinition = requirementDefinition(app, templates, entry.id);
+      const reviewer = element('input'); reviewer.maxLength = 200;
+      const evidence = element('textarea'); evidence.rows = 4; evidence.maxLength = 4000;
+      const snapshot = element('details'); snapshot.append(element('summary', '本次对应的定义'), definitionView(expectedDefinition));
+      dialog.append(element('p', entry.statement), element('p', entry.source), field('确认人称呼', reviewer), field('确认依据与结论', evidence), snapshot,
+        button('下载当前确认草稿', () => download('FlowLens-确认草稿.json', JSON.stringify({requirementId: entry.id, reviewer: reviewer.value, evidence: evidence.value, expectedDefinition}, null, 2))),
+        button('保存本次确认记录', async () => {
+          await mutate(next => {
+            const index = next.applications.findIndex(item => item.id === app.id);
+            if (index < 0) throw Error('应用已不存在，请下载草稿');
+            next.applications[index] = confirmRequirement(next.applications[index], next.templates, entry.id, {reviewer: reviewer.value, evidence: evidence.value, expectedDefinition});
+          });
+          dialog.close(); list.close(); say('确认记录已保存，后续修改将重新核对定义。');
+        }, 'primary'));
+      protectDraft(dialog, [reviewer, evidence]);
+    }
+  }
+
+  function definitionView(serialized) {
+    const view = element('div');
+    const raw = element('details');
+    raw.append(element('summary', '完整定义 · 研发核对'), element('pre', serialized));
+    view.append(element('pre', requirementDefinitionText(serialized)), raw);
+    return view;
+  }
+
+  function editDiscovery() {
+    const dialog = modal('需求工作单');
+    dialog.append(element('p', '记录现场讨论。每份材料写明名称、版本和位置；尚不清楚的内容留空，导出时显示待确认。工作单随整个应用共享。拟确认人可填写称呼，业务确认结果将在后续规则追踪中记录。'));
+    const inputs = new Map();
+    for (const [key, label] of discoveryFields) {
+      const input = element('textarea');
+      input.rows = 3;
+      input.maxLength = 8000;
+      input.value = app.discovery?.[key] ?? '';
+      input.placeholder = '待确认';
+      inputs.set(key, input);
+      dialog.append(field(label, input));
+    }
+    const draft = () => ({version: 1, ...Object.fromEntries([...inputs].map(([key, input]) => [key, input.value]))});
+    protectDraft(dialog, [...inputs.values()]);
+    dialog.append(button('下载当前工作单', () => download('FlowLens-需求工作单.txt', discoveryText({...app, discovery: draft()}), 'text/plain;charset=utf-8')),
+      button('保存需求工作单', async () => {
+        const value = draft();
+        await mutate(next => {
+          const target = next.applications.find(item => item.id === app.id);
+          if (!target) throw Error('应用已不存在，请先下载当前工作单');
+          target.discovery = value;
+        });
+        dialog.close();
+        say('需求工作单已保存，可随应用工作包导出。');
+      }, 'primary'));
+  }
 
   function configure() {
     const dialog = modal('关联关系与项目资料');

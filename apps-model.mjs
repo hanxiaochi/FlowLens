@@ -1,5 +1,35 @@
+import {validateApplicationScenarios} from './apps-scenarios.mjs';
 import {createCase, applyOperation, uid} from './forms-model.mjs';
 import {validateFieldValue} from './forms-schema.mjs';
+import {validateRequirements} from './apps-requirements.mjs';
+
+export const discoveryFields = [
+  ['problem', '谁遇到了什么问题'],
+  ['currentProcess', '现在怎样处理'],
+  ['baseline', '当前耗时、单量与遗漏情况及依据'],
+  ['outcome', '预期结果与验收方式'],
+  ['scope', '本次范围及暂缓事项'],
+  ['sources', '材料名称、版本与来源位置'],
+  ['owner', '拟请谁确认业务'],
+  ['openQuestions', '待确认问题'],
+  ['deployment', '设备、网络与维护条件']
+];
+
+export function validateDiscovery(value) {
+  if (value === undefined) return;
+  if (!value || typeof value !== 'object' || Array.isArray(value) || value.version !== 1) throw Error('需求工作单版本或格式无效');
+  const allowed = new Set(['version', ...discoveryFields.map(([key]) => key)]);
+  if (Object.keys(value).some(key => !allowed.has(key))) throw Error('需求工作单包含无法识别的字段');
+  for (const [key, label] of discoveryFields) {
+    if (typeof value[key] !== 'string' || value[key].length > 8000) throw Error(label + '需为不超过 8000 字符的文字');
+  }
+}
+
+export function discoveryText(app) {
+  validateDiscovery(app.discovery);
+  return [app.name + ' · 需求工作单', '记录供业务讨论使用，确认结论与规则版本请另行核对。',
+    ...discoveryFields.map(([key, label]) => label + '\n' + (app.discovery?.[key]?.trim() || '待确认'))].join('\n\n');
+}
 
 export function createApplication(name, templateIds) {
   if (!name?.trim() || name.length > 200 || !templateIds.length) throw Error('请填写应用名称并选择至少一份模板');
@@ -102,6 +132,9 @@ export function validateApplications(workspace) {
   if (!Array.isArray(apps) || apps.length > 100 || !Array.isArray(projects) || projects.length > 1000) throw Error('应用或项目数量无效');
   const appIds = new Set();
   for (const app of apps) {
+    validateDiscovery(app.discovery);
+    validateApplicationScenarios(app.scenarioRuns);
+    validateRequirements(app.requirements);
     if (typeof app.id !== 'string' || app.id.length > 200 || !app.id || appIds.has(app.id) || !app.name?.trim() || app.name.length > 200 || !Array.isArray(app.templateIds) || !app.templateIds.length || new Set(app.templateIds).size !== app.templateIds.length) throw Error('应用定义无效');
     appIds.add(app.id);
     if (!app.templateIds.every(id => workspace.templates.some(item => item.id === id))) throw Error('应用引用的模板不存在');
