@@ -38,6 +38,8 @@ Expanded review history now explains the original field requirements, detail col
 
 Run sample scenarios from a requirement to inspect the acting role, inputs, rejection reasons, and changes to state, revision, and fields. Each run is tied to its saved definition, so later rule changes prompt another run. Current execution uses generated sample values for one form and its local rules. Field observations, custom inputs, and cross-form scenario execution remain planned. All 171 local tests passed; browser checks covered execution, persistence, downloads, and the exported verifier. This increment is unreleased and has not been deployed.
 
+Field observations now capture preconditions, steps and inputs, expected and observed results, evidence locations, and follow-up actions. Each record retains the current definition and prompts review after changes. Observer names and conclusions are entered by the recorder. Browser checks covered a fictional example, save, reload, and download; all 172 local tests passed. Custom execution inputs and cross-form scenarios remain planned.
+
 The team app now separates fields still due at the current stage, issues in completed stages, and attachments whose verification is incomplete. Open a record from the review and return to the same page. Download a readable HTML checklist for review or printing without additional software.
 
 [Candidate user guide](docs/project-review-guide.en.md)

@@ -1,6 +1,6 @@
 import {applicationDelivery} from './apps-delivery.js';
 import {summarizeRecord} from './forms-model.mjs';
-import {saveRequirement, confirmRequirement, requirementDefinition, requirementStatus, requirementStatusLabels, requirementTarget, requirementsText, requirementDefinitionText, runRequirementScenario, scenarioRunStatus, scenarioStatusLabels, scenarioRunText} from './apps-requirements.mjs';
+import {saveRequirement, confirmRequirement, requirementDefinition, requirementStatus, requirementStatusLabels, requirementTarget, requirementsText, requirementDefinitionText, recordRequirementObservation, observationFields, observationStatus, observationStatusLabels, observationText, runRequirementScenario, scenarioRunStatus, scenarioStatusLabels, scenarioRunText} from './apps-requirements.mjs';
 import {createApplication, createProject, startProjectCase, validateRelation, applicationPackage, discoveryFields, discoveryText} from './apps-model.mjs';
 
 const element = (tag, text, className) => {
@@ -164,7 +164,7 @@ export function renderApplications(host, {workspace, appId, projectId, role, onS
         element('p', target ? `${target.template.title} / ${target.item.label ?? target.item.title}` : '原关联对象已移除，请重新选择'), element('pre', entry.source));
       card.append(button('编辑依据', () => editRequirement(entry)));
       if (target) card.append(button('查看表式与规则', () => { list.close(); onOpen('templates', target.template.id); }), button('记录业务确认', () => recordReview(entry)));
-      if (target) card.append(button('运行样例场景', () => scenarioPreview(entry)));
+      if (target) card.append(button('运行样例场景', () => scenarioPreview(entry)), button('记录现场观察', () => recordObservation(entry)));
       for (const review of [...entry.reviews].reverse()) {
         const history = element('details');
         history.append(element('summary', `${new Date(review.at).toLocaleString('zh-CN', {hour12: false})} · ${review.reviewer}`), element('p', review.evidence), definitionView(review.definition));
@@ -177,9 +177,40 @@ export function renderApplications(host, {workspace, appId, projectId, role, onS
           element('pre', scenarioRunText(run)), button('下载这次场景记录', () => download('FlowLens-场景运行.json', JSON.stringify(run, null, 2))));
         card.append(history);
       }
+      for (const observation of [...(entry.observations ?? [])].reverse()) {
+        const history = element('details');
+        history.append(element('summary', `${new Date(observation.at).toLocaleString('zh-CN', {hour12: false})} · ${observationStatusLabels[observationStatus(app, templates, entry, observation)]}`),
+          element('pre', observationText(observation)), definitionView(observation.definition),
+          button('下载这次现场观察', () => download('FlowLens-现场观察.json', JSON.stringify(observation, null, 2))));
+        card.append(history);
+      }
       list.append(card);
     }
     if (!app.requirements?.length) list.append(element('p', '还没有需求依据。先选一个字段或办理动作，写下客户的原话和材料出处。'));
+
+    function recordObservation(entry) {
+      const dialog = modal('记录现场观察');
+      const expectedDefinition = requirementDefinition(app, templates, entry.id);
+      dialog.append(element('p', entry.statement), element('p', '记录实际使用的环境、操作和结果。观察人及结论由记录者填写，记录随应用共享。保存后保留历史，补充或纠正请追加记录。'));
+      const inputs = new Map();
+      for (const [key, label, limit] of observationFields) {
+        const input = element('textarea'); input.rows = key === 'steps' || key === 'actual' ? 4 : 2; input.maxLength = limit;
+        inputs.set(key, input); dialog.append(field(label, input));
+      }
+      const outcome = choice([['blocked', '待验证'], ['passed', '符合预期'], ['failed', '发现问题']], 'blocked');
+      const values = () => ({...Object.fromEntries([...inputs].map(([key, input]) => [key, input.value])), outcome: outcome.value, expectedDefinition});
+      dialog.append(field('观察结论', outcome), element('p', '发现问题或待验证时，请填写待解决事项与跟进人。'),
+        button('下载现场观察草稿', () => download('FlowLens-现场观察草稿.json', JSON.stringify({requirementId: entry.id, ...values()}, null, 2))),
+        button('保存现场观察', async () => {
+          await mutate(next => {
+            const index = next.applications.findIndex(item => item.id === app.id);
+            if (index < 0) throw Error('应用已不存在，请下载草稿');
+            next.applications[index] = recordRequirementObservation(next.applications[index], next.templates, entry.id, values());
+          });
+          dialog.close(); list.close(); say('现场观察已保存，可在需求依据中查看。');
+        }, 'primary'));
+      protectDraft(dialog, [...inputs.values(), outcome]);
+    }
 
     function scenarioPreview(entry) {
       const dialog = modal('运行关联表式的样例场景');

@@ -4,7 +4,7 @@ import {applicationDemo} from './apps-demo.mjs';
 import {applicationPackage} from './apps-model.mjs';
 import {upgradeWorkspace} from './forms-store.mjs';
 import {prepareProjectRestore} from './team-project-restore.mjs';
-import {saveRequirement, confirmRequirement, requirementDefinition, requirementStatus, validateRequirements, requirementsText, requirementDefinitionText, runRequirementScenario, scenarioRunStatus, scenarioRunText, retainRequirementHistory} from './apps-requirements.mjs';
+import {recordRequirementObservation, observationStatus, observationText, saveRequirement, confirmRequirement, requirementDefinition, requirementStatus, validateRequirements, requirementsText, requirementDefinitionText, runRequirementScenario, scenarioRunStatus, scenarioRunText, retainRequirementHistory} from './apps-requirements.mjs';
 
 function fixture(kind = 'field') {
   const workspace = applicationDemo();
@@ -190,4 +190,46 @@ test('conditional scenarios show the actual return and keep a failed completion 
   assert.equal(run.report.passed, false);
   assert.equal(scenarioRunStatus(failed, workspace.templates, entry, run), 'failed');
   assert.ok(run.report.results.some(result => !result.passed));
+});
+
+
+test('field observations preserve evidence, version boundaries and previous business records', () => {
+  const {workspace, app, id} = fixture();
+  app.requirements[0].reviews = [];
+  const before = structuredClone(workspace);
+  const input = {observer: '虚构观察人', environment: '本地虚构项目', preconditions: '已有指令单', steps: '填写项目名称并提交', expected: '进入签发', actual: '页面进入签发，证据记录 A', followUp: '', outcome: 'passed', expectedDefinition: requirementDefinition(app, workspace.templates, id)};
+  const next = recordRequirementObservation(app, workspace.templates, id, input);
+  const entry = next.requirements[0], observation = entry.observations[0];
+  assert.deepEqual(workspace, before);
+  assert.equal(app.requirements[0].observations, undefined);
+  assert.equal(requirementStatus(next, workspace.templates, entry), 'pending');
+  assert.equal(observationStatus(next, workspace.templates, entry, observation), 'passed');
+  assert.match(observationText(observation), /证据记录 A/);
+  assert.match(requirementsText(next, workspace.templates), /虚构观察人/);
+  workspace.applications[0] = next;
+  const restored = upgradeWorkspace(applicationPackage(workspace, app.id));
+  assert.deepEqual(restored.applications[0].requirements[0].observations, entry.observations);
+  const edited = saveRequirement(next, workspace.templates, {...entry, source: '修订来源'});
+  assert.deepEqual(edited.requirements[0].observations, entry.observations);
+  assert.equal(observationStatus(edited, workspace.templates, edited.requirements[0], observation), 'changed');
+  assert.equal(observationStatus(next, [], entry, observation), 'missing');
+  assert.throws(() => recordRequirementObservation(edited, workspace.templates, id, input), /定义已变化/);
+  assert.throws(() => recordRequirementObservation(next, [], id, input), /已移除/);
+  const oldClient = structuredClone(next); delete oldClient.requirements[0].observations;
+  assert.deepEqual(retainRequirementHistory(next, oldClient).requirements[0].observations, entry.observations);
+  assert.equal(oldClient.requirements[0].observations, undefined);
+  const tampered = structuredClone(next); tampered.requirements[0].observations[0].actual = '改写';
+  assert.throws(() => retainRequirementHistory(next, tampered), /现场观察历史/);
+  for (const outcome of ['failed', 'blocked']) {
+    assert.throws(() => recordRequirementObservation(app, workspace.templates, id, {...input, outcome}), /有效文字/);
+    const saved = recordRequirementObservation(next, workspace.templates, id, {...input, outcome, followUp: '测试人员复核页面'});
+    assert.equal(saved.requirements[0].observations.length, 2);
+    assert.equal(observationStatus(saved, workspace.templates, saved.requirements[0], saved.requirements[0].observations[1]), outcome);
+  }
+  for (const patch of [{outcome: 'unknown'}, {observer: ''}, {actual: 'x'.repeat(8001)}, {at: 'invalid'}]) {
+    const invalid = structuredClone(entry); Object.assign(invalid.observations[0], patch);
+    assert.throws(() => validateRequirements([invalid]));
+  }
+  const duplicate = structuredClone(entry); duplicate.observations.push(structuredClone(observation));
+  assert.throws(() => validateRequirements([duplicate]), /编号或日期/);
 });

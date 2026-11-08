@@ -5,6 +5,28 @@ import {verifyTemplate} from './forms-acceptance.mjs';
 export const requirementStatusLabels = {pending: '待确认', confirmed: '已记录确认', changed: '需重新确认', missing: '关联对象已移除'};
 export const scenarioStatusLabels = {passed: '本地场景通过', failed: '本地场景有失败项', changed: '定义已变化，需重新运行', missing: '关联对象已移除'};
 
+export const observationStatusLabels = {passed: '现场记录符合预期', failed: '现场记录发现问题', blocked: '现场记录待验证', changed: '定义已变化，需复核观察', missing: '关联对象已移除'};
+export const observationFields = [
+  ['observer', '观察人称呼', 200], ['environment', '环境与材料版本', 2000],
+  ['preconditions', '操作前提', 4000], ['steps', '操作步骤与输入', 8000],
+  ['expected', '预期结果', 4000], ['actual', '实际观察与证据位置', 8000],
+  ['followUp', '待解决事项与跟进人', 4000]
+];
+
+function validateObservations(observations = []) {
+  if (!Array.isArray(observations) || observations.length > 50) throw Error('每条需求最多保存 50 次现场观察');
+  const ids = new Set();
+  for (const observation of observations) {
+    if (!observation || typeof observation !== 'object') throw Error('现场观察格式无效');
+    text(observation.id, 200); text(observation.at, 100);
+    if (ids.has(observation.id) || !Number.isFinite(Date.parse(observation.at))) throw Error('现场观察编号或日期无效');
+    ids.add(observation.id);
+    if (!['passed', 'failed', 'blocked'].includes(observation.outcome)) throw Error('请选择现场观察结论');
+    for (const [key, , limit] of observationFields) text(observation[key], limit, key !== 'followUp' || observation.outcome !== 'passed');
+    validateDefinitionSnapshot(observation.definition);
+  }
+}
+
 function text(value, limit, required = true) {
   if (typeof value !== 'string' || value.length > limit || (required && !value.trim())) throw Error('需求记录需填写有效文字，最多 ' + limit + ' 字符');
 }
@@ -67,6 +89,7 @@ export function validateRequirements(entries = []) {
     text(entry.target.id, 200);
     if (!Array.isArray(entry.reviews) || entry.reviews.length > 50) throw Error('每条需求最多保存 50 次确认记录');
     validateScenarioRuns(entry.runs);
+    validateObservations(entry.observations);
     for (const review of entry.reviews) {
       if (!review || typeof review !== 'object') throw Error('确认记录格式无效');
       text(review.reviewer, 200);
@@ -122,6 +145,7 @@ export function saveRequirement(app, templates, input) {
   const entry = {id: old?.id ?? uid(), statement: input.statement, source: input.source, origin: input.origin,
     target: structuredClone(input.target), reviews: structuredClone(old?.reviews ?? [])};
   if (old?.runs) entry.runs = structuredClone(old.runs);
+  if (old?.observations) entry.observations = structuredClone(old.observations);
   validateRequirements([entry]);
   if (!requirementTarget(app, templates, entry.target)) throw Error('请选择当前应用中的表式、字段或办理动作');
   const next = old ? entries.map(item => item.id === old.id ? entry : item) : [...entries, entry];
@@ -153,10 +177,36 @@ export function retainRequirementHistory(previous, incoming) {
   for (const old of previous.requirements) {
     const next = merged.requirements.find(entry => entry.id === old.id);
     if (!next || JSON.stringify(next.reviews.slice(0, old.reviews.length)) !== JSON.stringify(old.reviews)) throw Error('发布需保留已有需求依据与确认历史，请先取得最新应用定义');
+    if (next.observations === undefined && old.observations) next.observations = structuredClone(old.observations);
+    if (old.observations && JSON.stringify(next.observations.slice(0, old.observations.length)) !== JSON.stringify(old.observations)) throw Error('发布需保留已有现场观察历史，请先取得最新应用定义');
     if (next.runs === undefined && old.runs) next.runs = structuredClone(old.runs);
     if (old.runs && JSON.stringify(next.runs.slice(0, old.runs.length)) !== JSON.stringify(old.runs)) throw Error('发布需保留已有场景运行历史，请先取得最新应用定义');
   }
   return merged;
+}
+
+export function recordRequirementObservation(app, templates, id, input) {
+  const entry = app.requirements?.find(item => item.id === id);
+  if (!entry) throw Error('需求记录已不存在');
+  const definition = definitionFor(app, templates, entry);
+  if (definition === null) throw Error('关联对象已移除，请先重新关联');
+  if (definition !== input.expectedDefinition) throw Error('定义已变化，请重新核对后记录观察');
+  const observation = {id: uid(), at: new Date().toISOString(), definition, outcome: input.outcome};
+  for (const [key] of observationFields) observation[key] = input[key];
+  const updated = {...entry, observations: [...(entry.observations ?? []), observation]};
+  validateRequirements([updated]);
+  return {...app, requirements: app.requirements.map(item => item.id === id ? updated : item)};
+}
+
+export function observationStatus(app, templates, entry, observation) {
+  const current = definitionFor(app, templates, entry);
+  if (current === null) return 'missing';
+  return current === observation.definition ? observation.outcome : 'changed';
+}
+
+export function observationText(observation) {
+  return ['现场观察 ' + observation.at, observationStatusLabels[observation.outcome],
+    ...observationFields.map(([key, label]) => label + '\n' + (observation[key] || '未记录'))].join('\n\n');
 }
 
 export function runRequirementScenario(app, templates, id) {
@@ -252,7 +302,8 @@ export function requirementsText(app, templates) {
     const title = target ? `${target.template.title} / ${target.item.label ?? target.item.title}` : `${entry.target.templateId} / ${entry.target.id}`;
     const history = entry.reviews.map(review => `确认人 ${review.reviewer}\n记录时间 ${review.at}\n确认依据 ${review.evidence}\n当时定义摘要\n${requirementDefinitionText(review.definition)}\n\n完整定义快照\n${review.definition}`).join('\n\n');
     const scenarios = (entry.runs ?? []).map(run => scenarioStatusLabels[scenarioRunStatus(app, templates, entry, run)] + '\n' + scenarioRunText(run)).join('\n\n');
-    return `${entry.statement}\n关联 ${title}\n来源 ${entry.origin === 'ai' ? 'AI 建议' : '人工录入'}\n材料原文或出处\n${entry.source}\n当前状态 ${requirementStatusLabels[requirementStatus(app, templates, entry)]}\n\n${history || '尚无确认记录'}\n\n${scenarios || '尚无样例场景运行'}`;
+    const observations = (entry.observations ?? []).map(item => observationStatusLabels[observationStatus(app, templates, entry, item)] + '\n' + observationText(item)).join('\n\n');
+    return `${entry.statement}\n关联 ${title}\n来源 ${entry.origin === 'ai' ? 'AI 建议' : '人工录入'}\n材料原文或出处\n${entry.source}\n当前状态 ${requirementStatusLabels[requirementStatus(app, templates, entry)]}\n\n${history || '尚无确认记录'}\n\n${scenarios || '尚无样例场景运行'}\n\n${observations || '尚无现场观察记录'}`;
   });
   return [app.name + ' · 需求依据与确认记录', '确认人及依据由记录者填写；团队发布操作按现有账号审计。', ...sections].join('\n\n');
 }
