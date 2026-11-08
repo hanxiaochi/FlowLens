@@ -10,7 +10,7 @@ export function sampleValue(field) {
   return '验证填写';
 }
 
-function stageValues(template, owner) {
+function stageValues(template, owner, overrides = {}) {
   const values = Object.fromEntries(template.fields.filter(field => field.owner === owner).map(field => [field.id, sampleValue(field)]));
   for (const rule of template.decisionRules ?? []) {
     if (rule.stageId !== owner || values[rule.fieldId] !== rule.equals) continue;
@@ -18,10 +18,21 @@ function stageValues(template, owner) {
     const alternative = field.options?.find(value => !(template.decisionRules ?? []).some(item => item.stageId === owner && item.fieldId === field.id && item.equals === value));
     if (alternative !== undefined) values[field.id] = alternative;
   }
+  for (const field of template.fields.filter(item => item.owner === owner)) {
+    if (Object.hasOwn(overrides, field.id)) values[field.id] = overrides[field.id];
+  }
   return values;
 }
 
-export function verifyTemplate(template) {
+export function scenarioSampleValues(template) {
+  return Object.assign({}, ...['draft', ...template.workflow.map(stage => stage.id)].map(owner => stageValues(template, owner)));
+}
+
+export function verifyTemplate(template, overrides) {
+  if (overrides !== undefined && (!overrides || typeof overrides !== 'object' || Array.isArray(overrides))) throw Error('场景输入格式无效');
+  for (const [id, value] of Object.entries(overrides ?? {})) {
+    if (!template.fields.some(field => field.id === id) || typeof value !== 'string' || value.length > 20000) throw Error('场景输入包含未知字段或超长内容');
+  }
   validateWorkflow(template.workflow);
   const results = [];
   let steps = [];
@@ -64,7 +75,7 @@ export function verifyTemplate(template) {
     const label = stage < 0 ? '填报' : template.workflow[stage].label;
     const role = stage < 0 ? record.submitter : template.workflow[stage].role;
     const type = stage < 0 ? 'submit' : 'advance';
-    const values = stageValues(template, owner);
+    const values = stageValues(template, owner, overrides);
     check(owner + ': wrong role', label + ' · 错误角色', '拒绝办理，记录及修订保持原值', () => rejects(record, {type, role: role + '-wrong', values}));
     for (const field of template.fields.filter(item => item.owner === owner && item.required)) {
       check(owner + ': required ' + field.id, label + ' · 缺少' + field.label, '拒绝流转并提示必填项，记录保持原值', () => rejects(record, {type, role, values: {...values, [field.id]: ''}}));
@@ -78,7 +89,7 @@ export function verifyTemplate(template) {
         ensure(returned.id === id && returned.events.length === record.events.length + 1, '历史或编号丢失');
         for (let index = returned.step; index < stage; index++) {
           const nextOwner = index < 0 ? 'draft' : template.workflow[index].id;
-          returned = perform(returned, {type: index < 0 ? 'submit' : 'advance', role: index < 0 ? returned.submitter : template.workflow[index].role, values: stageValues(template, nextOwner)});
+          returned = perform(returned, {type: index < 0 ? 'submit' : 'advance', role: index < 0 ? returned.submitter : template.workflow[index].role, values: stageValues(template, nextOwner, overrides)});
           ensure(returned.step === index + 1, '样例未能回到原办理阶段，请核对条件和输入');
         }
         ensure(returned.step === stage && returned.id === id, '重提后阶段或编号不一致');
@@ -108,5 +119,7 @@ export function verifyTemplate(template) {
     ensure(record.status === 'complete', '未完成归档');
     rejects(record, {type: 'save', role: record.submitter});
   });
-  return {scope: '本地业务规则，未验证生产服务、身份或数据库权限', passed: results.every(item => item.passed), results};
+  const report = {scope: '本地业务规则，未验证生产服务、身份或数据库权限', passed: results.every(item => item.passed), results};
+  if (overrides !== undefined) Object.assign(report, {inputMode: 'custom', inputs: {...scenarioSampleValues(template), ...overrides}});
+  return report;
 }

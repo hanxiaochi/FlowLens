@@ -1,3 +1,4 @@
+import {scenarioSampleValues} from './forms-acceptance.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {applicationDemo} from './apps-demo.mjs';
@@ -232,4 +233,53 @@ test('field observations preserve evidence, version boundaries and previous busi
   }
   const duplicate = structuredClone(entry); duplicate.observations.push(structuredClone(observation));
   assert.throws(() => validateRequirements([duplicate]), /编号或日期/);
+});
+
+
+test('custom scenario inputs reach operations, retain failures and reject stale definitions', () => {
+  const {workspace, app, id} = fixture();
+  const template = workspace.templates[0];
+  const values = scenarioSampleValues(template);
+  values.project = '客户提供的虚构项目';
+  values.items = JSON.stringify([{position: '二层', issue: '现场问题', quantity: '3'}]);
+  const original = structuredClone({workspace, app, values});
+  const expectedDefinition = requirementDefinition(app, workspace.templates, id);
+  const next = runRequirementScenario(app, workspace.templates, id, {expectedDefinition, values});
+  const run = next.requirements[0].runs[0];
+  assert.equal(run.report.passed, true);
+  assert.equal(run.report.inputMode, 'custom');
+  assert.deepEqual(run.report.inputs, values);
+  const step = run.report.results.find(result => result.name === 'draft: advance and replay').steps[0];
+  assert.equal(step.input.project, values.project);
+  assert.equal(step.input.items, values.items);
+  assert.match(scenarioRunText(run), /自定义输入/);
+  assert.deepEqual({workspace, app, values}, original);
+  const failed = runRequirementScenario(app, workspace.templates, id, {expectedDefinition, values: {...values, project: ''}});
+  assert.equal(failed.requirements[0].runs[0].report.passed, false);
+  assert.match(failed.requirements[0].runs[0].report.results.find(result => result.name === 'draft: advance and replay').actual, /项目名称/);
+  const changed = structuredClone(workspace.templates); changed[0].fields[0].label = '新名称';
+  assert.throws(() => runRequirementScenario(app, changed, id, {expectedDefinition, values}), /定义已变化/);
+  for (const invalid of [null, [], {unknown: 'value'}, {project: 123}, {project: 'x'.repeat(20001)}]) {
+    assert.throws(() => runRequirementScenario(app, workspace.templates, id, {values: invalid}), /场景输入/);
+  }
+  const tampered = structuredClone(next.requirements[0]); tampered.runs[0].report.inputs.unknown = 'value';
+  assert.throws(() => validateRequirements([tampered]), /未知字段/);
+  workspace.applications[0] = next;
+  assert.deepEqual(upgradeWorkspace(applicationPackage(workspace, app.id)).applications[0].requirements[0].runs, next.requirements[0].runs);
+});
+
+test('custom conditional input remains explicit while automatic samples find the completing choice', () => {
+  const workspace = applicationDemo(), template = workspace.templates.find(item => item.id === 'app-reply');
+  const app = saveRequirement(workspace.applications[0], workspace.templates, {statement: '复查意见', source: '虚构来源', origin: 'manual', target: {kind: 'template', templateId: template.id, id: template.id}});
+  const id = app.requirements[0].id, values = scenarioSampleValues(template);
+  assert.equal(values.result, '通过');
+  values.result = '不通过';
+  const next = runRequirementScenario(app, workspace.templates, id, {values});
+  const run = next.requirements[0].runs[0];
+  assert.equal(run.report.inputs.result, '不通过');
+  assert.equal(run.report.passed, false);
+  const attempt = run.report.results.find(result => result.name === 'review: advance and replay');
+  assert.equal(attempt.steps[0].input.result, '不通过');
+  assert.equal(attempt.steps[0].outcome, 'rejected');
+  assert.match(attempt.actual, /条件触发退回，请填写办理意见作为原因/);
 });

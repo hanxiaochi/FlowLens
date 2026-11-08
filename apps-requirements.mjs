@@ -50,6 +50,15 @@ function validateScenarioRuns(runs = []) {
     const report = run.report;
     if (!report || !Array.isArray(report.results) || !report.results.length || report.results.length > 2000 || JSON.stringify(report).length > 1000000) throw Error('场景报告格式无效或超过容量');
     text(report.scope, 1000);
+    if (report.inputMode !== undefined) {
+      if (report.inputMode !== 'custom' || !report.inputs || typeof report.inputs !== 'object' || Array.isArray(report.inputs)) throw Error('自定义场景输入无效');
+      const fields = JSON.parse(run.definition).template.fields;
+      if (!Array.isArray(fields)) throw Error('场景定义缺少字段');
+      for (const [id, value] of Object.entries(report.inputs)) {
+        if (!fields.some(field => field.id === id)) throw Error('自定义场景输入包含未知字段');
+        text(value, 20000, false);
+      }
+    } else if (report.inputs !== undefined) throw Error('场景输入缺少模式');
     for (const result of report.results) {
       text(result.name, 1000); text(result.title, 1000); text(result.expected, 4000); text(result.actual, 4000);
       if (typeof result.passed !== 'boolean' || !Array.isArray(result.steps) || result.steps.length > 32) throw Error('场景结果无效');
@@ -209,12 +218,14 @@ export function observationText(observation) {
     ...observationFields.map(([key, label]) => label + '\n' + (observation[key] || '未记录'))].join('\n\n');
 }
 
-export function runRequirementScenario(app, templates, id) {
+export function runRequirementScenario(app, templates, id, options = {}) {
   const entry = app.requirements?.find(item => item.id === id);
   if (!entry) throw Error('需求记录已不存在');
   const target = requirementTarget(app, templates, entry.target);
   if (!target) throw Error('关联对象已移除，请先重新关联');
-  const run = {id: uid(), at: new Date().toISOString(), definition: definitionFor(app, templates, entry), report: verifyTemplate(target.template)};
+  const definition = definitionFor(app, templates, entry);
+  if (options.expectedDefinition !== undefined && options.expectedDefinition !== definition) throw Error('定义已变化，请重新核对场景输入');
+  const run = {id: uid(), at: new Date().toISOString(), definition, report: verifyTemplate(target.template, options.values)};
   const updated = {...entry, runs: [...(entry.runs ?? []), run]};
   validateRequirements([updated]);
   return {...app, requirements: app.requirements.map(item => item.id === id ? updated : item)};
@@ -242,7 +253,7 @@ export function scenarioRunText(run) {
     }).join('\n\n');
     return [result.title, '预期\n' + result.expected, '实际\n' + result.actual, result.passed ? '此项通过' : '此项失败', steps].join('\n\n');
   });
-  return ['样例场景运行 ' + run.at, run.report.scope, '使用自动样例值，执行过程保存在独立内存记录中。', ...scenarios].join('\n\n');
+  return ['样例场景运行 ' + run.at, run.report.scope, run.report.inputMode === 'custom' ? '使用自定义输入，执行过程保存在独立内存记录中。继续办理检查预期进入下一阶段；命中退回条件或输入校验失败会保留失败项。' : '使用自动样例值，执行过程保存在独立内存记录中。', ...scenarios].join('\n\n');
 }
 
 export function requirementDefinitionText(serialized) {

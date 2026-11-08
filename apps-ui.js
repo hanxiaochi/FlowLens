@@ -1,3 +1,5 @@
+import {scenarioSampleValues} from './forms-acceptance.mjs';
+import {renderDetailField} from './forms-detail-ui.js';
 import {applicationDelivery} from './apps-delivery.js';
 import {summarizeRecord} from './forms-model.mjs';
 import {saveRequirement, confirmRequirement, requirementDefinition, requirementStatus, requirementStatusLabels, requirementTarget, requirementsText, requirementDefinitionText, recordRequirementObservation, observationFields, observationStatus, observationStatusLabels, observationText, runRequirementScenario, scenarioRunStatus, scenarioStatusLabels, scenarioRunText} from './apps-requirements.mjs';
@@ -164,7 +166,7 @@ export function renderApplications(host, {workspace, appId, projectId, role, onS
         element('p', target ? `${target.template.title} / ${target.item.label ?? target.item.title}` : '原关联对象已移除，请重新选择'), element('pre', entry.source));
       card.append(button('编辑依据', () => editRequirement(entry)));
       if (target) card.append(button('查看表式与规则', () => { list.close(); onOpen('templates', target.template.id); }), button('记录业务确认', () => recordReview(entry)));
-      if (target) card.append(button('运行样例场景', () => scenarioPreview(entry)), button('记录现场观察', () => recordObservation(entry)));
+      if (target) card.append(button('运行样例场景', () => scenarioPreview(entry)), button('用自己的数据试规则', () => customScenario(entry)), button('记录现场观察', () => recordObservation(entry)));
       for (const review of [...entry.reviews].reverse()) {
         const history = element('details');
         history.append(element('summary', `${new Date(review.at).toLocaleString('zh-CN', {hour12: false})} · ${review.reviewer}`), element('p', review.evidence), definitionView(review.definition));
@@ -210,6 +212,45 @@ export function renderApplications(host, {workspace, appId, projectId, role, onS
           dialog.close(); list.close(); say('现场观察已保存，可在需求依据中查看。');
         }, 'primary'));
       protectDraft(dialog, [...inputs.values(), outcome]);
+    }
+
+    function customScenario(entry) {
+      const dialog = modal('用自己的数据试规则');
+      const template = requirementTarget(app, templates, entry.target).template;
+      const expectedDefinition = requirementDefinition(app, templates, entry.id);
+      const defaults = scenarioSampleValues(template);
+      const inputs = new Map();
+      dialog.append(element('p', '修改各阶段的样例输入后运行本地规则检查。继续办理检查预期进入下一阶段；输入为空、格式不符或命中退回条件会保留失败项，可展开查看实际结果。错误角色、缺少必填及条件退回检查会另行构造输入。'));
+      for (const owner of ['draft', ...template.workflow.map(stage => stage.id)]) {
+        dialog.append(element('h3', owner === 'draft' ? '填报' : template.workflow.find(stage => stage.id === owner).label));
+        for (const item of template.fields.filter(field => field.owner === owner)) {
+          if (item.type === 'table') {
+            const host = element('section'); host.append(element('h4', item.label));
+            renderDetailField(host, item, defaults[item.id], true);
+            inputs.set(item.id, host.querySelector('textarea[data-field]')); dialog.append(host);
+            continue;
+          }
+          let input;
+          if (item.type === 'select' || item.type === 'boolean') {
+            const options = item.type === 'boolean' ? [['true', '是'], ['false', '否']] : item.options.map(value => [value, value]);
+            input = choice([['', '未填写'], ...options], defaults[item.id]);
+          } else {
+            input = element('textarea'); input.rows = 2; input.maxLength = 20000; input.value = defaults[item.id];
+          }
+          inputs.set(item.id, input); dialog.append(field(item.label + (item.required ? '（必填）' : ''), input));
+        }
+      }
+      const values = () => Object.fromEntries([...inputs].map(([id, input]) => [id, input.value]));
+      dialog.append(button('下载场景输入草稿', () => download('FlowLens-场景输入草稿.json', JSON.stringify({requirementId: entry.id, expectedDefinition, values: values()}, null, 2))),
+        button('运行并保存自定义场景', async () => {
+          await mutate(next => {
+            const index = next.applications.findIndex(item => item.id === app.id);
+            if (index < 0) throw Error('应用已不存在，请下载草稿');
+            next.applications[index] = runRequirementScenario(next.applications[index], next.templates, entry.id, {expectedDefinition, values: values()});
+          });
+          dialog.close(); list.close(); say('自定义场景已保存，请展开运行记录核对实际结果。');
+        }, 'primary'));
+      protectDraft(dialog, [...inputs.values()]);
     }
 
     function scenarioPreview(entry) {
