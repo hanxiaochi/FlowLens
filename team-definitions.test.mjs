@@ -10,7 +10,7 @@ import http from 'node:http';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {discoveryFields} from './apps-model.mjs';
-import {saveRequirement, confirmRequirement, requirementDefinition, requirementStatus} from './apps-requirements.mjs';
+import {recordRequirementObservation, runRequirementScenario, saveRequirement, confirmRequirement, requirementDefinition, requirementStatus} from './apps-requirements.mjs';
 
 const password = 'publication-test-password';
 const optionsFor = plan => ({operationId: crypto.randomUUID(), planFingerprint: plan.planFingerprint, expectedUserId: plan.userId, expectedInstanceId: plan.instanceId});
@@ -215,5 +215,46 @@ test('layout previews retain the original blank template and summarize merged ta
     assert.match(layout.after, /1 处合并/);
     assert.ok(!layout.after.includes('"rows"'));
     assert.deepEqual(store.visibleWorkspace(admin), before);
+  } finally { store.close(); await rm(directory, {recursive: true, force: true}); }
+});
+
+
+test('team publication previews evidence invalidation and preserves observation history and business cases', async () => {
+  const {directory, store, admin, member, initial} = await setup();
+  try {
+    const incoming = structuredClone(initial), template = incoming.templates[0];
+    let app = saveRequirement(incoming.applications[0], incoming.templates, {statement: '项目名称带入', source: '虚构访谈', origin: 'manual', target: {kind: 'field', templateId: template.id, id: template.fields[0].id}});
+    const id = app.requirements[0].id;
+    app = runRequirementScenario(app, incoming.templates, id);
+    app = recordRequirementObservation(app, incoming.templates, id, {observer: '虚构观察人', environment: '本地样例', preconditions: '已有项目', steps: '打开指令单', expected: '项目名一致', actual: '核对一致', followUp: '', outcome: 'passed', expectedDefinition: requirementDefinition(app, incoming.templates, id)});
+    incoming.applications[0] = app;
+    const first = store.previewDefinitions(admin, incoming);
+    assert.equal(first.requirementEvidenceChanges.length, 2);
+    assert.ok(first.requirementEvidenceChanges.every(item => item.before === null && item.after === 'passed'));
+    assert.ok(first.changes[0].details.some(item => item.path.endsWith('/ 现场观察历史') && item.after.includes('核对一致')));
+    assert.throws(() => store.previewDefinitions(member, incoming), error => error.status === 403);
+    store.publishDefinitions(admin, incoming, optionsFor(first));
+    const current = store.visibleWorkspace(admin).workspace;
+    const changed = structuredClone(current);
+    changed.templates[0].version++;
+    changed.templates[0].fields[0].required = !changed.templates[0].fields[0].required;
+    const before = store.visibleWorkspace(admin), audit = store.audit(admin);
+    const plan = store.previewDefinitions(admin, changed);
+    assert.deepEqual(plan.requirementEvidenceChanges.map(item => [item.kind, item.before, item.after]), [['runs', 'passed', 'changed'], ['observations', 'passed', 'changed']]);
+    assert.deepEqual(store.visibleWorkspace(admin), before);
+    assert.deepEqual(store.audit(admin), audit);
+    store.publishDefinitions(admin, changed, optionsFor(plan));
+    const saved = store.visibleWorkspace(admin).workspace;
+    assert.deepEqual(saved.cases, current.cases);
+    assert.deepEqual(saved.applications[0].requirements, current.applications[0].requirements);
+    assert.deepEqual(store.previewDefinitions(admin, changed).requirementEvidenceChanges, []);
+    const legacy = structuredClone(saved); delete legacy.applications[0].requirements[0].observations;
+    store.publishDefinitions(admin, legacy, optionsFor(store.previewDefinitions(admin, legacy)));
+    assert.deepEqual(store.visibleWorkspace(admin).workspace.applications[0].requirements, saved.applications[0].requirements);
+    for (const mutate of [entry => { entry.observations = []; }, entry => { entry.observations[0].actual = '改写'; }]) {
+      const invalid = structuredClone(saved); mutate(invalid.applications[0].requirements[0]);
+      assert.throws(() => store.previewDefinitions(admin, invalid), /现场观察历史/);
+      assert.deepEqual(store.visibleWorkspace(admin).workspace.cases, current.cases);
+    }
   } finally { store.close(); await rm(directory, {recursive: true, force: true}); }
 });

@@ -40,6 +40,8 @@ Run sample scenarios from a requirement to inspect the acting role, inputs, reje
 
 Field observations now capture preconditions, steps and inputs, expected and observed results, evidence locations, and follow-up actions. Each record retains the current definition and prompts review after changes. Observer names and conclusions are entered by the recorder. Browser checks covered a fictional example, save, reload, and download; all 172 local tests passed. Custom execution inputs and cross-form scenarios remain planned.
 
+Publication previews also list sample runs and field observations affected by the proposed changes, including those needing another run or review. Browser upload, preview, and publication passed on an isolated fictional instance at a 390-pixel viewport. Existing business records and evidence histories matched after publication. All 173 local tests passed.
+
 The team app now separates fields still due at the current stage, issues in completed stages, and attachments whose verification is incomplete. Open a record from the review and return to the same page. Download a readable HTML checklist for review or printing without additional software.
 
 [Candidate user guide](docs/project-review-guide.en.md)

@@ -1,5 +1,5 @@
 import {definitionDetails} from './team-definition-diff.mjs';
-import {retainRequirementHistory, requirementStatus} from './apps-requirements.mjs';
+import {retainRequirementHistory, requirementStatus, scenarioRunStatus, observationStatus} from './apps-requirements.mjs';
 import {parseCsv, prepareCsvImport} from './team-csv-import.mjs';
 import {summarizeWorkspace} from './team-read-model.mjs';
 import {prepareProjectRestore} from './team-project-restore.mjs';
@@ -447,9 +447,21 @@ export function openTeamStore(filename) {
   function definitionFingerprint(current) {
     return digest(JSON.stringify({applications: current.applications, templates: current.templates, projects: current.projects}));
   }
+  function requirementEvidenceStatuses(current) {
+    return current.applications.flatMap(app => (app.requirements ?? []).flatMap(entry =>
+      [['runs', scenarioRunStatus], ['observations', observationStatus]].flatMap(([kind, status]) =>
+        (entry[kind] ?? []).map(record => ({
+          applicationId: app.id, applicationName: app.name, requirementId: entry.id, statement: entry.statement,
+          kind, recordId: record.id, at: record.at, status: status(app, current.templates, entry, record)
+        }))
+      )
+    ));
+  }
   function definitionPlan(user, current, incoming) {
     incoming.applications = incoming.applications.map(app => retainRequirementHistory(current.applications.find(item => item.id === app.id), app));
     const previousReviews = new Map(current.applications.flatMap(app => (app.requirements ?? []).map(entry => [JSON.stringify([app.id, entry.id]), requirementStatus(app, current.templates, entry)])));
+    const previousEvidence = new Map(requirementEvidenceStatuses(current).map(item =>
+      [JSON.stringify([item.applicationId, item.requirementId, item.kind, item.recordId]), item.status]));
     const baseline = definitionFingerprint(current);
     const changes = [];
     for (const collection of ['applications', 'templates', 'projects']) {
@@ -469,6 +481,9 @@ export function openTeamStore(filename) {
       applicationId: app.id, applicationName: app.name, requirementId: entry.id, statement: entry.statement,
       before: previousReviews.get(JSON.stringify([app.id, entry.id])) ?? null, after: requirementStatus(app, current.templates, entry)
     }))).filter(item => item.before !== item.after);
+    const requirementEvidenceChanges = requirementEvidenceStatuses(current).map(({status, ...item}) => ({
+      ...item, before: previousEvidence.get(JSON.stringify([item.applicationId, item.requirementId, item.kind, item.recordId])) ?? null, after: status
+    })).filter(item => item.before !== item.after);
     upgradeWorkspace(current, {allowAttachmentReferences: true, copy: false});
     if (Buffer.byteLength(JSON.stringify(current)) > 32 * 1024 * 1024) fail(413, '当前实例工作区已超过 32 MB 容量，请联系管理员归档并规划独立实例');
     const context = serviceContext(user);
@@ -477,7 +492,7 @@ export function openTeamStore(filename) {
     return {
       ...context, userId: user.id, applicationId: incoming.applications[0].id,
       planFingerprint: digest(JSON.stringify({baseline, incoming, ...context, userId: user.id})),
-      changed: baseline !== definitionFingerprint(current), preservedRecords: result.preservedRecords, affectedApplications, changes, requirementReviewChanges
+      changed: baseline !== definitionFingerprint(current), preservedRecords: result.preservedRecords, affectedApplications, changes, requirementReviewChanges, requirementEvidenceChanges
     };
   }
   function previewDefinitions(user, input) {
