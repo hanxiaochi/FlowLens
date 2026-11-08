@@ -966,3 +966,5 @@ D03 场景运行提交 abd8e7acdec09f098966d762ec18a9905ce3d4cb 的 CI 425051449
 下载 JSON 与 ZIP 内索引完全一致，所有合同文件路径存在，解压运行 verify-app.mjs 通过。ZIP SHA256 为 e24df935d058f0a274cb0a23659a76427ddea194410d5fc15bbcb7c52fcf44ba，证据 outputs/FlowLens-discovery-qa/handoff-download-checks.json。新增功能尚未正式发行或部署，提交后核对跨平台 CI。
 
 下一步收敛 D01–D04 的发行检查，补跨表历史团队网页发布、并发保存和恢复副本验证，核对候选包与文档，再准备新的候选发行。真实业务试点和正式云端验收继续按 G01–G06 跟踪。
+
+交接索引提交 466bd8631fab8d66047edf805f1089f521bf9394 的 CI 42508897265 已逐项核对，Windows、Ubuntu 测试和构建、容器及 Compose 验收全部通过。
