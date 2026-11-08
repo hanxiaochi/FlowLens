@@ -1,5 +1,6 @@
 import {applicationDelivery} from './apps-delivery.js';
 import {summarizeRecord} from './forms-model.mjs';
+import {saveRequirement, confirmRequirement, requirementDefinition, requirementStatus, requirementStatusLabels, requirementTarget, requirementsText} from './apps-requirements.mjs';
 import {createApplication, createProject, startProjectCase, validateRelation, applicationPackage, discoveryFields, discoveryText} from './apps-model.mjs';
 
 const element = (tag, text, className) => {
@@ -79,6 +80,7 @@ export function renderApplications(host, {workspace, appId, projectId, role, onS
   heading.append(element('span', 'YOUR BUSINESS WORKSPACE', 'eyebrow'), element('h2', app.name), element('p', '选择项目，查看待办，从业务入口开始办理。'));
   const controls = element('div', undefined, 'application-controls');
   controls.append(button('需求工作单', editDiscovery));
+  controls.append(button('需求依据与确认', reviewRequirements));
   const projectChoice = choice([['', '请选择项目'], ...projects.map(item => [item.id, item.name])], projectId);
   projectChoice.onchange = () => { if (guard()) onSelect(appId, projectChoice.value); else projectChoice.value = projectId; };
   controls.append(field('当前项目', projectChoice), button('＋ 新建项目', () => {
@@ -139,6 +141,84 @@ export function renderApplications(host, {workspace, appId, projectId, role, onS
   }
   host.append(journey);
 
+  function protectDraft(dialog, inputs) {
+    const initial = inputs.map(input => input.value);
+    const dirty = () => inputs.some((input, index) => input.value !== initial[index]);
+    const beforeUnload = event => { if (dirty()) { event.preventDefault(); event.returnValue = ''; } };
+    window.addEventListener('beforeunload', beforeUnload);
+    const close = () => { if (!dirty() || window.confirm('内容尚未保存，确定关闭并放弃本次修改？')) dialog.close(); };
+    dialog.querySelector('button').onclick = close;
+    dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
+    dialog.addEventListener('close', () => window.removeEventListener('beforeunload', beforeUnload));
+  }
+
+  function reviewRequirements() {
+    const list = modal('需求依据与确认');
+    list.append(element('p', '将材料原文与表式、字段或办理动作关联。确认人及依据由记录者填写，团队发布操作沿用账号审计。表式版本、业务定义、关联映射或需求文字改变后，已有确认显示需重新确认。记录随应用共享。'));
+    list.append(button('添加需求依据', () => editRequirement()), button('下载依据与历史', () => download('FlowLens-需求依据.txt', requirementsText(app, templates), 'text/plain;charset=utf-8')));
+    for (const entry of app.requirements ?? []) {
+      const status = requirementStatus(app, templates, entry);
+      const target = requirementTarget(app, templates, entry.target);
+      const card = element('section', undefined, 'requirement-entry');
+      card.append(element('h3', entry.statement), element('p', requirementStatusLabels[status] + ' · ' + (entry.origin === 'ai' ? 'AI 建议' : '人工录入')),
+        element('p', target ? `${target.template.title} / ${target.item.label ?? target.item.title}` : '原关联对象已移除，请重新选择'), element('pre', entry.source));
+      card.append(button('编辑依据', () => editRequirement(entry)));
+      if (target) card.append(button('查看表式与规则', () => { list.close(); onOpen('templates', target.template.id); }), button('记录业务确认', () => recordReview(entry)));
+      for (const review of [...entry.reviews].reverse()) {
+        const history = element('details');
+        history.append(element('summary', `${review.at} · ${review.reviewer}`), element('p', review.evidence), element('pre', review.definition));
+        card.append(history);
+      }
+      list.append(card);
+    }
+    if (!app.requirements?.length) list.append(element('p', '还没有需求依据。先选一个字段或办理动作，写下客户的原话和材料出处。'));
+
+    function editRequirement(entry) {
+      const dialog = modal(entry ? '编辑需求依据' : '添加需求依据');
+      const options = templates.flatMap(template => [
+        [JSON.stringify({templateId: template.id, kind: 'template', id: template.id}), template.title + ' · 整份表式'],
+        ...template.fields.map(item => [JSON.stringify({templateId: template.id, kind: 'field', id: item.id}), template.title + ' · 字段 · ' + item.label]),
+        ...template.workflow.map(item => [JSON.stringify({templateId: template.id, kind: 'stage', id: item.id}), template.title + ' · 办理 · ' + item.label])
+      ]);
+      const selected = entry ? JSON.stringify({templateId: entry.target.templateId, kind: entry.target.kind, id: entry.target.id}) : '';
+      const target = choice([['', '请选择关联对象'], ...options], selected);
+      const statement = element('textarea'); statement.rows = 3; statement.maxLength = 4000; statement.value = entry?.statement ?? '';
+      const source = element('textarea'); source.rows = 5; source.maxLength = 8000; source.value = entry?.source ?? '';
+      const origin = choice([['manual', '人工录入'], ['ai', 'AI 建议']], entry?.origin ?? 'manual');
+      const input = () => ({id: entry?.id, statement: statement.value, source: source.value, origin: origin.value, target: target.value ? JSON.parse(target.value) : null});
+      dialog.append(field('关联表式、字段或办理动作', target), field('需求或规则描述', statement), field('材料原文、版本与出处', source), field('记录来源', origin),
+        button('下载当前依据草稿', () => download('FlowLens-需求依据草稿.json', JSON.stringify(input(), null, 2))),
+        button('保存需求依据', async () => {
+          await mutate(next => {
+            const index = next.applications.findIndex(item => item.id === app.id);
+            if (index < 0) throw Error('应用已不存在，请下载草稿');
+            next.applications[index] = saveRequirement(next.applications[index], next.templates, input());
+          });
+          dialog.close(); list.close(); say('需求依据已保存。');
+        }, 'primary'));
+      protectDraft(dialog, [target, statement, source, origin]);
+    }
+
+    function recordReview(entry) {
+      const dialog = modal('记录业务确认');
+      const expectedDefinition = requirementDefinition(app, templates, entry.id);
+      const reviewer = element('input'); reviewer.maxLength = 200;
+      const evidence = element('textarea'); evidence.rows = 4; evidence.maxLength = 4000;
+      const snapshot = element('details'); snapshot.append(element('summary', '本次对应的定义'), element('pre', expectedDefinition));
+      dialog.append(element('p', entry.statement), element('p', entry.source), field('确认人称呼', reviewer), field('确认依据与结论', evidence), snapshot,
+        button('下载当前确认草稿', () => download('FlowLens-确认草稿.json', JSON.stringify({requirementId: entry.id, reviewer: reviewer.value, evidence: evidence.value, expectedDefinition}, null, 2))),
+        button('保存本次确认记录', async () => {
+          await mutate(next => {
+            const index = next.applications.findIndex(item => item.id === app.id);
+            if (index < 0) throw Error('应用已不存在，请下载草稿');
+            next.applications[index] = confirmRequirement(next.applications[index], next.templates, entry.id, {reviewer: reviewer.value, evidence: evidence.value, expectedDefinition});
+          });
+          dialog.close(); list.close(); say('确认记录已保存，后续修改将重新核对定义。');
+        }, 'primary'));
+      protectDraft(dialog, [reviewer, evidence]);
+    }
+  }
+
   function editDiscovery() {
     const dialog = modal('需求工作单');
     dialog.append(element('p', '记录现场讨论。每份材料写明名称、版本和位置；尚不清楚的内容留空，导出时显示待确认。工作单随整个应用共享。拟确认人可填写称呼，业务确认结果将在后续规则追踪中记录。'));
@@ -152,15 +232,8 @@ export function renderApplications(host, {workspace, appId, projectId, role, onS
       inputs.set(key, input);
       dialog.append(field(label, input));
     }
-    const initial = [...inputs.values()].map(input => input.value);
-    const dirty = () => [...inputs.values()].some((input, index) => input.value !== initial[index]);
     const draft = () => ({version: 1, ...Object.fromEntries([...inputs].map(([key, input]) => [key, input.value]))});
-    const beforeUnload = event => { if (dirty()) { event.preventDefault(); event.returnValue = ''; } };
-    window.addEventListener('beforeunload', beforeUnload);
-    const close = () => { if (!dirty() || window.confirm('工作单尚未保存，确定关闭并放弃本次修改？')) dialog.close(); };
-    dialog.querySelector('button').onclick = close;
-    dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
-    dialog.addEventListener('close', () => window.removeEventListener('beforeunload', beforeUnload));
+    protectDraft(dialog, [...inputs.values()]);
     dialog.append(button('下载当前工作单', () => download('FlowLens-需求工作单.txt', discoveryText({...app, discovery: draft()}), 'text/plain;charset=utf-8')),
       button('保存需求工作单', async () => {
         const value = draft();

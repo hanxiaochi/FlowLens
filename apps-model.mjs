@@ -1,5 +1,6 @@
 import {createCase, applyOperation, uid} from './forms-model.mjs';
 import {validateFieldValue} from './forms-schema.mjs';
+import {validateRequirements} from './apps-requirements.mjs';
 
 export const discoveryFields = [
   ['problem', '谁遇到了什么问题'],
@@ -131,6 +132,7 @@ export function validateApplications(workspace) {
   const appIds = new Set();
   for (const app of apps) {
     validateDiscovery(app.discovery);
+    validateRequirements(app.requirements);
     if (typeof app.id !== 'string' || app.id.length > 200 || !app.id || appIds.has(app.id) || !app.name?.trim() || app.name.length > 200 || !Array.isArray(app.templateIds) || !app.templateIds.length || new Set(app.templateIds).size !== app.templateIds.length) throw Error('应用定义无效');
     appIds.add(app.id);
     if (!app.templateIds.every(id => workspace.templates.some(item => item.id === id))) throw Error('应用引用的模板不存在');

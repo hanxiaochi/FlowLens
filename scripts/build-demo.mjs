@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const out=resolve(root,'dist');await mkdir(out,{recursive:true});
-const files=['studio.js','studio.css','layout.css','forms.css','model.mjs','examples.mjs','scene.js','graph.js','export.mjs','deployment.mjs','layout.mjs','layout-ui.js','impact.mjs','diagrams.mjs','diagrams-ui.js','image-input.mjs','forms-ui.js','forms-docx.mjs','forms-model.mjs','forms-rules.mjs','forms-detail-ui.js','apps-model.mjs','apps-ui.js','apps-delivery.js','apps-verify.mjs','apps-demo.mjs','forms-schema.mjs','forms-system.mjs','forms-delivery-ui.js','forms-acceptance.mjs','forms-verify.mjs','forms-store.mjs','forms-print.mjs','forms-demo.mjs'];
+const files=['studio.js','studio.css','layout.css','forms.css','model.mjs','examples.mjs','scene.js','graph.js','export.mjs','deployment.mjs','layout.mjs','layout-ui.js','impact.mjs','diagrams.mjs','diagrams-ui.js','image-input.mjs','forms-ui.js','forms-docx.mjs','forms-model.mjs','forms-rules.mjs','forms-detail-ui.js','apps-model.mjs', 'apps-requirements.mjs','apps-ui.js','apps-delivery.js','apps-verify.mjs','apps-demo.mjs','forms-schema.mjs','forms-system.mjs','forms-delivery-ui.js','forms-acceptance.mjs','forms-verify.mjs','forms-store.mjs','forms-print.mjs','forms-demo.mjs'];
 const write=async(name,text)=>{await mkdir(dirname(resolve(out,name)),{recursive:true});await writeFile(resolve(out,name),text);};
 for(const name of files){let text=await readFile(resolve(root,name),'utf8');if(name==='forms-ui.js')text=text.replace("from '/forms-vendor/fflate.js'","from './forms-vendor/fflate.js'");await write(name,text);}
 let html=await readFile(resolve(root,'studio.html'),'utf8');

@@ -51,3 +51,5 @@ body.forms-active .crumb{font-size:0}body.forms-active .crumb span,body.forms-ac
 .forms-intro { margin-bottom: 8px; }.forms-intro .forms-toolbar { max-width: 480px; }
 
 .forms-record-summary{display:grid;gap:5px;overflow-wrap:anywhere;margin:12px 0}.forms-record-summary dt{font-size:12px;color:#82788d}.forms-record-summary dd{margin:0 0 7px;font-size:13px;line-height:1.5}.forms-record-id,.forms-list-summary{overflow-wrap:anywhere}.forms-list-item .forms-list-summary{white-space:normal;font-size:12px;line-height:1.5}
+
+.requirement-entry{border-top:1px solid #d9d0e1;margin-top:20px;padding-top:16px}.requirement-entry h3{overflow-wrap:anywhere}.forms-dialog pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;max-height:320px;overflow:auto}.requirement-entry button{margin:4px}.forms-dialog select{max-width:100%;min-width:0}

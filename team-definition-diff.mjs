@@ -2,6 +2,7 @@ import {discoveryFields} from './apps-model.mjs';
 
 const labels = {
   ...Object.fromEntries(discoveryFields), discovery: '需求工作单',
+  requirements: '需求依据', statement: '需求描述', origin: '记录来源', target: '关联对象', reviews: '确认历史',
   title: '名称', name: '名称', version: '版本', code: '表号', source: '来源',
   submitterRole: '发起角色', fields: '填写区', workflow: '办理流程', summaryFields: '清单摘要',
   templateIds: '应用表式', relations: '单据关联', bindings: '项目资料带入',

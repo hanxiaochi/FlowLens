@@ -21,6 +21,11 @@ export function prepareProjectRestore(inspection, options, user) {
     relation.to = mappings.templates.get(relation.to);
   }
   for (const binding of app.bindings) binding.templateId = mappings.templates.get(binding.templateId);
+  for (const requirement of app.requirements ?? []) {
+    const target = requirement.target;
+    target.templateId = mappings.templates.get(target.templateId) ?? target.templateId;
+    if (target.kind === 'template') target.id = mappings.templates.get(target.id) ?? target.id;
+  }
   for (const template of workspace.templates) template.id = mappings.templates.get(template.id);
   const project = workspace.projects[0];
   project.id = mappings.projects.get(project.id);

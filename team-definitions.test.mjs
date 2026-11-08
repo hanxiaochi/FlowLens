@@ -10,6 +10,7 @@ import http from 'node:http';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {discoveryFields} from './apps-model.mjs';
+import {saveRequirement, confirmRequirement, requirementDefinition, requirementStatus} from './apps-requirements.mjs';
 
 const password = 'publication-test-password';
 const optionsFor = plan => ({operationId: crypto.randomUUID(), planFingerprint: plan.planFingerprint, expectedUserId: plan.userId, expectedInstanceId: plan.instanceId});
@@ -44,6 +45,39 @@ test('discovery publication requires admin, shows readable changes and rejects s
     invalid.applications[0].discovery.problem = 'x'.repeat(8001);
     assert.throws(() => store.previewDefinitions(admin, invalid), /8000/);
     assert.equal(store.visibleWorkspace(admin).workspace.applications[0].discovery.problem, '重复录入');
+  } finally { store.close(); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('publication retains requirement history across legacy updates and rejects history replacement', async () => {
+  const {directory, store, admin, initial} = await setup();
+  try {
+    const incoming = structuredClone(initial);
+    const template = incoming.templates[0];
+    let app = saveRequirement(incoming.applications[0], incoming.templates, {statement: '项目名称必填', source: '虚构访谈', origin: 'manual', target: {kind: 'field', templateId: template.id, id: template.fields[0].id}});
+    const id = app.requirements[0].id;
+    app = confirmRequirement(app, incoming.templates, id, {reviewer: '业务代表', evidence: '样例核对', expectedDefinition: requirementDefinition(app, incoming.templates, id)});
+    incoming.applications[0] = app;
+    store.publishDefinitions(admin, incoming, optionsFor(store.previewDefinitions(admin, incoming)));
+    const legacy = structuredClone(initial);
+    legacy.applications[0].name = '旧版包更新名称';
+    store.publishDefinitions(admin, legacy, optionsFor(store.previewDefinitions(admin, legacy)));
+    const current = store.visibleWorkspace(admin).workspace;
+    assert.deepEqual(current.applications[0].requirements, app.requirements);
+    for (const mutate of [
+      updated => { updated.applications[0].requirements = []; },
+      updated => { updated.applications[0].requirements[0].reviews = []; },
+      updated => { updated.applications[0].requirements[0].reviews[0].reviewer = '替换历史人员'; }
+    ]) {
+      const invalid = structuredClone(current); mutate(invalid);
+      assert.throws(() => store.previewDefinitions(admin, invalid), /保留已有需求/);
+    }
+    const changed = structuredClone(current);
+    changed.templates[0].version++;
+    changed.templates[0].fields[0].required = !changed.templates[0].fields[0].required;
+    store.publishDefinitions(admin, changed, optionsFor(store.previewDefinitions(admin, changed)));
+    const saved = store.visibleWorkspace(admin).workspace;
+    assert.equal(requirementStatus(saved.applications[0], saved.templates, saved.applications[0].requirements[0]), 'changed');
+    assert.deepEqual(saved.applications[0].requirements[0].reviews, app.requirements[0].reviews);
   } finally { store.close(); await rm(directory, {recursive: true, force: true}); }
 });
 
