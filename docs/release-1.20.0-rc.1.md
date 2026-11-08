@@ -14,7 +14,7 @@
 
 183 项本地测试通过。独立构建的团队运行目录完成 24 项检查，包含账号权限、并发写入、重试、发布、项目资料包、备份还原、恢复后会话撤销和原请求拒绝。浏览器已执行跨表历史的团队发布，数据库核对原单据及历史一致。项目归档恢复回归确认历史原快照保留、副本提示重新运行，备份重新打开仍能读取。
 
-新候选源码的跨平台 CI、四类发行 ZIP 与实际下载复验分别记录在开发计划中。当前文件为候选发行准备说明，GitHub 附件尚待生成和校验。
+提交 818982030a494c2b6eab3bca14e916f81a08754e 的 CI 42509633797 已通过 Windows、Ubuntu、容器与 Compose 检查。四类发行 ZIP 已上传并核对 SHA256，团队包从 GitHub 重新下载后通过 24 项 HTTP/CLI 检查。附件固定于该提交，主分支继续补充验收记录。
 
 ## 使用范围
 
@@ -28,6 +28,6 @@
 
 This candidate connects discovery worksheets, customer source text, version-bound reviews, field observations, scenario checks, and developer handoff. Teams can inspect publication impact and retain their evidence when definitions change.
 
-All 183 local tests and 24 checks against the built team runtime passed. Browser publication and archive-restoration checks retained existing records and historical snapshots. Cross-platform CI, release archives, and downloaded-archive verification are tracked separately in the development plan. Release attachments are still being prepared.
+All 183 local tests and 24 checks against the built team runtime passed. Browser publication and archive-restoration checks retained existing records and historical snapshots. Windows, Ubuntu, container, and Compose CI passed for commit 8189820. All four release archives were uploaded with verified SHA256 digests. The team archive downloaded from GitHub passed 24 HTTP/CLI checks. Archives remain pinned to that commit while the main branch carries subsequent acceptance notes.
 
 Reviewers and observations are recorded manually. Scenario results cover local rules and fictional projects. Production authorization, deployment, business-owner acceptance, and real-user trials require their own evidence. Production and the public demo remain on 1.18.0 with public AI disabled.

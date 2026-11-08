@@ -28,7 +28,7 @@ Today you can try form workflows, interaction simulations, and exports of applic
 
 ### Requirements discovery on the main branch
 
-The main branch is preparing **1.20.0-rc.1**. These features remain unreleased and have not been deployed to the public demo or production cloud. [Candidate preparation notes](docs/release-1.20.0-rc.1.md)
+**1.20.0-rc.1** is available as a prerelease with local, team, source, and public-demo archives. The hosted demo and production cloud remain on 1.18.0. [Download the candidate](https://github.com/hanxiaochi/FlowLens/releases/tag/v1.20.0-rc.1) · [Release notes](docs/release-1.20.0-rc.1.md)
 
 - **Discovery worksheets** capture the business problem, current process, scope, source material, open questions, and deployment conditions.
 - **Requirement evidence and reviews** link customer statements to forms, fields, or workflow steps. Reviews retain their definitions and require another check after changes.
@@ -48,7 +48,7 @@ The team app now separates fields still due at the current stage, issues in comp
 
 The review list now supports issue categories, record/summary search, and records your assigned roles can handle. Returning from a record preserves the filters and page. Downloads still include the whole project.
 
-This is **1.19.0-rc.2**; the released and cloud versions remain **1.18.0**. All 158 local tests passed, including attachment and report capacity limits, search across pages, and role-based review filters. Pagination, record navigation, downloading, and narrow-screen reading have been checked in the browser. Printed pagination and release acceptance still need verification. See the [delivery plan (Chinese)](docs/delivery-plan.md).
+Project review was introduced in **1.19.0-rc.2** and is included in the 1.20 candidate. The stable and cloud versions remain **1.18.0**. At that stage, all 158 local tests passed, including attachment and report capacity limits, search across pages, and role-based review filters. Pagination, record navigation, downloading, and narrow-screen reading have been checked in the browser. Printed pagination and release acceptance still need verification. See the [delivery plan (Chinese)](docs/delivery-plan.md).
 
 ## 1.18 take your project ledger into Excel
 
