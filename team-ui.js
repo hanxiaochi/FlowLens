@@ -1,4 +1,5 @@
 import {projectRoles} from './apps-model.mjs';
+import {requirementStatusLabels} from './apps-requirements.mjs';
 import {canEdit} from './forms-model.mjs';
 import {FIELD_TYPES} from './forms-schema.mjs';
 import {renderDetailField} from './forms-detail-ui.js';
@@ -463,6 +464,15 @@ async function definitionPreviewView(incoming, previousEntry = null) {
   content.append(node('h1', '核对表式发布'), node('p', '该应用已有 ' + plan.preservedRecords + ' 份业务沿用原表式快照。新建业务使用发布后的定义。'));
   content.append(node('p', '涉及应用 · ' + plan.affectedApplications.map(app => app.name).join('、')));
   content.append(node('p', plan.changed ? '以下为更新包与服务器当前定义的差异。' : '当前定义与更新包一致，可以确认当前状态。'));
+  if (plan.requirementReviewChanges?.length) {
+    const reviews = node('section', undefined, 'panel');
+    reviews.append(node('h2', '需求确认状态变化'));
+    for (const change of plan.requirementReviewChanges.slice(0, 100)) {
+      reviews.append(node('h3', change.applicationName + ' · ' + change.statement), node('p', (requirementStatusLabels[change.before] ?? '此前无记录') + ' → ' + requirementStatusLabels[change.after]));
+    }
+    reviews.append(node('p', '共 ' + plan.requirementReviewChanges.length + ' 项状态变化，页面最多显示 100 项，完整列表随预览下载。', 'muted'));
+    content.append(reviews);
+  }
   if (previousEntry) content.append(node('p', '这份预览按当前服务器状态重新计算。原请求仍保留，操作编号 ' + previousEntry.operationId + '。请先确认原请求的处理结果。', 'status-warning'));
   const collectionNames = {applications: '应用', templates: '表式', projects: '项目'};
   let remaining = 200;

@@ -74,7 +74,10 @@ test('publication retains requirement history across legacy updates and rejects 
     const changed = structuredClone(current);
     changed.templates[0].version++;
     changed.templates[0].fields[0].required = !changed.templates[0].fields[0].required;
-    store.publishDefinitions(admin, changed, optionsFor(store.previewDefinitions(admin, changed)));
+    const changedPlan = store.previewDefinitions(admin, changed);
+    assert.deepEqual(changedPlan.requirementReviewChanges.map(item => [item.requirementId, item.before, item.after]), [[id, 'confirmed', 'changed']]);
+    assert.equal(requirementStatus(current.applications[0], current.templates, current.applications[0].requirements[0]), 'confirmed');
+    store.publishDefinitions(admin, changed, optionsFor(changedPlan));
     const saved = store.visibleWorkspace(admin).workspace;
     assert.equal(requirementStatus(saved.applications[0], saved.templates, saved.applications[0].requirements[0]), 'changed');
     assert.deepEqual(saved.applications[0].requirements[0].reviews, app.requirements[0].reviews);

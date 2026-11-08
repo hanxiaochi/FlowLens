@@ -2,6 +2,23 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {applicationDemo} from './apps-demo.mjs';
 import {definitionDetails} from './team-definition-diff.mjs';
+import {saveRequirement, confirmRequirement, requirementDefinition} from './apps-requirements.mjs';
+
+test('requirement diffs show source, target and review evidence in readable sections', () => {
+  const fixture = applicationDemo();
+  const before = fixture.applications[0], template = fixture.templates[0];
+  let after = saveRequirement(before, fixture.templates, {statement: '项目名称来自项目资料', source: '虚构访谈第 1 页', origin: 'ai', target: {templateId: template.id, kind: 'field', id: template.fields[0].id}});
+  const id = after.requirements[0].id;
+  after = confirmRequirement(after, fixture.templates, id, {reviewer: '业务代表', evidence: '按样例核对', expectedDefinition: requirementDefinition(after, fixture.templates, id)});
+  const details = definitionDetails(before, after, fixture.templates, fixture.templates);
+  assert.ok(details.some(item => item.path.endsWith('/ 记录来源') && item.after === 'AI 建议'));
+  assert.ok(details.some(item => item.path.endsWith('/ 关联对象') && item.after === '监理指令单 / 项目名称'));
+  assert.ok(details.some(item => item.path.endsWith('/ 来源') && item.after === '虚构访谈第 1 页'));
+  const reviews = details.find(item => item.path.endsWith('/ 确认历史'));
+  assert.match(reviews.after, /业务代表/);
+  assert.match(reviews.after, /按样例核对/);
+  assert.ok(!reviews.after.includes('"bindings"'));
+});
 
 test('definition differences explain fields, detail columns, workflows and summary selections', () => {
   const fixture = applicationDemo(), before = fixture.templates[0], after = structuredClone(before);

@@ -37,6 +37,13 @@ function display(key, value, definition, templates) {
   if (key === 'summaryFields' && value === undefined) return '自动摘要';
   if (value === undefined) return '未设置';
   if (key === 'blocks') return layoutDescription(value);
+  if (key === 'origin') return {manual: '人工录入', ai: 'AI 建议'}[value] ?? String(value);
+  if (key === 'target') {
+    const template = templates.find(item => item.id === value.templateId);
+    const target = value.kind === 'field' ? template?.fields.find(item => item.id === value.id) : template?.workflow.find(item => item.id === value.id);
+    return `${template?.title ?? value.templateId} / ${value.kind === 'template' ? '整份表式' : target?.label ?? value.id}`;
+  }
+  if (key === 'reviews') return value.map(review => `确认人 ${review.reviewer}\n记录时间 ${review.at}\n确认依据 ${review.evidence}\n对应表式版本 ${JSON.parse(review.definition).template.version ?? '未记录'}`).join('\n\n') || '尚无确认记录';
   if (typeof value === 'boolean') return value ? '是' : '否';
   if (key === 'type') return types[value] ?? String(value);
   if (key === 'kind') return kinds[value] ?? String(value);
@@ -71,16 +78,16 @@ export function definitionDetails(previous, next, beforeTemplates, afterTemplate
       const heading = [...path, labels[key] ?? key];
       if (key === 'discovery') {
         properties(before?.[key], after?.[key], heading);
-      } else if (['fields', 'workflow', 'columns'].includes(key)) {
+      } else if (['fields', 'workflow', 'columns', 'requirements'].includes(key)) {
         const oldItems = before?.[key] ?? [], newItems = after?.[key] ?? [];
         const oldById = new Map(oldItems.map(item => [item.id, item]));
         const newById = new Map(newItems.map(item => [item.id, item]));
         if (!same(oldItems.map(item => item.id), newItems.map(item => item.id))) {
-          details.push({path: [...heading, '排列顺序'].join(' / '), before: oldItems.map(item => item.label).join(' → ') || '无', after: newItems.map(item => item.label).join(' → ') || '无'});
+          details.push({path: [...heading, '排列顺序'].join(' / '), before: oldItems.map(item => item.label ?? item.statement).join(' → ') || '无', after: newItems.map(item => item.label ?? item.statement).join(' → ') || '无'});
         }
         for (const id of new Set([...oldItems, ...newItems].map(item => item.id))) {
           const oldItem = oldById.get(id), newItem = newById.get(id);
-          const itemPath = [...heading, newItem?.label ?? oldItem.label];
+          const itemPath = [...heading, newItem?.label ?? newItem?.statement ?? oldItem.label ?? oldItem.statement];
           if (!oldItem || !newItem) details.push({path: itemPath.join(' / '), before: oldItem ? '存在' : '无', after: newItem ? '新增' : '移除'});
           properties(oldItem, newItem, itemPath);
         }
