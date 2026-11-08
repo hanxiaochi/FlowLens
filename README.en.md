@@ -48,7 +48,7 @@ The team app now separates fields still due at the current stage, issues in comp
 
 The review list now supports issue categories, record/summary search, and records your assigned roles can handle. Returning from a record preserves the filters and page. Downloads still include the whole project.
 
-Project review was introduced in **1.19.0-rc.2** and is included in 1.20. At that stage, all 158 local tests passed, including attachment and report capacity limits, search across pages, and role-based review filters. Pagination, record navigation, downloading, and narrow-screen reading have been checked in the browser. Complete PDF pagination checks and post-upgrade production browser interaction acceptance remain pending. See the [delivery plan (Chinese)](docs/delivery-plan.md).
+Project review was introduced in **1.19.0-rc.2** and is included in 1.20. At that stage, all 158 local tests passed, including attachment and report capacity limits, search across pages, and role-based review filters. Pagination, record navigation, downloading, and narrow-screen reading have been checked in the browser. Production browser filtering, record navigation, and complete report downloads passed. A downloaded cloud backup was restored and verified on Windows. Complete PDF pagination acceptance remains pending. See the [delivery plan (Chinese)](docs/delivery-plan.md).
 
 ## 1.18 take your project ledger into Excel
 
