@@ -1,4 +1,5 @@
 import {uid} from './forms-model.mjs';
+import {FIELD_TYPES} from './forms-schema.mjs';
 
 export const requirementStatusLabels = {pending: '待确认', confirmed: '已记录确认', changed: '需重新确认', missing: '关联对象已移除'};
 
@@ -112,12 +113,62 @@ export function retainRequirementHistory(previous, incoming) {
   return incoming;
 }
 
+export function requirementDefinitionText(serialized) {
+  let definition;
+  try { definition = JSON.parse(serialized); } catch { return '快照无法生成摘要，请核对完整定义。'; }
+  const template = definition?.template;
+  if (!template || !Array.isArray(template.fields) || !Array.isArray(template.workflow) ||
+      !template.fields.every(field => field && typeof field.label === 'string') ||
+      !template.workflow.every(stage => stage && typeof stage.label === 'string')) return '这份历史快照的摘要字段不完整，请核对完整定义。';
+  const stageName = id => id === 'draft' ? '填报阶段' : template.workflow.find(stage => stage.id === id)?.label ?? id ?? '未记录';
+  const fieldName = id => template.fields.find(field => field.id === id)?.label ?? id ?? '未记录';
+  const target = definition.target;
+  const targetName = target?.kind === 'field' ? fieldName(target.id) : target?.kind === 'stage' ? stageName(target.id) : target?.kind === 'template' ? '整份表式' : '未记录关联对象';
+  function fieldText(field) {
+    const details = [field.label, FIELD_TYPES[field.type ?? 'text'] ?? field.type, field.required ? '必填' : '选填'];
+    if (field.unit) details.push('单位 ' + field.unit);
+    if (field.min !== undefined) details.push('最小值 ' + field.min);
+    if (field.max !== undefined) details.push('最大值 ' + field.max);
+    if (Array.isArray(field.options)) details.push('选项 ' + field.options.join('、'));
+    if (field.sum !== undefined) details.push(field.sum ? '计算合计' : '不计算合计');
+    return details.join(' · ');
+  }
+  const fields = template.fields.flatMap(field => [
+    fieldText(field) + ' · 在' + stageName(field.owner) + '填写',
+    ...(Array.isArray(field.columns) ? field.columns.filter(column => column && typeof column.label === 'string').map(column => '  明细列 ' + fieldText(column)) : [])
+  ]);
+  const workflow = template.workflow.map(stage => {
+    const action = {review: '审核', issue: '签发', receipt: '签收'}[stage.kind] ?? stage.kind ?? '未记录办理方式';
+    const returning = stage.kind === 'receipt' ? '签收后继续' : '可退回至' + stageName(stage.returnTo ?? 'draft');
+    return `${stage.label} · 由${stage.role ?? '待安排'}办理 · ${action} · ${returning}`;
+  });
+  const rules = (Array.isArray(template.decisionRules) ? template.decisionRules : []).filter(rule => rule && typeof rule === 'object').map(rule =>
+    `${stageName(rule.stageId)}继续办理时，${fieldName(rule.fieldId)}为“${rule.equals}”，退回至${stageName(rule.returnTo)}，填写退回原因。`);
+  const bindings = (Array.isArray(definition.bindings) ? definition.bindings : []).filter(binding => binding?.templateId === template.id).map(binding =>
+    `${fieldName(binding.fieldId)}从项目${{name: '名称', contractor: '施工单位'}[binding.key] ?? binding.key}带入`);
+  const relations = (Array.isArray(definition.relations) ? definition.relations : []).filter(relation => relation && [relation.from, relation.to].includes(template.id)).map(relation => {
+    const mappings = (Array.isArray(relation.mappings) ? relation.mappings : []).filter(mapping => mapping && typeof mapping === 'object').map(mapping =>
+      `${relation.from === template.id ? fieldName(mapping.from) : mapping.from} → ${relation.to === template.id ? fieldName(mapping.to) : mapping.to}`);
+    return `${relation.label ?? '关联业务'}\n${mappings.join('\n') || '无字段带入'}`;
+  });
+  return [
+    `${template.title ?? '历史表式'} · 版本 ${template.version ?? '未记录'}`, '关联对象\n' + targetName,
+    '当时的需求描述\n' + (definition.statement ?? '未记录'), '当时的原文与出处\n' + (definition.source ?? '未记录'),
+    '记录来源\n' + ({manual: '人工录入', ai: 'AI 建议'}[definition.origin] ?? '未记录'),
+    '发起角色\n' + (template.submitterRole ?? '填报人'), '字段要求\n' + (fields.join('\n') || '无填写字段'),
+    '办理顺序\n' + (workflow.join('\n') || '未记录办理阶段'), '条件退回\n' + (rules.join('\n') || '未配置条件退回'),
+    '项目资料带入\n' + (bindings.join('\n') || '无项目资料映射'),
+    '关联业务与字段带入\n' + (relations.join('\n\n') || '无关联业务'),
+    '其他表的字段使用快照中保存的编号。原表布局及完整属性可在完整定义中核对。'
+  ].join('\n\n');
+}
+
 export function requirementsText(app, templates) {
   validateRequirements(app.requirements);
   const sections = (app.requirements ?? []).map(entry => {
     const target = requirementTarget(app, templates, entry.target);
     const title = target ? `${target.template.title} / ${target.item.label ?? target.item.title}` : `${entry.target.templateId} / ${entry.target.id}`;
-    const history = entry.reviews.map(review => `确认人 ${review.reviewer}\n记录时间 ${review.at}\n确认依据 ${review.evidence}\n当时定义\n${review.definition}`).join('\n\n');
+    const history = entry.reviews.map(review => `确认人 ${review.reviewer}\n记录时间 ${review.at}\n确认依据 ${review.evidence}\n当时定义摘要\n${requirementDefinitionText(review.definition)}\n\n完整定义快照\n${review.definition}`).join('\n\n');
     return `${entry.statement}\n关联 ${title}\n来源 ${entry.origin === 'ai' ? 'AI 建议' : '人工录入'}\n材料原文或出处\n${entry.source}\n当前状态 ${requirementStatusLabels[requirementStatus(app, templates, entry)]}\n\n${history || '尚无确认记录'}`;
   });
   return [app.name + ' · 需求依据与确认记录', '确认人及依据由记录者填写；团队发布操作按现有账号审计。', ...sections].join('\n\n');

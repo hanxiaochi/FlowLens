@@ -1,6 +1,6 @@
 import {applicationDelivery} from './apps-delivery.js';
 import {summarizeRecord} from './forms-model.mjs';
-import {saveRequirement, confirmRequirement, requirementDefinition, requirementStatus, requirementStatusLabels, requirementTarget, requirementsText} from './apps-requirements.mjs';
+import {saveRequirement, confirmRequirement, requirementDefinition, requirementStatus, requirementStatusLabels, requirementTarget, requirementsText, requirementDefinitionText} from './apps-requirements.mjs';
 import {createApplication, createProject, startProjectCase, validateRelation, applicationPackage, discoveryFields, discoveryText} from './apps-model.mjs';
 
 const element = (tag, text, className) => {
@@ -166,7 +166,7 @@ export function renderApplications(host, {workspace, appId, projectId, role, onS
       if (target) card.append(button('查看表式与规则', () => { list.close(); onOpen('templates', target.template.id); }), button('记录业务确认', () => recordReview(entry)));
       for (const review of [...entry.reviews].reverse()) {
         const history = element('details');
-        history.append(element('summary', `${review.at} · ${review.reviewer}`), element('p', review.evidence), element('pre', review.definition));
+        history.append(element('summary', `${new Date(review.at).toLocaleString('zh-CN', {hour12: false})} · ${review.reviewer}`), element('p', review.evidence), definitionView(review.definition));
         card.append(history);
       }
       list.append(card);
@@ -204,7 +204,7 @@ export function renderApplications(host, {workspace, appId, projectId, role, onS
       const expectedDefinition = requirementDefinition(app, templates, entry.id);
       const reviewer = element('input'); reviewer.maxLength = 200;
       const evidence = element('textarea'); evidence.rows = 4; evidence.maxLength = 4000;
-      const snapshot = element('details'); snapshot.append(element('summary', '本次对应的定义'), element('pre', expectedDefinition));
+      const snapshot = element('details'); snapshot.append(element('summary', '本次对应的定义'), definitionView(expectedDefinition));
       dialog.append(element('p', entry.statement), element('p', entry.source), field('确认人称呼', reviewer), field('确认依据与结论', evidence), snapshot,
         button('下载当前确认草稿', () => download('FlowLens-确认草稿.json', JSON.stringify({requirementId: entry.id, reviewer: reviewer.value, evidence: evidence.value, expectedDefinition}, null, 2))),
         button('保存本次确认记录', async () => {
@@ -217,6 +217,14 @@ export function renderApplications(host, {workspace, appId, projectId, role, onS
         }, 'primary'));
       protectDraft(dialog, [reviewer, evidence]);
     }
+  }
+
+  function definitionView(serialized) {
+    const view = element('div');
+    const raw = element('details');
+    raw.append(element('summary', '完整定义 · 研发核对'), element('pre', serialized));
+    view.append(element('pre', requirementDefinitionText(serialized)), raw);
+    return view;
   }
 
   function editDiscovery() {

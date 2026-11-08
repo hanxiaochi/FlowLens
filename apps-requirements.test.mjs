@@ -4,7 +4,7 @@ import {applicationDemo} from './apps-demo.mjs';
 import {applicationPackage} from './apps-model.mjs';
 import {upgradeWorkspace} from './forms-store.mjs';
 import {prepareProjectRestore} from './team-project-restore.mjs';
-import {saveRequirement, confirmRequirement, requirementDefinition, requirementStatus, validateRequirements, requirementsText} from './apps-requirements.mjs';
+import {saveRequirement, confirmRequirement, requirementDefinition, requirementStatus, validateRequirements, requirementsText, requirementDefinitionText} from './apps-requirements.mjs';
 
 function fixture(kind = 'field') {
   const workspace = applicationDemo();
@@ -100,4 +100,39 @@ test('project copies remap linked targets and retain the original confirmation f
     assert.deepEqual(restoredApp.requirements[0].reviews, app.requirements[0].reviews);
     assert.notEqual(restoredApp.requirements[0].target.templateId, app.requirements[0].target.templateId);
   }
+});
+
+test('historical summaries explain original fields, actors and conditions without changing confirmation identity', () => {
+  const workspace = applicationDemo();
+  const template = workspace.templates.find(item => item.id === 'app-reply');
+  const app = saveRequirement(workspace.applications[0], workspace.templates, {
+    statement: '复查不通过退回填报', source: '虚构访谈原文', origin: 'manual',
+    target: {kind: 'stage', templateId: template.id, id: template.workflow[0].id}
+  });
+  const id = app.requirements[0].id;
+  const serialized = requirementDefinition(app, workspace.templates, id);
+  const summary = requirementDefinitionText(serialized);
+  assert.match(summary, /整改回复单 · 版本/);
+  assert.match(summary, /监理复查 · 由专业监理办理/);
+  assert.match(summary, /复查结论为“不通过”，退回至填报阶段/);
+  assert.match(summary, /整改说明 · 文字 · 必填/);
+  assert.match(summary, /选项 通过、不通过/);
+  assert.match(summary, /项目名称从项目名称带入/);
+  const saved = confirmRequirement(app, workspace.templates, id, {reviewer: '测试确认人', evidence: '样例', expectedDefinition: serialized});
+  workspace.templates.find(item => item.id === 'app-reply').workflow[0].role = '新角色';
+  assert.match(requirementDefinitionText(saved.requirements[0].reviews[0].definition), /由专业监理办理/);
+  assert.ok(!requirementDefinitionText(serialized).includes('新角色'));
+  assert.equal(saved.requirements[0].reviews[0].definition, serialized);
+  assert.equal(requirementStatus(saved, workspace.templates, saved.requirements[0]), 'changed');
+  assert.ok(requirementsText(saved, workspace.templates).includes(serialized));
+});
+
+test('definition summaries retain detail constraints and tolerate incomplete historical snapshots', () => {
+  const {app, workspace, id} = fixture();
+  const serialized = requirementDefinition(app, workspace.templates, id);
+  const summary = requirementDefinitionText(serialized);
+  assert.match(summary, /明细列 数量 · 数字/);
+  assert.match(summary, /计算合计/);
+  assert.match(requirementDefinitionText('{'), /无法生成摘要/);
+  assert.match(requirementDefinitionText(JSON.stringify({template: {title: '旧快照'}, target: {}})), /摘要字段不完整/);
 });

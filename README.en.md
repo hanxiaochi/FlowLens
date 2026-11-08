@@ -34,6 +34,8 @@ Requirement evidence can now link source text to a form, field, or workflow step
 
 The team publication preview now shows readable changes to requirement statements, sources, linked objects, and review history, along with the review statuses that will change. Browser upload, preview, and publication passed on an isolated fictional instance. Existing records and review history matched after publication. Checks at a 390-pixel viewport and all 167 local tests passed.
 
+Expanded review history now explains the original field requirements, detail columns, responsible roles, and conditional returns. The complete definition opens separately, and downloads retain both the summary and original snapshot. Browser checks covered historical summaries and narrow-screen expansion, with all 169 local tests passing. Fields in other forms currently use the identifiers saved in the historical snapshot.
+
 The team app now separates fields still due at the current stage, issues in completed stages, and attachments whose verification is incomplete. Open a record from the review and return to the same page. Download a readable HTML checklist for review or printing without additional software.
 
 [Candidate user guide](docs/project-review-guide.en.md)
