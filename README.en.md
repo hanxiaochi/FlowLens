@@ -10,7 +10,7 @@ No installation or API key needed. Start with a fictional supervision applicatio
 
 FlowLens helps business users, implementation consultants, and forward-deployed engineers discuss requirements through working examples. Start with Word forms, natural language, or screenshots, review fields and workflow rules, then explore data changes and deployment choices before handing the design to developers.
 
-Today you can try form workflows, interaction simulations, and exports of application definitions and API/SQL drafts. Imported Word forms need field and layout review. AI inputs require a configured model endpoint; the public demo uses built-in examples. Next, we plan to bring source references, open questions, and business confirmation records into the product so developers can trace the reasoning behind each rule. See the [next-stage plan (Chinese)](docs/delivery-plan.md#discovery-next).
+Today you can try form workflows, interaction simulations, and exports of application definitions and API/SQL drafts. Imported Word forms need field and layout review. AI inputs require a configured model endpoint; the public demo uses built-in examples. The 1.20 candidate includes source references, open questions, and business confirmation records so developers can trace the reasoning behind each rule. See the [next-stage plan (Chinese)](docs/delivery-plan.md#discovery-next).
 
 ![Fictional inspection form under review](docs/images/forms-demo.png)
 
