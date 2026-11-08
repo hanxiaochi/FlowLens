@@ -951,3 +951,5 @@ D03 场景运行提交 abd8e7acdec09f098966d762ec18a9905ce3d4cb 的 CI 425051449
 浏览器勾选虚构需求、运行、保存、刷新并重新打开历史成功。实际下载历史与 ZIP 中 scenarioRuns 完全一致，来源快照与当前所选原文一致，原单据及需求历史保持。解压交付 ZIP 后 verify-app.mjs 通过。ZIP SHA256 为 42671e90fa7b882f12feefce87e6cb7f162795d0b7ce7c05a8931eb18c40db13，证据 outputs/FlowLens-discovery-qa/chain-history-checks.json。
 
 下一步进入 D04，整合需求覆盖、待确认问题、过期证据和开发合同草案的交接入口。跨表历史团队浏览器发布、并发保存和恢复副本直接验收仍保留检查项。新增能力尚未发行或上线，提交后核对跨平台 CI。
+
+跨表历史提交 bbd67e017cdfd3e43588dae0e5d8b6888a4386b3 的 CI 42508337487 已逐项核对，Windows、Ubuntu 测试和构建、容器及 Compose 全部通过。首次查询遇到 TLS EOF，重试取得同一提交的运行结果。
