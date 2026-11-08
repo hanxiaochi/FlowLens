@@ -1,4 +1,7 @@
+import {discoveryFields} from './apps-model.mjs';
+
 const labels = {
+  ...Object.fromEntries(discoveryFields), discovery: '需求工作单',
   title: '名称', name: '名称', version: '版本', code: '表号', source: '来源',
   submitterRole: '发起角色', fields: '填写区', workflow: '办理流程', summaryFields: '清单摘要',
   templateIds: '应用表式', relations: '单据关联', bindings: '项目资料带入',
@@ -65,7 +68,9 @@ export function definitionDetails(previous, next, beforeTemplates, afterTemplate
     for (const key of Object.keys({...before, ...after})) {
       if (key === 'id' || (key === 'version' && path.length === 0) || same(before?.[key], after?.[key])) continue;
       const heading = [...path, labels[key] ?? key];
-      if (['fields', 'workflow', 'columns'].includes(key)) {
+      if (key === 'discovery') {
+        properties(before?.[key], after?.[key], heading);
+      } else if (['fields', 'workflow', 'columns'].includes(key)) {
         const oldItems = before?.[key] ?? [], newItems = after?.[key] ?? [];
         const oldById = new Map(oldItems.map(item => [item.id, item]));
         const newById = new Map(newItems.map(item => [item.id, item]));

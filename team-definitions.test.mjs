@@ -9,6 +9,7 @@ import {createTeamServer} from './team-server.mjs';
 import http from 'node:http';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {discoveryFields} from './apps-model.mjs';
 
 const password = 'publication-test-password';
 const optionsFor = plan => ({operationId: crypto.randomUUID(), planFingerprint: plan.planFingerprint, expectedUserId: plan.userId, expectedInstanceId: plan.instanceId});
@@ -23,6 +24,28 @@ async function setup() {
   store.setMembership(admin, {userId: admin.id, projectId: initial.projects[0].id, roles: ['专业监理']});
   return {directory, store, admin, other, member, initial};
 }
+
+test('discovery publication requires admin, shows readable changes and rejects stale plans', async () => {
+  const {directory, store, admin, other, member, initial} = await setup();
+  try {
+    const incoming = structuredClone(initial);
+    incoming.applications[0].discovery = {version: 1, ...Object.fromEntries(discoveryFields.map(([key]) => [key, '']))};
+    incoming.applications[0].discovery.problem = '重复录入';
+    const plan = store.previewDefinitions(admin, incoming);
+    const competing = store.previewDefinitions(other, incoming);
+    assert.ok(plan.changes[0].details.some(item => item.path === '需求工作单 / 谁遇到了什么问题' && item.after === '重复录入'));
+    assert.throws(() => store.previewDefinitions(member, incoming), error => error.status === 403);
+    const savedCases = store.visibleWorkspace(admin).workspace.cases;
+    store.publishDefinitions(admin, incoming, optionsFor(plan));
+    assert.deepEqual(store.visibleWorkspace(admin).workspace.applications[0].discovery, incoming.applications[0].discovery);
+    assert.deepEqual(store.visibleWorkspace(admin).workspace.cases, savedCases);
+    assert.throws(() => store.publishDefinitions(other, incoming, optionsFor(competing)), error => error.status === 409);
+    const invalid = structuredClone(incoming);
+    invalid.applications[0].discovery.problem = 'x'.repeat(8001);
+    assert.throws(() => store.previewDefinitions(admin, invalid), /8000/);
+    assert.equal(store.visibleWorkspace(admin).workspace.applications[0].discovery.problem, '重复录入');
+  } finally { store.close(); await rm(directory, {recursive: true, force: true}); }
+});
 
 test('definition preview is read-only and guarded publication rejects a competing baseline', async () => {
   const {directory, store, admin, other, initial} = await setup();

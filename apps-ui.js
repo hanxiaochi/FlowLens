@@ -1,6 +1,6 @@
 import {applicationDelivery} from './apps-delivery.js';
 import {summarizeRecord} from './forms-model.mjs';
-import {createApplication, createProject, startProjectCase, validateRelation, applicationPackage} from './apps-model.mjs';
+import {createApplication, createProject, startProjectCase, validateRelation, applicationPackage, discoveryFields, discoveryText} from './apps-model.mjs';
 
 const element = (tag, text, className) => {
   const node = document.createElement(tag);
@@ -78,6 +78,7 @@ export function renderApplications(host, {workspace, appId, projectId, role, onS
   const heading = element('div');
   heading.append(element('span', 'YOUR BUSINESS WORKSPACE', 'eyebrow'), element('h2', app.name), element('p', '选择项目，查看待办，从业务入口开始办理。'));
   const controls = element('div', undefined, 'application-controls');
+  controls.append(button('需求工作单', editDiscovery));
   const projectChoice = choice([['', '请选择项目'], ...projects.map(item => [item.id, item.name])], projectId);
   projectChoice.onchange = () => { if (guard()) onSelect(appId, projectChoice.value); else projectChoice.value = projectId; };
   controls.append(field('当前项目', projectChoice), button('＋ 新建项目', () => {
@@ -137,6 +138,41 @@ export function renderApplications(host, {workspace, appId, projectId, role, onS
     journey.append(card);
   }
   host.append(journey);
+
+  function editDiscovery() {
+    const dialog = modal('需求工作单');
+    dialog.append(element('p', '记录现场讨论。每份材料写明名称、版本和位置；尚不清楚的内容留空，导出时显示待确认。工作单随整个应用共享。拟确认人可填写称呼，业务确认结果将在后续规则追踪中记录。'));
+    const inputs = new Map();
+    for (const [key, label] of discoveryFields) {
+      const input = element('textarea');
+      input.rows = 3;
+      input.maxLength = 8000;
+      input.value = app.discovery?.[key] ?? '';
+      input.placeholder = '待确认';
+      inputs.set(key, input);
+      dialog.append(field(label, input));
+    }
+    const initial = [...inputs.values()].map(input => input.value);
+    const dirty = () => [...inputs.values()].some((input, index) => input.value !== initial[index]);
+    const draft = () => ({version: 1, ...Object.fromEntries([...inputs].map(([key, input]) => [key, input.value]))});
+    const beforeUnload = event => { if (dirty()) { event.preventDefault(); event.returnValue = ''; } };
+    window.addEventListener('beforeunload', beforeUnload);
+    const close = () => { if (!dirty() || window.confirm('工作单尚未保存，确定关闭并放弃本次修改？')) dialog.close(); };
+    dialog.querySelector('button').onclick = close;
+    dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
+    dialog.addEventListener('close', () => window.removeEventListener('beforeunload', beforeUnload));
+    dialog.append(button('下载当前工作单', () => download('FlowLens-需求工作单.txt', discoveryText({...app, discovery: draft()}), 'text/plain;charset=utf-8')),
+      button('保存需求工作单', async () => {
+        const value = draft();
+        await mutate(next => {
+          const target = next.applications.find(item => item.id === app.id);
+          if (!target) throw Error('应用已不存在，请先下载当前工作单');
+          target.discovery = value;
+        });
+        dialog.close();
+        say('需求工作单已保存，可随应用工作包导出。');
+      }, 'primary'));
+  }
 
   function configure() {
     const dialog = modal('关联关系与项目资料');

@@ -1,10 +1,11 @@
 import {zipSync, strToU8} from './forms-vendor/fflate.js';
-import {applicationPackage} from './apps-model.mjs';
+import {applicationPackage, discoveryText} from './apps-model.mjs';
 import {formOpenApi, formSql, formBrief} from './forms-system.mjs';
 
 export async function applicationDelivery(workspace, appId) {
   const pack = applicationPackage(workspace, appId);
   const files = {'application.json': strToU8(JSON.stringify(pack, null, 2))};
+  files['discovery.txt'] = strToU8(discoveryText(pack.applications[0]));
   const definitions = new Map([...pack.templates,...pack.cases.map(record=>record.template)].map(template=>[template.id+'@'+template.version,template]));
   for (const template of definitions.values()) {
     const prefix = 'contracts/' + encodeURIComponent(template.id) + '-v' + template.version;

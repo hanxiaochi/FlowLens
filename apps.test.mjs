@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {applicationDemo} from './apps-demo.mjs';
-import {startProjectCase, applicationPackage, createProject, validateRelation} from './apps-model.mjs';
+import {startProjectCase, applicationPackage, createProject, validateRelation, discoveryFields, discoveryText} from './apps-model.mjs';
 import {applyOperation} from './forms-model.mjs';
 import {validateWorkspace, upgradeWorkspace, commitWorkspace} from './forms-store.mjs';
 import {proposeRule, acceptRule} from './forms-rules.mjs';
@@ -10,6 +10,28 @@ import {printableForm} from './forms-print.mjs';
 import {verifyTemplate} from './forms-acceptance.mjs';
 import {formSql, formSystem, formOpenApi} from './forms-system.mjs';
 import {PGlite} from '@electric-sql/pglite';
+
+test('discovery worksheet survives application export and rejects malformed imports without changing saved state', async () => {
+  const original = applicationDemo();
+  assert.equal(upgradeWorkspace(original).applications[0].discovery, undefined);
+  assert.match(discoveryText(original.applications[0]), /待确认/);
+  const draft = structuredClone(original);
+  const discovery = {version: 1, ...Object.fromEntries(discoveryFields.map(([key]) => [key, '']))};
+  discovery.problem = '现场整改重复录入';
+  discovery.sources = '样例指令单\n2025 版，第 2 页';
+  draft.applications[0].discovery = discovery;
+  const restored = upgradeWorkspace(applicationPackage(draft, draft.applications[0].id));
+  assert.deepEqual(restored.applications[0].discovery, discovery);
+  assert.match(discoveryText(restored.applications[0]), /2025 版，第 2 页/);
+  for (const bad of [null, [], {...discovery, version: 2}, {...discovery, owner: 1}, {...discovery, problem: 'x'.repeat(8001)}, {...discovery, approved: true}]) {
+    const incoming = structuredClone(draft);
+    incoming.applications[0].discovery = bad;
+    assert.throws(() => validateWorkspace(incoming));
+  }
+  await assert.rejects(commitWorkspace(original, next => { next.applications[0].discovery = discovery; }, async () => { throw Error('WORKSPACE_CONFLICT'); }), /WORKSPACE_CONFLICT/);
+  assert.equal(original.applications[0].discovery, undefined);
+  assert.equal(draft.applications[0].discovery.problem, '现场整改重复录入');
+});
 
 function operate(workspace, record, type, values = {}, note = '') {
   const role = record.status === 'draft' ? record.submitter : record.template.workflow[record.step].role;

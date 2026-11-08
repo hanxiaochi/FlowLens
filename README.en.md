@@ -26,6 +26,8 @@ Today you can try form workflows, interaction simulations, and exports of applic
 
 ## Release candidate: review project records before handoff
 
+The main branch also includes an unreleased discovery worksheet. Record the business problem, current process, acceptance criteria, source references, and open questions from the application home. Saved notes travel with the application package, and the delivery ZIP includes a readable text copy. Team administrators can review individual changes when publishing application updates. Rule-level source links and confirmation history remain planned. This feature has not been deployed to the public demo or production cloud.
+
 The team app now separates fields still due at the current stage, issues in completed stages, and attachments whose verification is incomplete. Open a record from the review and return to the same page. Download a readable HTML checklist for review or printing without additional software.
 
 [Candidate user guide](docs/project-review-guide.en.md)
