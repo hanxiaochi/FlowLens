@@ -38,7 +38,7 @@ Today you can try form workflows, interaction simulations, and exports of applic
 
 Review and single-form evidence track the linked form; cross-form history tracks the complete application definition. Team publication previews show affected records. Older packages inherit existing histories, and publication rejects history removal or replacement. An application can retain 10 cross-form reports of up to two million characters each. Participants still need to check requirement coverage and business meaning.
 
-All 183 local tests passed. Browser checks covered saving, reloads, downloads, selected concurrent-edit cases, and narrow screens. Downloaded delivery packages were extracted and executed. Real business trials, production authorization, and deployment acceptance remain tracked in the [development plan (Chinese)](docs/delivery-plan.md#discovery-next).
+All 183 local tests passed. Browser checks covered saving, reloads, downloads, cross-tab conflicts for scenario history and observations, retained draft downloads, and narrow screens. Downloaded delivery packages were extracted and executed. Real business trials, production authorization, and deployment acceptance remain tracked in the [development plan (Chinese)](docs/delivery-plan.md#discovery-next).
 
 The team app now separates fields still due at the current stage, issues in completed stages, and attachments whose verification is incomplete. Open a record from the review and return to the same page. Download a readable HTML checklist for review or printing without additional software.
 
