@@ -938,3 +938,5 @@ D03 场景运行提交 abd8e7acdec09f098966d762ec18a9905ce3d4cb 的 CI 425051449
 178 项本地测试和两类构建通过，覆盖三表链路、原工作区保持、映射值、条件失败时保留输入、分支路径和容量上限。浏览器实际完成运行，13 项通过、3 张虚构单据；运行前后实际下载工作包完全相同。实际下载 ZIP 的 application.json 与工作包一致，解压后 node verify-app.mjs 成功并包含 13 项跨表结果。ZIP SHA256 为 a3698cc121e07e9b689ce8609fba6beb0fd2ee37fcdd784cd0ead402a894de4f，证据 outputs/FlowLens-discovery-qa/chain-download-checks.json。文本状态显示进一步改为中文，模块回归继续核对。
 
 下一步整合跨表报告保存、需求关联及开发交接清单。新增功能尚未正式发行或部署，真实业务、维护交接和云端验收仍按原目标推进。
+
+跨表场景提交 5fdcdf500a2d98d7f1c53970f9f1f83a84905262 的 CI 42507486840 已逐项核对，Windows、Ubuntu 测试和构建、容器及 Compose 验收全部通过。
