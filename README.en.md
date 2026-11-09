@@ -50,6 +50,8 @@ The review list now supports issue categories, record/summary search, and record
 
 Project review was introduced in **1.19.0-rc.2** and is included in 1.20. At that stage, all 158 local tests passed, including attachment and report capacity limits, search across pages, and role-based review filters. Pagination, record navigation, downloading, and narrow-screen reading have been checked in the browser. Production browser filtering, record navigation, and complete report downloads passed. A downloaded cloud backup was restored and verified on Windows. Complete PDF pagination acceptance remains pending. See the [delivery plan (Chinese)](docs/delivery-plan.md).
 
+On November 9, 2026, an authorized production host reboot verified automatic recovery of the app, HTTPS gateway, and backup timer. Five-account business data and all four attachments matched the pre-reboot baseline. Operator handoff and real business trials remain outstanding. [Acceptance record (Chinese)](docs/delivery-readiness-2026-11-04.md)
+
 ## 1.18 take your project ledger into Excel
 
 The team app now exports an XLSX workbook with one row per record and separate detail sheets linked by record ID. Different historical form structures get separate sheets. Long identifiers, leading zeros, and formula-like input remain text. Use this workbook for review and handoff; use the project archive for attachments, workflow history, and recovery.
